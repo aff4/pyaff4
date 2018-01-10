@@ -1,6 +1,3 @@
-[submodule "third_party/gtest"]
-	path = third_party/gtest
-	url = https://github.com/google/googletest.git
-[submodule "pyaff4/test_images"]
-	path = pyaff4/test_images
-	url = https://github.com/aff4/ReferenceImages.git
+[submodule "test_images"]
+        path = test_images
+        url = https://github.com/aff4/ReferenceImages.git
