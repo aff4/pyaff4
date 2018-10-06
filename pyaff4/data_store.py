@@ -238,6 +238,10 @@ class MemoryDataStore(object):
     def DeleteSubject(self, subject):
         self.store.pop(rdfvalue.URN(subject), None)
 
+    # FIXME: This is a big API breaking change - we simply can not
+    # change the type we are returning from Get() depending on random
+    # factors. We need to make the store _always_ hold a list for all
+    # members.
     def Add(self, subject, attribute, value):
         subject = rdfvalue.URN(subject).SerializeToString()
         attribute = rdfvalue.URN(attribute).SerializeToString()
@@ -284,6 +288,14 @@ class MemoryDataStore(object):
     def Close(self, obj):
         self.ObjectCache.Remove(obj)
 
+    def _should_ignore(self, attr, type):
+        if not isinstance(type, list):
+            type = [type]
+
+        for t in type:
+            if attr in self.suppressed_rdftypes.get(t, ()):
+                return True
+
     def DumpToTurtle(self, stream=None, verbose=False):
         g = rdflib.Graph()
         for urn, items in self.store.items():
@@ -302,7 +314,7 @@ class MemoryDataStore(object):
                     if attr.startswith(lexicon.AFF4_VOLATILE_NAMESPACE):
                         continue
 
-                    if attr in self.suppressed_rdftypes.get(type, ()):
+                    if self._should_ignore(attr, type):
                         continue
 
                 attr = rdflib.URIRef(attr)
@@ -315,6 +327,7 @@ class MemoryDataStore(object):
         result = g.serialize(format='turtle')
         if stream:
             stream.write(result)
+
         return result
 
     def LoadFromTurtle(self, stream):
@@ -391,7 +404,7 @@ class MemoryDataStore(object):
         return obj
 
     def Dump(self, verbose=False):
-        print(self.DumpToTurtle(verbose=verbose))
+        print(utils.SmartUnicode(self.DumpToTurtle(verbose=verbose)))
         self.ObjectCache.Dump()
 
     def isImageStream(self, subject):
