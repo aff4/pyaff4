@@ -14,11 +14,14 @@ AFF4 Standard v1.0. Canonical images are provided in the AFF4 Reference Images g
 project at https://github.com/aff4/ReferenceImages
 
 1. Reading ZipFile style volumes.
+2. Reading striped ZipFile volumes.
 2. Reading AFF4 Image streams using the deflate or snappy compressor.
-3. Reading RDF metadata using Turtle (and in some instances YAML for backwards compatibility).
-4. Map streams.
+3. Reading RDF metadata using both YAML and Turtle.
+4. Verification of linear and block hashed images.
+5. Writing ZipFile style volumes.
 
 ## What is in progress
+
 1. Logical file acquisition.
 
  ## What is not yet supported:
@@ -32,10 +35,12 @@ the AFF4 that have not yet been implemented in this codebase include:
 4. Reading RDF metadata using both YAML and Turtle.
 5. Verification of linear and block hashed images.
 6. Writing ZipFile style volumes
+7. Appending to ZipFile volumes
 
 ## Notice
 
-This is not an official Google product (experimental or otherwise), it is just code that happens to be owned by Google and Schatz Forensic.
+This is not an official Google product (experimental or otherwise), it is just
+code that happens to be owned by Google and Schatz Forensic.
 
 ## References
 [1] "Extending the advanced forensic format to accommodate multiple data sources,
