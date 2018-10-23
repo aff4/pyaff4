@@ -97,34 +97,7 @@ class LogicalTest(unittest.TestCase):
         finally:
             os.unlink(containerName)
 
-    def testSegmentAndImageStream(self):
-        containerName = "/tmp/test.aff4"
-        try:
-            container_urn = rdfvalue.URN.FromFileName(containerName)
-            with data_store.MemoryDataStore() as resolver:
-                urn = None
-                with container.Container.createURN(resolver, container_urn) as volume:
-                    src = io.BytesIO("hello")
-                    urn = volume.writeLogical(u"information.turtle", src, 10)
 
-                    testImagesPath
-
-
-            with container.Container.openURNtoContainer(container_urn) as volume:
-                images = list(volume.images())
-                self.assertEqual(1, len(images), "Only one logical image")
-                self.assertEqual("information.turtle", images[0].name(), "information.turtle should be escaped")
-
-                try:
-                    with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
-                        txt = fd.read(10000000)
-                        self.assertEqual("hello", txt, "escaped file returned")
-                except Exception:
-                    traceback.print_exc()
-                    self.fail("content of information.turtle is wrong")
-
-        finally:
-            os.unlink(containerName)
 
 if __name__ == '__main__':
     unittest.main()

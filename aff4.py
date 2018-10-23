@@ -253,6 +253,3 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv)
-    #addFile("/Users/bradley/git/pyaff4/test_images/AFF4-L/dream.aff4", "/Users/bradley/git/pyaff4/test_images/AFF4-L/dream.txt")
-    #addFileBaseFile("/Users/bradley/git/pyaff4/test_images/AFF4-L/dream.aff4","/Users/bradley/git/pyaff4/test_images/AFF4-L", "information.turtle")
-    #addFile("/Users/bradley/git/pyaff4/test_images/AFF4-L/dream.aff4", "/Users/bradley/git/pyaff4/test_images/AFF4Std/Base-Linear-AllHashes.aff4")
