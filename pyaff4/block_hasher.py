@@ -469,14 +469,18 @@ class InterimStdValidator(Validator):
                     # Merkel tree inner nodes
                     current_hash = hashes.new(hash_datatype)
 
-                    # FIXME: This is a flaw in the scheme since there
-                    # is no reasonable order specified. We temporarily
-                    # sort the results to get the test to pass but
-                    # this needs to be properly addressed.
-
-                    # We rely on the natural ordering of the map URN's
+                    # The canonical striped images and Evimetry rely on the natural ordering
+                    # (string comparison) of the map URN's
                     # as they are stored in the map to order the
                     # blockMapHashes in the Merkel tree.
+                    #
+                    # For example for a striped image composed of two containers, we would have one map per
+                    # container. c1  -- >  aff4://363ac10c-8d8d-4905-ac25-a14aaddd8a41
+                    #            c2  -->   aff4://2dd04819-73c8-40e3-a32b-fdddb0317eac
+                    # At this level of the merkel tree, we order the concatenated hashes based on
+                    # the map URI, so we would calculate the hash from c2 then c1
+                    # TODO: update the specification to reflect this rule
+
                     for parent_map, calculated_hash in sorted(calculated_hashes.items()):
                         current_hash.update(calculated_hash.digest())
 
