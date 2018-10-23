@@ -195,7 +195,7 @@ class Std11Lexicon(StdLexicon):
     lastAccessed = (AFF4_NAMESPACE + "lastAccessed")
     recordChanged = (AFF4_NAMESPACE + "recordChanged")
     birthTime = (AFF4_NAMESPACE + "birthTime")
-    pathName = (AFF4_NAMESPACE + "originalFilename")
+    pathName = (AFF4_NAMESPACE + "originalFileName")
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE

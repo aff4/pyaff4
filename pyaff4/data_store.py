@@ -299,8 +299,11 @@ class MemoryDataStore(object):
             if attr in self.suppressed_rdftypes.get(t, ()):
                 return True
 
-    def DumpToTurtle(self, stream=None, verbose=False):
+    def DumpToTurtle(self, volumeurn, stream=None, verbose=False):
         g = rdflib.Graph()
+        g.bind("aff4", rdflib.Namespace(self.lexicon.base))
+        volumeNamespace = rdflib.Namespace(volumeurn.value)
+
         for urn, items in self.store.items():
             urn = rdflib.URIRef(utils.SmartUnicode(urn))
             type = items.get(utils.SmartUnicode(lexicon.AFF4_TYPE))
@@ -327,9 +330,12 @@ class MemoryDataStore(object):
                 for item in value:
                     g.add((urn, attr, item.GetRaptorTerm()))
 
-        result = g.serialize(format='turtle')
+        result = g.serialize(format='turtle', base=volumeNamespace)
+        result = utils.SmartUnicode(result)
+        basestart = "@base <%s> .\r\n" % volumeurn.value
+        result = basestart + result
         if stream:
-            stream.write(result)
+            stream.write(utils.SmartStr(result))
 
         return result
 

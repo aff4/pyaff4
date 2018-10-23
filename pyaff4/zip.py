@@ -861,7 +861,7 @@ class ZipFile(aff4.AFF4Volume):
             with self.CreateZipSegment(u"information.turtle") as turtle_segment:
                 turtle_segment.compression_method = ZIP_DEFLATE
 
-                self.resolver.DumpToTurtle(stream=turtle_segment)
+                self.resolver.DumpToTurtle(self.urn, stream=turtle_segment)
                 turtle_segment.Flush()
 
             # Write the central directory.

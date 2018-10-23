@@ -268,11 +268,17 @@ class WritableLogicalImageContainer(Container):
 
     def __init__(self, version, volumeURN, resolver, lex):
         super(WritableLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
-        version_urn = self.urn.Append("version.txt")
+
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
+            container_description_urn = self.urn.Append("container.description")
+            with volume.CreateMember(container_description_urn) as container_description_file:
+                container_description_file.Write(SmartStr(volume.urn.value))
+
+            version_urn = self.urn.Append("version.txt")
             with volume.CreateMember(version_urn) as versionFile:
                 # AFF4 logical containers are at v1.1
                 versionFile.Write(SmartStr(u"major=1\nminor=1\ntool=pyaff4\n"))
+
 
     def writeCompressedBlockStream(self, image_urn, filename, readstream):
         with aff4_image.AFF4Image.NewAFF4Image(self.resolver, image_urn, self.urn) as stream:
