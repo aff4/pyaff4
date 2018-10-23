@@ -16,6 +16,7 @@ project at https://github.com/aff4/ReferenceImages
 1. Reading ZipFile style volumes.
 2. Reading AFF4 Image streams using the deflate or snappy compressor.
 3. Reading RDF metadata using Turtle (and in some instances YAML for backwards compatibility).
+4. Map streams.
 
 ## What is in progress
 1. Logical file acquisition.
@@ -25,17 +26,16 @@ project at https://github.com/aff4/ReferenceImages
 The write support in the libraries is currently broken and being worked on. Other aspects of 
 the AFF4 that have not yet been implemented in this codebase include:
 
-1. Encrypted AFF4 volumes.
-2. Persistent data store.
-3. HTTP backed streams.
-4. Splitting an AFF4 Image across multiple volumes.
-5. Map streams.
-6. Support for signed statements or Bill of Materials.
+1. Reading ZipFile style volumes.
+2. Reading striped ZipFile volumes.
+3. Reading AFF4 Image streams using the deflate or snappy compressor.
+4. Reading RDF metadata using both YAML and Turtle.
+5. Verification of linear and block hashed images.
+6. Writing ZipFile style volumes
 
 ## Notice
 
-This is not an official Google product (experimental or otherwise), it is just
-code that happens to be owned by Google.
+This is not an official Google product (experimental or otherwise), it is just code that happens to be owned by Google and Schatz Forensic.
 
 ## References
 [1] "Extending the advanced forensic format to accommodate multiple data sources,
