@@ -17,12 +17,8 @@
 from pyaff4 import data_store, container, logical
 from pyaff4 import escaping
 from pyaff4 import lexicon
-from pyaff4 import rdfvalue
-from pyaff4 import aff4_map
-from pyaff4.container import Container
-from pyaff4 import zip
+from pyaff4 import rdfvalue, linear_hasher, hashes
 import unittest, traceback
-from pyaff4 import utils
 import os, io
 
 """
@@ -35,6 +31,54 @@ class LogicalTest(unittest.TestCase):
     def setUp(self):
         pass
 
+    # create a single path image using the Push API (block by block writing)
+    def createAndReadSinglePathImagePush(self, containerName, pathName, arnPathFragment):
+        try:
+            hasher = linear_hasher.PushHasher([lexicon.HASH_SHA1, lexicon.HASH_MD5])
+
+            container_urn = rdfvalue.URN.FromFileName(containerName)
+            with data_store.MemoryDataStore() as resolver:
+                with container.Container.createURN(resolver, container_urn) as volume:
+                    with volume.newLogicalStream(pathName, 20) as writer:
+                        writer_arn = writer.urn
+
+                        # add in some data using the Push API, hashing while we go
+                        data = "helloworld"
+                        writer.Write(data)
+                        hasher.update(data)
+                        writer.Write(data)
+                        hasher.update(data)
+
+                        # write in the hashes before auto-close
+                        for h in hasher.hashes:
+                            hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
+                            volume.resolver.Add(writer_arn, rdfvalue.URN(lexicon.standard.hash), hh)
+
+
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                self.assertEqual(1, len(images), "Only one logical image")
+                self.assertEqual(pathName, images[0].name(), "unicode filename should be preserved")
+
+                fragment = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+
+                self.assertEqual(arnPathFragment, fragment)
+                try:
+                    with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                        txt = fd.ReadAll()
+                        self.assertEqual("helloworldhelloworld", txt, "content should be same")
+                except Exception:
+                    traceback.print_exc()
+                    self.fail()
+        except Exception:
+            traceback.print_exc()
+            self.fail()
+
+        finally:
+            os.unlink(containerName)
+
+    # create a single path image using the Pull API (Streaming API)
     def createAndReadSinglePathImage(self, containerName, pathName, arnPathFragment):
         try:
             container_urn = rdfvalue.URN.FromFileName(containerName)
@@ -66,6 +110,10 @@ class LogicalTest(unittest.TestCase):
 
         finally:
             os.unlink(containerName)
+
+    def testWindowsUNCLogicalImagePush(self):
+        containerName = "/tmp/test-unc.aff4"
+        self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
 
     def testWindowsUNCLogicalImage(self):
         containerName = "/tmp/test-unc.aff4"

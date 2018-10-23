@@ -182,7 +182,7 @@ def addPathNames(container_name, pathnames, recursive):
                 else:
                     with open(pathname, "rb") as src:
                         hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
-                        urn = volume.writeLogical(pathname, hasher, fsmeta.length)
+                        urn = volume.writeLogicalStream(pathname, hasher, fsmeta.length)
                         fsmeta.urn = urn
                         fsmeta.store(resolver)
                         for h in hasher.hashes:

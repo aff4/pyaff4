@@ -168,6 +168,7 @@ class LinearHasher2:
                 # EOF
                 return
 
+
 class StreamHasher(object):
     def __init__(self, parent, hashDatatypes):
         self.parent = parent
@@ -185,6 +186,24 @@ class StreamHasher(object):
             for h in self.hashes:
                 h.update(data)
         return data
+
+    def getHash(self, dataType):
+        return next(h for h in self.hashes if self.hashToType[h] == dataType)
+
+class PushHasher(object):
+    def __init__(self, hashDatatypes):
+        self.hashes = []
+        self.hashToType = {}
+        for hashDataType in hashDatatypes:
+            h = hashes.new(hashDataType)
+            self.hashToType[h] = hashDataType
+            self.hashes.append(h)
+
+    def update(self, data):
+        datalen = len(data)
+        if datalen > 0:
+            for h in self.hashes:
+                h.update(data)
 
     def getHash(self, dataType):
         return next(h for h in self.hashes if self.hashToType[h] == dataType)

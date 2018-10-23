@@ -94,7 +94,7 @@ class AFF4Image(aff4.AFF4Stream):
             # it.
             volume.children.add(image_urn)
 
-            resolver.Set(image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
+            resolver.Add(image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
                 lexicon.AFF4_IMAGE_TYPE))
 
             resolver.Set(image_urn, lexicon.AFF4_STORED,
@@ -255,7 +255,7 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_length = 0
 
     def _write_metadata(self):
-        self.resolver.Set(self.urn, lexicon.AFF4_TYPE,
+        self.resolver.Add(self.urn, lexicon.AFF4_TYPE,
                           rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
 
         self.resolver.Set(self.urn, lexicon.AFF4_IMAGE_CHUNK_SIZE,
@@ -314,6 +314,17 @@ class AFF4Image(aff4.AFF4Stream):
         self.readptr += len(result)
 
         return result
+
+    def ReadAll(self):
+        res = b""
+        while True:
+            toRead = 32 * 1024
+            data = self.Read(toRead)
+            if data == None or len(data) == 0:
+                # EOF
+                return res
+            else:
+                res += data
 
     def _parse_bevy_index(self, bevy):
         """Read and return the bevy's index.

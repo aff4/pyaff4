@@ -272,6 +272,7 @@ class WritableLogicalImageContainer(Container):
     # logical images geater than this size are stored in ImageStreams
     # smaller ones in Zip Segments
     maxSegmentResidentSize = 1 * 1024 * 1024
+    #maxSegmentResidentSize = 5
 
     def __init__(self, version, volumeURN, resolver, lex):
         super(WritableLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
@@ -293,17 +294,68 @@ class WritableLogicalImageContainer(Container):
                     versionFile.Write(SmartStr(str(self.version)))
 
 
+    # write the logical stream as a compressed block stream using the Stream API
     def writeCompressedBlockStream(self, image_urn, filename, readstream):
         with aff4_image.AFF4Image.NewAFF4Image(self.resolver, image_urn, self.urn) as stream:
             stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
             stream.WriteStream(readstream)
 
+        # write the logical stream as a zip segment using the Stream API
     def writeZipStream(self, image_urn, filename, readstream):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(image_urn) as streamed:
                 streamed.compression_method = zip.ZIP_DEFLATE
                 streamed.WriteStream(readstream)
 
+    # create a file like object for writing a logical image as a new compressed block stream
+    def newCompressedBlockStream(self, image_urn, filename):
+        stream = aff4_image.AFF4Image.NewAFF4Image(self.resolver, image_urn, self.urn)
+        stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
+        return stream
+
+    # create a file like object for writing a logical image as a new zip segment
+    def newZipStream(self, image_urn, filename):
+        with self.resolver.AFF4FactoryOpen(self.urn) as volume:
+            writer = volume.CreateMember(image_urn)
+            writer.compression_method = zip.ZIP_DEFLATE
+            return writer
+
+    # create a file like object for writing a logical image
+    def newLogicalStream(self, filename, length):
+        image_urn = None
+        if self.isAFF4Collision(filename):
+            image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
+        else:
+            image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
+
+        writer = None
+        if length > self.maxSegmentResidentSize:
+            writer = self.newCompressedBlockStream(image_urn, filename)
+        else:
+            writer = self.newZipStream(image_urn, filename)
+
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        return writer
+
+    def writeLogicalStream(self, filename, readstream, length):
+        image_urn = None
+        if self.isAFF4Collision(filename):
+            image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
+        else:
+            image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
+
+        if length > self.maxSegmentResidentSize:
+            self.writeCompressedBlockStream(image_urn, filename, readstream)
+        else:
+            self.writeZipStream(image_urn, filename, readstream)
+            #self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
+
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        return image_urn
 
     def writeLogical(self, filename, readstream, length):
         image_urn = None
