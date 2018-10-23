@@ -72,11 +72,17 @@ class _CompressorStream(object):
         elif self.owner.compression == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
             compressed_chunk = chunk
 
-        self.bevy_index.append((self.bevy_length, len(compressed_chunk)))
-        self.bevy_length += len(compressed_chunk)
+        compressedLen = len(compressed_chunk)
         self.chunk_count_in_bevy += 1
 
-        return compressed_chunk
+        if compressedLen < self.owner.chunk_size - 16:
+            self.bevy_index.append((self.bevy_length, compressedLen))
+            self.bevy_length += compressedLen
+            return compressed_chunk
+        else:
+            self.bevy_index.append((self.bevy_length, self.owner.chunk_size))
+            self.bevy_length += self.owner.chunk_size
+            return chunk
 
 
 class AFF4Image(aff4.AFF4Stream):

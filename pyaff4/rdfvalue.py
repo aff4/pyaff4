@@ -118,6 +118,21 @@ class XSDString(RDFValue):
     def __str__(self):
         return self.value
 
+class XSDDateTime(RDFValue):
+    """A unicode string."""
+    datatype = rdflib.XSD.datetime
+
+    def SerializeToString(self):
+        return utils.SmartStr(self.value)
+
+    def UnSerializeFromString(self, string):
+        self.Set(rdflib.Literal(self.value, datatype=rdflib.XSD.datetime))
+
+    def Set(self, data):
+        self.value = rdflib.Literal(data)
+
+    def __str__(self):
+        return self.value
 
 @functools.total_ordering
 class XSDInteger(RDFValue):
@@ -171,6 +186,8 @@ class RDFHash(XSDString):
     def digest(self):
         return binascii.unhexlify(self.value)
 
+    def shortName(self):
+        return self.datatype[len("http://aff4.org/Schema#"):]
 
 class SHA512Hash(RDFHash):
     datatype = rdflib.URIRef("http://aff4.org/Schema#SHA512")
@@ -241,7 +258,7 @@ class URN(RDFValue):
 
     def SerializeToString(self):
         components = self.Parse()
-        return utils.SmartStr(urllib.parse.urlunparse(components))
+        return utils.SmartUnicode(urllib.parse.urlunparse(components))
 
     def UnSerializeFromString(self, string):
         utils.AssertStr(string)
@@ -293,13 +310,18 @@ class URN(RDFValue):
             component = urllib.parse.quote(component)
 
         # Work around usual posixpath.join bug.
-        component = component.lstrip("/")
-        new_path = posixpath.normpath(posixpath.join(
-            "/", components.path, component))
-
+        #component = component.lstrip("/")
+        #new_path = posixpath.normpath(posixpath.join(
+        #   "/", components.path, component))
+        new_path = None
+        if components.path != u"":
+            new_path = components.path + "/" + component
+        else:
+            new_path = "/" + component
         components = components._replace(path=new_path)
 
-        return URN(urllib.parse.urlunparse(components))
+        # we dont rely on the basic urllib as our IRI scheme is not a regular URL scheme
+        return URN(u"%s://%s%s" % (components.scheme, components.hostname, components.path))
 
     def RelativePath(self, urn):
         urn_value = str(urn)
@@ -315,6 +337,13 @@ class URN(RDFValue):
     def __repr__(self):
         return "<%s>" % self.value
 
+    def __eq__(self, other):
+        #return utils.SmartStr(self) == utils.SmartStr(other)
+        return utils.SmartUnicode(self.value) == utils.SmartUnicode(other)
+
+    def __ne__(self, other):
+        #return utils.SmartStr(self) == utils.SmartStr(other)
+        return utils.SmartUnicode(self.value) != utils.SmartUnicode(other)
 
 def AssertURN(urn):
     if not isinstance(urn, URN):

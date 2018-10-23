@@ -58,7 +58,7 @@ class ReferenceTest(unittest.TestCase):
                             with aff4_map.AFF4Map.NewAFF4Map(
                                     resolver2, self.image_urn, self.volume_urn) as imageURN:
                                 # add the segment that refers to the file in the destination address space
-                                # the locations were determined by opening a
+                                # the locations were determined by opening in a forensic tool
                                 partitionOffset = 0x10000
                                 fileOffset = 0xfc3000
                                 diskOffset = partitionOffset + fileOffset

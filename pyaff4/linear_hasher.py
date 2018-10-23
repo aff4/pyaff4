@@ -15,15 +15,12 @@ from __future__ import unicode_literals
 # the License.
 
 from builtins import object
-import hashlib
-import rdflib
-
+import io
 from pyaff4 import block_hasher
 from pyaff4 import container
 from pyaff4 import data_store
 from pyaff4 import hashes
 from pyaff4 import lexicon
-from pyaff4 import rdfvalue
 from pyaff4 import zip
 
 
@@ -87,6 +84,27 @@ class LinearHasher(object):
                 return hashes.newImmutableHash(b, hashDataType)
         raise Exception("IllegalState")
 
+    def doHash(self, mapURI, hashDataType):
+        hash = hashes.new(hashDataType)
+        if not self.isMap(mapURI):
+            import pdb; pdb.set_trace()
+
+        if self.isMap(mapURI):
+            with self.resolver.AFF4FactoryOpen(mapURI) as mapStream:
+                remaining = mapStream.Size()
+                count = 0
+                while remaining > 0:
+                    toRead = min(32*1024, remaining)
+                    data = mapStream.Read(toRead)
+                    assert len(data) == toRead
+                    remaining -= len(data)
+                    hash.update(data)
+                    count = count + 1
+
+                b = hash.hexdigest()
+                return hashes.newImmutableHash(b, hashDataType)
+        raise Exception("IllegalState")
+
     def isMap(self, stream):
         for type in self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
             if self.lexicon.map == type:
@@ -114,3 +132,59 @@ class ScudetteLinearHasher(LinearHasher):
         LinearHasher.__init__(self, listener)
         self.lexicon = lex
         self.resolver = resolver
+
+class LinearHasher2:
+    def __init__(self, resolver, listener=None):
+        if listener == None:
+            self.listener = block_hasher.ValidationListener()
+        else:
+            self.listener = listener
+        self.delegate = None
+        self.resolver = resolver
+
+    def hash(self, image):
+
+        storedHashes = list(self.resolver.QuerySubjectPredicate(image.urn, lexicon.standard.hash))
+        with self.resolver.AFF4FactoryOpen(image.urn) as stream:
+            datatypes = [h.datatype for h in storedHashes]
+            stream2 = StreamHasher(stream, datatypes)
+            self.readall2(stream2)
+            for storedHash in storedHashes:
+                dt = storedHash.datatype
+                shortHashAlgoName = storedHash.shortName()
+                calculatedHashHexDigest = stream2.getHash(dt).hexdigest()
+                storedHashHexDigest = storedHash.value
+                if storedHashHexDigest == calculatedHashHexDigest:
+                    self.listener.onValidHash(shortHashAlgoName, calculatedHashHexDigest, image.urn)
+                else:
+                    self.listener.onInvalidHash(shortHashAlgoName, storedHashHexDigest, calculatedHashHexDigest, image.urn)
+
+
+    def readall2(self, stream):
+        while True:
+            toRead = 32 * 1024
+            data = stream.read(toRead)
+            if data == None or len(data) == 0:
+                # EOF
+                return
+
+class StreamHasher(object):
+    def __init__(self, parent, hashDatatypes):
+        self.parent = parent
+        self.hashes = []
+        self.hashToType = {}
+        for hashDataType in hashDatatypes:
+            h = hashes.new(hashDataType)
+            self.hashToType[h] = hashDataType
+            self.hashes.append(h)
+
+    def read(self, bytes):
+        data = self.parent.read(bytes)
+        datalen = len(data)
+        if datalen > 0:
+            for h in self.hashes:
+                h.update(data)
+        return data
+
+    def getHash(self, dataType):
+        return next(h for h in self.hashes if self.hashToType[h] == dataType)

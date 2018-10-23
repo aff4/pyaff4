@@ -19,16 +19,20 @@ from builtins import next
 from builtins import str
 from builtins import object
 
-from pyaff4 import data_store
+from pyaff4.utils import SmartStr
+from pyaff4 import data_store, aff4_image
 from pyaff4 import hashes
 from pyaff4 import lexicon
 from pyaff4 import aff4_map
 from pyaff4 import rdfvalue
 from pyaff4 import aff4
+from pyaff4 import escaping
 from pyaff4.aff4_metadata import RDFObject
+from pyaff4 import zip
 
 import yaml
-from pyaff4 import zip
+import uuid
+
 
 localcache = {}
 
@@ -40,12 +44,10 @@ class Image(object):
         self.dataStream = dataStream
 
 class Container(object):
-    def __init__(self, volumeURN, resolver, lex, image, dataStream):
+    def __init__(self, volumeURN, resolver, lex):
         self.urn = volumeURN
         self.lexicon = lex
         self.resolver = resolver
-        self.image = Image(image, resolver, dataStream)
-        self.dataStream = dataStream
 
     def getMetadata(self, klass):
         try:
@@ -91,8 +93,40 @@ class Container(object):
         return Container.openURN(rdfvalue.URN.FromFileName(filename))
 
     @staticmethod
+    def createURN(resolver, container_urn):
+        """Public method to create a new writable locical AFF4 container."""
+
+        resolver.Set(container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
+
+        zip_file = zip.ZipFile.NewZipFile(resolver, container_urn)
+
+        volume_urn = zip_file.urn
+        localcache[volume_urn] = WritableLogicalImageContainer(volume_urn, resolver, lexicon.standard)
+        return localcache[volume_urn]
+
+    @staticmethod
     def openURN(urn):
         return Container.openURNtoContainer(urn).image.dataStream
+
+    @staticmethod
+    def new(urn):
+        lex = lexicon.standard
+        resolver = data_store.MemoryDataStore(lex)
+        with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
+            volumeURN = zip_file.urn
+            imageURN = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
+
+            datastreams = list(resolver.QuerySubjectPredicate(imageURN, lex.dataStream))
+
+            for stream in datastreams:
+                if lex.map in resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
+                    dataStream = resolver.AFF4FactoryOpen(stream)
+                    image = aff4.Image(resolver, urn=imageURN)
+                    dataStream.parent = image
+
+                    localcache[urn] = PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
+                    return localcache[urn]
+                
 
     @staticmethod
     def openURNtoContainer(urn):
@@ -105,18 +139,28 @@ class Container(object):
             with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
                 volumeURN = zip_file.urn
                 if lex == lexicon.standard:
-                    imageURN = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
+                    images = list(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
+                    imageURN = images[0]
 
                     datastreams = list(resolver.QuerySubjectPredicate(imageURN, lex.dataStream))
 
-                    for stream in datastreams:
-                        if lex.map in resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
-                            dataStream = resolver.AFF4FactoryOpen(stream)
-                            image = aff4.Image(resolver, urn=imageURN)
-                            dataStream.parent = image
+                    if len(datastreams) > 0:
+                        # it is a disk image or a memory image
 
-                            localcache[urn] = Container(volumeURN, resolver, lex, image, dataStream)
-                            return localcache[urn]
+                        for stream in datastreams:
+                            if lex.map in resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
+                                dataStream = resolver.AFF4FactoryOpen(stream)
+                                image = aff4.Image(resolver, urn=imageURN)
+                                dataStream.parent = image
+
+                                localcache[urn] = PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
+                                return localcache[urn]
+                    else:
+                        # it is a logical image
+
+                        localcache[urn] = LogicalImageContainer(volumeURN, resolver, lex)
+                        return localcache[urn]
+
 
                 elif lex == lexicon.scudette:
                     m = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.map))
@@ -139,5 +183,98 @@ class Container(object):
                         except:
                             pass
 
-                        localcache[urn] = Container(volumeURN, resolver, lex, image, dataStream)
+                        localcache[urn] = PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
                         return localcache[urn]
+
+class PhysicalImageContainer(Container):
+    def __init__(self, volumeURN, resolver, lex, image, dataStream):
+        super(PhysicalImageContainer, self).__init__(volumeURN, resolver, lex)
+        self.image = Image(image, resolver, dataStream)
+        self.dataStream = dataStream
+
+class LogicalImageContainer(Container):
+    def __init__(self, volumeURN, resolver, lex):
+        super(LogicalImageContainer, self).__init__(volumeURN, resolver, lex)
+
+    def images(self):
+        _images = self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
+        for image in _images:
+            pathName = next(self.resolver.QuerySubjectPredicate(image, lexicon.standard11.pathName))
+            yield aff4.LogicalImage(self.resolver, self.urn, image, pathName)
+
+    def open(self, urn):
+        pathName = next(self.resolver.QuerySubjectPredicate(urn, lexicon.standard11.pathName))
+        return aff4.LogicalImage(self.resolver, self.urn, urn, pathName)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Return ourselves to the resolver cache.
+        #self.resolver.Return(self)
+        return self
+
+    def __enter__(self):
+        return self
+
+class WritableLogicalImageContainer(Container):
+
+    # logical images geater than this size are stored in ImageStreams
+    # smaller ones in Zip Segments
+    maxSegmentResidentSize = 1 * 1024 * 1024
+
+    def __init__(self, volumeURN, resolver, lex):
+        super(WritableLogicalImageContainer, self).__init__(volumeURN, resolver, lex)
+        version_urn = self.urn.Append("version.txt")
+        with self.resolver.AFF4FactoryOpen(self.urn) as volume:
+            with volume.CreateMember(version_urn) as versionFile:
+                # AFF4 logical containers are at v1.1
+                versionFile.Write(SmartStr(u"major=1\nminor=1\ntool=pyaff4\n"))
+
+    def writeCompressedBlockStream(self, image_urn, filename, readstream):
+        with aff4_image.AFF4Image.NewAFF4Image(self.resolver, image_urn, self.urn) as stream:
+            stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
+            stream.WriteStream(readstream)
+
+    def writeZipStream(self, image_urn, filename, readstream):
+        with self.resolver.AFF4FactoryOpen(self.urn) as volume:
+            with volume.CreateMember(image_urn) as streamed:
+                streamed.compression_method = zip.ZIP_DEFLATE
+                streamed.WriteStream(readstream)
+
+
+    def writeLogical(self, filename, readstream, length):
+        image_urn = None
+        if self.isAFF4Collision(filename):
+            image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
+        else:
+            image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
+
+        if length > self.maxSegmentResidentSize:
+            urn = self.writeCompressedBlockStream(image_urn, filename, readstream)
+        else:
+            urn = self.writeZipStream(image_urn, filename, readstream)
+            self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
+
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        return image_urn
+
+    def isAFF4Collision(self, filename):
+        if filename in ["information.turtle", "version.txt", "container.description"]:
+            return True
+        return False
+
+    def toSegmentName(self, pathName):
+        # remove leading "/"
+        if pathName[0] == "/":
+            pathname = pathName[1:]
+
+        pathName = pathName.replace("\\", "/")
+        pathName = pathName.replace("//", "")
+
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Return ourselves to the resolver cache.
+        self.resolver.Return(self)
+
+    def __enter__(self):
+        return self

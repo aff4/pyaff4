@@ -89,10 +89,10 @@ class AFF4ObjectCache(object):
     def Put(self, aff4_obj, in_use_state=False):
         key = aff4_obj.urn.SerializeToString()
         CHECK(key not in self.in_use,
-              "Object %s Put in cache while already in use." % key)
+              u"Object %s Put in cache while already in use." % utils.SmartUnicode(key))
 
         CHECK(key not in self.lru_map,
-              "Object %s Put in cache while already in cache." % key)
+              u"Object %s Put in cache while already in cache." % utils.SmartUnicode(key))
 
         entry = AFF4ObjectCacheEntry(key, aff4_obj)
         if in_use_state:
@@ -129,9 +129,9 @@ class AFF4ObjectCache(object):
         key = aff4_obj.urn.SerializeToString()
         entry = self.in_use.get(key)
         CHECK(entry is not None,
-              "Object %s Returned to cache, but it is not in use!" % key)
+              u"Object %s Returned to cache, but it is not in use!" % key)
         CHECK(entry.use_count > 0,
-              "Returned object %s is not used." % key)
+              u"Returned object %s is not used." % key)
 
         entry.use_count -= 1
         if entry.use_count == 0:
@@ -163,11 +163,11 @@ class AFF4ObjectCache(object):
         # Now dump the objects in use.
         print("Objects in use:")
         for key, entry in list(self.in_use.items()):
-            print("%s - %s" % (key, entry.use_count))
+            print(u"%s - %s" % (utils.SmartUnicode(key), entry.use_count))
 
         print("Objects in cache:")
         for entry in self.lru_list:
-            print("%s - %s" % (entry.key, entry.use_count))
+            print(u"%s - %s" % (utils.SmartUnicode(entry.key), entry.use_count))
 
     def Flush(self):
         # It is an error to flush the object cache while there are still items
@@ -254,9 +254,11 @@ class MemoryDataStore(object):
             oldvalue = self.store.get(subject)[attribute]
             t = type(oldvalue)
             if  t != type([]):
-                self.store.get(subject)[attribute] = [oldvalue, value]
+                if value != oldvalue:
+                    self.store.get(subject)[attribute] = [oldvalue, value]
             else:
-                self.store.get(subject)[attribute].append(value)
+                if value not in oldvalue:
+                    oldvalue.append(value)
 
     def Set(self, subject, attribute, value):
         subject = rdfvalue.URN(subject).SerializeToString()
@@ -380,8 +382,8 @@ class MemoryDataStore(object):
             # TODO: this could be cleaner. RDF properties have multiple values
             if type(uri_types) == type([]):
                 for typ in uri_types:
-                    if typ in registry.AFF4_TYPE_MAP:
-                        handler = registry.AFF4_TYPE_MAP.get(typ)
+                    handler = registry.AFF4_TYPE_MAP.get(typ)
+                    if handler is not None:
                         break
             else:
                 handler = registry.AFF4_TYPE_MAP.get(uri_types)
@@ -460,11 +462,11 @@ class MemoryDataStore(object):
                         value = [value]
 
                     if object in value:
-                        yield rdfvalue.URN().UnSerializeFromString(subject)
+                        yield rdfvalue.URN(subject)
 
     def QuerySubjectPredicate(self, subject, predicate):
-        subject = utils.SmartStr(subject)
-        predicate = utils.SmartStr(predicate)
+        subject = utils.SmartUnicode(subject)
+        predicate = utils.SmartUnicode(predicate)
         for s, data in six.iteritems(self.store):
             if s == subject:
                 for pred, value in six.iteritems(data):
@@ -480,7 +482,7 @@ class MemoryDataStore(object):
         prefix = utils.SmartStr(prefix)
         for subject in self.store:
             if subject.startswith(prefix):
-                yield rdfvalue.URN().UnSerializeFromString(subject)
+                yield rdfvalue.URN(subject)
 
     def QueryPredicatesBySubject(self, subject):
         subject = utils.SmartStr(subject)
