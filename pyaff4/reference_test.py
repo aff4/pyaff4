@@ -4,7 +4,7 @@ from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import aff4_map
 from pyaff4.container import Container
-import zip
+from pyaff4 import zip
 import unittest
 from pyaff4 import utils
 import os
@@ -27,7 +27,7 @@ class ReferenceTest(unittest.TestCase):
 
             with zip.ZipFile.NewZipFile(resolver, rdfvalue.URN.FromFileName(self.stdLinear)) as image_container:
                 # there is generally only one Image in a container. Get the underlying Map
-                imageURN = resolver.QueryPredicateObject(lexicon.AFF4_TYPE, self.lexicon.Image).next()
+                imageURN = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, self.lexicon.Image))
                 datastreams = list(resolver.QuerySubjectPredicate(imageURN, self.lexicon.dataStream))
                 imageMapURN = datastreams[0]
 
@@ -88,7 +88,7 @@ class ReferenceTest(unittest.TestCase):
 
                     # read the header of the virtual file
                     image.Seek(0, 0)
-                    self.assertEquals("%PDF", image.Read(4))
+                    self.assertEquals(b"%PDF", image.Read(4))
 
                     # read the whole virtual file and compare with a known hash of it
                     image.Seek(0, 0)
