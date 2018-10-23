@@ -33,7 +33,7 @@ class LinearHasher(object):
         self.delegate = None
 
     def hash(self, urn, mapURI, hashDataType):
-        lex = container.Container.identifyURN(urn)
+        (version, lex) = container.Container.identifyURN(urn)
         resolver = data_store.MemoryDataStore(lex)
 
         with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
@@ -49,7 +49,7 @@ class LinearHasher(object):
             return self.delegate.doHash(mapURI, hashDataType)
 
     def hashMulti(self, urna, urnb, mapURI, hashDataType):
-        lex = container.Container.identifyURN(urna)
+        (version, lex) = container.Container.identifyURN(urna)
         resolver = data_store.MemoryDataStore(lex)
 
         with zip.ZipFile.NewZipFile(resolver, urna) as zip_filea:

@@ -43,11 +43,23 @@ class Image(object):
         self.resolver = resolver
         self.dataStream = dataStream
 
+def parseProperties(propertiesText):
+    res = {}
+    for line in propertiesText.split("\n"):
+        try:
+            (prop, value) = line.split("=")
+            res[prop] = value
+        except:
+            pass
+    return res
+
+
 class Container(object):
-    def __init__(self, volumeURN, resolver, lex):
+    def __init__(self, version, volumeURN, resolver, lex):
         self.urn = volumeURN
         self.lexicon = lex
         self.resolver = resolver
+        self.version = version
 
     def getMetadata(self, klass):
         try:
@@ -61,6 +73,7 @@ class Container(object):
         """Public method to identify a filename as an AFF4 container."""
         return Container.identifyURN(rdfvalue.URN.FromFileName(filename))
 
+
     @staticmethod
     def identifyURN(urn):
         resolver = data_store.MemoryDataStore(lexicon.standard)
@@ -71,15 +84,17 @@ class Container(object):
             try:
                 # AFF4 Std v1.0 introduced the version file
                 version = zip_file.OpenZipSegment("version.txt")
+                versionTxt = version.ReadAll()
                 resolver.Close(version)
-                return lexicon.standard
+                version = parseProperties(versionTxt)
+                return (version, lexicon.standard)
             except:
                 if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
                     # Rekall defined the new AFF4 namespace post the Wirespeed paper
-                    return lexicon.scudette
+                    return ({ "major" : "0", "minor": "0" }, lexicon.scudette)
                 else:
                     # Wirespeed (Evimetry) 1.x and Evimetry 2.x stayed with the original namespace
-                    return lexicon.legacy
+                    return ({ "major" : "0", "minor": "1" }, lexicon.legacy)
 
     def isMap(self, stream):
         types = self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE)
@@ -101,7 +116,8 @@ class Container(object):
         zip_file = zip.ZipFile.NewZipFile(resolver, container_urn)
 
         volume_urn = zip_file.urn
-        localcache[volume_urn] = WritableLogicalImageContainer(volume_urn, resolver, lexicon.standard)
+        version = { "major" : "0", "minor": "1", "tool" : "pyaff4" }
+        localcache[volume_urn] = WritableLogicalImageContainer(version, volume_urn, resolver, lexicon.standard)
         return localcache[volume_urn]
 
     @staticmethod
@@ -134,7 +150,7 @@ class Container(object):
             cached = localcache[urn]
             return cached
         except:
-            lex = Container.identifyURN(urn)
+            (version, lex) = Container.identifyURN(urn)
             resolver = data_store.MemoryDataStore(lex)
             with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
                 volumeURN = zip_file.urn
@@ -153,13 +169,21 @@ class Container(object):
                                 image = aff4.Image(resolver, urn=imageURN)
                                 dataStream.parent = image
 
-                                localcache[urn] = PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
+                                localcache[urn] = PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
                                 return localcache[urn]
                     else:
                         # it is a logical image
+                        if version["major"] == "1" and version["minor"] == "1":
+                            # AFF4 logical images are defined at version 1.1
+                            localcache[urn] = LogicalImageContainer(version, volumeURN, resolver, lex)
+                            return localcache[urn]
+                        else:
+                            # scudette's winpmem pre-std implementation is at 1.0
+                            lex = lexicon.pmemlogical
+                            localcache[urn] = PreStdLogicalImageContainer(version, volumeURN, resolver, lex)
+                            return localcache[urn]
 
-                        localcache[urn] = LogicalImageContainer(volumeURN, resolver, lex)
-                        return localcache[urn]
+
 
 
                 elif lex == lexicon.scudette:
@@ -183,18 +207,18 @@ class Container(object):
                         except:
                             pass
 
-                        localcache[urn] = PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
+                        localcache[urn] = PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
                         return localcache[urn]
 
 class PhysicalImageContainer(Container):
-    def __init__(self, volumeURN, resolver, lex, image, dataStream):
-        super(PhysicalImageContainer, self).__init__(volumeURN, resolver, lex)
+    def __init__(self, version, volumeURN, resolver, lex, image, dataStream):
+        super(PhysicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
         self.image = Image(image, resolver, dataStream)
         self.dataStream = dataStream
 
 class LogicalImageContainer(Container):
-    def __init__(self, volumeURN, resolver, lex):
-        super(LogicalImageContainer, self).__init__(volumeURN, resolver, lex)
+    def __init__(self, version, volumeURN, resolver, lex):
+        super(LogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
 
     def images(self):
         _images = self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
@@ -214,14 +238,36 @@ class LogicalImageContainer(Container):
     def __enter__(self):
         return self
 
+class PreStdLogicalImageContainer(LogicalImageContainer):
+    def __init__(self, version, volumeURN, resolver, lex):
+        super(PreStdLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
+
+    def images(self):
+        _images = self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard.Image)
+        for image in _images:
+            pathName = next(self.resolver.QuerySubjectPredicate(image, self.lexicon.pathName))
+            yield aff4.LogicalImage(self.resolver, self.urn, image, pathName)
+
+    def open(self, urn):
+        pathName = next(self.resolver.QuerySubjectPredicate(urn, self.lexicon.pathName))
+        return aff4.LogicalImage(self.resolver, self.urn, urn, pathName)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Return ourselves to the resolver cache.
+        #self.resolver.Return(self)
+        return self
+
+    def __enter__(self):
+        return self
+
 class WritableLogicalImageContainer(Container):
 
     # logical images geater than this size are stored in ImageStreams
     # smaller ones in Zip Segments
     maxSegmentResidentSize = 1 * 1024 * 1024
 
-    def __init__(self, volumeURN, resolver, lex):
-        super(WritableLogicalImageContainer, self).__init__(volumeURN, resolver, lex)
+    def __init__(self, version, volumeURN, resolver, lex):
+        super(WritableLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
         version_urn = self.urn.Append("version.txt")
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(version_urn) as versionFile:
@@ -262,14 +308,6 @@ class WritableLogicalImageContainer(Container):
         if filename in ["information.turtle", "version.txt", "container.description"]:
             return True
         return False
-
-    def toSegmentName(self, pathName):
-        # remove leading "/"
-        if pathName[0] == "/":
-            pathname = pathName[1:]
-
-        pathName = pathName.replace("\\", "/")
-        pathName = pathName.replace("//", "")
 
 
     def __exit__(self, exc_type, exc_value, traceback):

@@ -101,7 +101,7 @@ class Validator(object):
         self.delegate = None
 
     def validateContainer(self, urn):
-        lex = container.Container.identifyURN(urn)
+        (version, lex) = container.Container.identifyURN(urn)
         resolver = data_store.MemoryDataStore(lex)
 
         with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
@@ -117,7 +117,7 @@ class Validator(object):
     def validateContainerMultiPart(self, urn_a, urn_b):
         # in this simple example, we assume that both files passed are
         # members of the Container
-        lex = container.Container.identifyURN(urn_a)
+        (version, lex) = container.Container.identifyURN(urn_a)
         resolver = data_store.MemoryDataStore(lex)
 
         with zip.ZipFile.NewZipFile(resolver, urn_a) as zip_filea:

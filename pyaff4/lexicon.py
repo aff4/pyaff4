@@ -195,7 +195,7 @@ class Std11Lexicon(StdLexicon):
     lastAccessed = (AFF4_NAMESPACE + "lastAccessed")
     recordChanged = (AFF4_NAMESPACE + "recordChanged")
     birthTime = (AFF4_NAMESPACE + "birthTime")
-    pathName = (AFF4_NAMESPACE + "pathName")
+    pathName = (AFF4_NAMESPACE + "originalFilename")
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE
@@ -231,10 +231,16 @@ class ScudetteLexicon(Lexicon):
     category  = base + "category"
     memoryPhysical = "http://aff4.org/Schema#memory/physical"
 
+# early logical imaging support for pmem
+class PmemLogicalPreStd(StdLexicon):
+    pathName = (AFF4_NAMESPACE + "original_filename")
+
+
 legacy = LegacyLexicon()
 standard = StdLexicon()
 scudette = ScudetteLexicon()
 standard11 = Std11Lexicon()
+pmemlogical = PmemLogicalPreStd()
 
 def AutoResolveAttribute(resolver, urn, attribute):
     """Iterate over all lexicons to autodetect the attribute."""

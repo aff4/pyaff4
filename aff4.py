@@ -20,7 +20,7 @@ def meta(file):
     metadataURN = volume.urn.Append("information.turtle")
     try:
         with resolver.AFF4FactoryOpen(metadataURN) as fd:
-            txt = fd.read(10000000)
+            txt = fd.ReadAll()
             print(utils.SmartUnicode(txt))
     except:
         pass
@@ -29,9 +29,9 @@ def meta(file):
 def list(file):
     volume = container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file))
 
-    if type(volume) == container.PhysicalImageContainer:
+    if issubclass(volume.__class__, container.PhysicalImageContainer):
         printDiskImageInfo(file, volume)
-    elif type(volume) == container.LogicalImageContainer:
+    elif issubclass(volume.__class__, container.LogicalImageContainer):
         printLogicalImageInfo(file, volume)
 
 def printLogicalImageInfo(file, volume):
@@ -186,11 +186,12 @@ def extract(container_name, imageURNs, destFolder):
             resolver = volume.resolver
             for imageUrn in imageURNs:
                 imageUrn = utils.SmartUnicode(imageUrn)
-                pathName = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.pathName))
+
+                pathName = next(resolver.QuerySubjectPredicate(imageUrn, volume.lexicon.pathName))
 
                 with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
                     if destFolder != "-":
-                        destFile = os.path.join(destFolder, escaping.toSegmentName(pathName.value))
+                        destFile = os.path.join(destFolder, escaping.arnPathFragment_from_path(pathName.value))
                         if not os.path.exists(os.path.dirname(destFile)):
                             try:
                                 os.makedirs(os.path.dirname(destFile))
