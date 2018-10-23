@@ -128,17 +128,16 @@ class Container(object):
                         dataStream.parent = image
 
                         legacyYamlInfoURI = dataStream.urn.Append("information.yaml")
-                        with resolver.AFF4FactoryOpen(legacyYamlInfoURI) as fd:
-                            txt = fd.read(10000000)
-                            dt = yaml.safe_load(txt)
-                            try:
+                        try:
+                            with resolver.AFF4FactoryOpen(legacyYamlInfoURI) as fd:
+                                txt = fd.read(10000000)
+                                dt = yaml.safe_load(txt)
                                 CR3 = dt["Registers"]["CR3"]
                                 resolver.Add(dataStream.parent.urn, lexicon.standard.memoryPageTableEntryOffset, rdfvalue.XSDInteger(CR3))
                                 kaslr_slide = dt["kaslr_slide"]
-                                resolver.Add(dataStream.parent.urn, lexicon.standard.OSXKALSRSlide,
-                                             rdfvalue.XSDInteger(kaslr_slide))
+                                resolver.Add(dataStream.parent.urn, lexicon.standard.OSXKALSRSlide, rdfvalue.XSDInteger(kaslr_slide))
+                        except:
+                            pass
 
-                            except:
-                                pass
                         localcache[urn] = Container(volumeURN, resolver, lex, image, dataStream)
                         return localcache[urn]

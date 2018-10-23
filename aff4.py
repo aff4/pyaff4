@@ -22,6 +22,8 @@ def info(file):
     print ("\tSize: %s (bytes)" % image.size)
     print ("\tSectors: %s" % image.sectorCount)
     print ("\tBlockMapHash: %s" % image.hash)
+
+    # the following property is to test that unknown properties are handled OK
     print ("\tUnknownproperty: %s" % image.foobar)
 
     computerInfo = volume.getMetadata("ComputeResource")
