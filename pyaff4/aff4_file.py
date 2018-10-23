@@ -137,8 +137,12 @@ class FileBackedObject(aff4.AFF4Stream):
     def Write(self, data):
         self.MarkDirty()
 
-        if self.fd.tell() != self.readptr:
-            self.fd.seek(self.readptr)
+        # On OSX, the following test doesn't work
+        # so we need to do the seek every time
+        # if self.fd.tell() != self.readptr:
+        #    self.fd.seek(self.readptr)
+        # TODO: make this platform aware
+        self.fd.seek(self.readptr)
 
         self.fd.write(data)
         # self.fd.flush()
