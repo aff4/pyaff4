@@ -83,6 +83,9 @@ class RDFValue(object):
     def __hash__(self):
         return hash(self.SerializeToString())
 
+    def __str__(self):
+        return self.SerializeToString()
+
 
 class RDFBytes(RDFValue):
     value = b""
