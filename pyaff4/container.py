@@ -25,14 +25,34 @@ from pyaff4 import lexicon
 from pyaff4 import aff4_map
 from pyaff4 import rdfvalue
 from pyaff4 import aff4
+from pyaff4.aff4_metadata import RDFObject
 
 import yaml
 from pyaff4 import zip
 
 localcache = {}
+
+class Image(object):
+    def __init__(self, image, resolver, dataStream):
+        self.image = image
+        self.urn = image.urn
+        self.resolver = resolver
+        self.dataStream = dataStream
+
 class Container(object):
-    def __init__(self):
-        pass
+    def __init__(self, volumeURN, resolver, lex, image, dataStream):
+        self.urn = volumeURN
+        self.lexicon = lex
+        self.resolver = resolver
+        self.image = Image(image, resolver, dataStream)
+        self.dataStream = dataStream
+
+    def getMetadata(self, klass):
+        try:
+            m = next(self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, self.lexicon.of(klass)))
+            return RDFObject(m, self.resolver, self.lexicon)
+        except:
+            return None
 
     @staticmethod
     def identify(filename):
@@ -72,6 +92,10 @@ class Container(object):
 
     @staticmethod
     def openURN(urn):
+        return Container.openURNtoContainer(urn).image.dataStream
+
+    @staticmethod
+    def openURNtoContainer(urn):
         try:
             cached = localcache[urn]
             return cached
@@ -79,37 +103,42 @@ class Container(object):
             lex = Container.identifyURN(urn)
             resolver = data_store.MemoryDataStore(lex)
             with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
+                volumeURN = zip_file.urn
                 if lex == lexicon.standard:
-                    image = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
+                    imageURN = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
 
-                    datastreams = list(resolver.QuerySubjectPredicate(image, lex.dataStream))
+                    datastreams = list(resolver.QuerySubjectPredicate(imageURN, lex.dataStream))
 
                     for stream in datastreams:
                         if lex.map in resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
-                            res = resolver.AFF4FactoryOpen(stream)
-                            localcache[urn] = res
-                            res.parent = aff4.Image(resolver, urn=image)
-                            return res
+                            dataStream = resolver.AFF4FactoryOpen(stream)
+                            image = aff4.Image(resolver, urn=imageURN)
+                            dataStream.parent = image
+
+                            localcache[urn] = Container(volumeURN, resolver, lex, image, dataStream)
+                            return localcache[urn]
 
                 elif lex == lexicon.scudette:
                     m = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.map))
                     cat = next(resolver.QuerySubjectPredicate(m, lex.category))
                     if cat == lex.memoryPhysical:
-                        res = resolver.AFF4FactoryOpen(m)
-                        localcache[urn] = res
-                        res.parent = aff4.Image(resolver, urn=m)
+                        dataStream = resolver.AFF4FactoryOpen(m)
 
-                        legacyYamlInfoURI = res.urn.Append("information.yaml")
+                        image = aff4.Image(resolver, urn=m)
+                        dataStream.parent = image
+
+                        legacyYamlInfoURI = dataStream.urn.Append("information.yaml")
                         with resolver.AFF4FactoryOpen(legacyYamlInfoURI) as fd:
                             txt = fd.read(10000000)
                             dt = yaml.safe_load(txt)
                             try:
                                 CR3 = dt["Registers"]["CR3"]
-                                resolver.Add(res.parent.urn, lexicon.standard.memoryPageTableEntryOffset, rdfvalue.XSDInteger(CR3))
+                                resolver.Add(dataStream.parent.urn, lexicon.standard.memoryPageTableEntryOffset, rdfvalue.XSDInteger(CR3))
                                 kaslr_slide = dt["kaslr_slide"]
-                                resolver.Add(res.parent.urn, lexicon.standard.OSXKALSRSlide,
+                                resolver.Add(dataStream.parent.urn, lexicon.standard.OSXKALSRSlide,
                                              rdfvalue.XSDInteger(kaslr_slide))
 
                             except:
                                 pass
-                        return res
+                        localcache[urn] = Container(volumeURN, resolver, lex, image, dataStream)
+                        return localcache[urn]

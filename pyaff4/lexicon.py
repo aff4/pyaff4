@@ -151,6 +151,9 @@ class Lexicon(object):
     def __init__(self):
         pass
 
+    def of(self, end):
+        return self.base + end
+
 class StdLexicon(Lexicon):
     base = AFF4_NAMESPACE
     map = base + "Map"

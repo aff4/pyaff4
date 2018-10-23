@@ -268,7 +268,8 @@ class MemoryDataStore(object):
     def Get(self, subject, attribute):
         subject = rdfvalue.URN(subject).SerializeToString()
         attribute = rdfvalue.URN(attribute).SerializeToString()
-        return self.store.get(subject, {}).get(attribute)
+        vals = self.store.get(subject, {})
+        return vals.get(attribute)
 
     def CacheGet(self, urn):
         result = self.ObjectCache.Get(urn)
