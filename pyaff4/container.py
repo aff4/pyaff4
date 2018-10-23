@@ -35,8 +35,6 @@ import yaml
 import uuid
 
 
-localcache = {}
-
 class Image(object):
     def __init__(self, image, resolver, dataStream):
         self.image = image
@@ -77,26 +75,27 @@ class Container(object):
 
     @staticmethod
     def identifyURN(urn):
-        resolver = data_store.MemoryDataStore(lexicon.standard)
-        with zip.ZipFile.NewZipFile(resolver, Version(0,1,"pyaff4"), urn) as zip_file:
-            if len(list(zip_file.members.keys())) == 0:
-                # it's a new zipfile
-                raise IOError("Not an AFF4 Volume")
-            try:
-                # AFF4 Std v1.0 introduced the version file
-                version = zip_file.OpenZipSegment("version.txt")
-                versionTxt = version.ReadAll()
-                resolver.Close(version)
-                version = parseProperties(versionTxt)
-                version = Version.create(version)
-                return (version, lexicon.standard)
-            except:
-                if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
-                    # Rekall defined the new AFF4 namespace post the Wirespeed paper
-                    return (Version(1,0,"pyaff4"), lexicon.scudette)
-                else:
-                    # Wirespeed (Evimetry) 1.x and Evimetry 2.x stayed with the original namespace
-                    return (Version(0,1,"pyaff4"), lexicon.legacy)
+        with data_store.MemoryDataStore(lexicon.standard) as resolver:
+            with zip.ZipFile.NewZipFile(resolver, Version(0,1,"pyaff4"), urn) as zip_file:
+                if len(list(zip_file.members.keys())) == 0:
+                    # it's a new zipfile
+                    raise IOError("Not an AFF4 Volume")
+
+                with zip_file.OpenZipSegment("version.txt") as version_segment:
+                    try:
+                        # AFF4 Std v1.0 introduced the version file
+                        versionTxt = version_segment.ReadAll()
+                        #resolver.Close(version)
+                        version = parseProperties(versionTxt)
+                        version = Version.create(version)
+                        return (version, lexicon.standard)
+                    except:
+                        if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
+                            # Rekall defined the new AFF4 namespace post the Wirespeed paper
+                            return (Version(1,0,"pyaff4"), lexicon.scudette)
+                        else:
+                            # Wirespeed (Evimetry) 1.x and Evimetry 2.x stayed with the original namespace
+                            return (Version(0,1,"pyaff4"), lexicon.legacy)
 
     def isMap(self, stream):
         types = self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE)
@@ -116,12 +115,9 @@ class Container(object):
         resolver.Set(container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
 
         version = Version(1, 1, "pyaff4")
-        zip_file = zip.ZipFile.NewZipFile(resolver, version, container_urn)
-
-        volume_urn = zip_file.urn
-
-        localcache[volume_urn] = WritableLogicalImageContainer(version, volume_urn, resolver, lexicon.standard)
-        return localcache[volume_urn]
+        with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
+            volume_urn = zip_file.urn
+            return WritableLogicalImageContainer(version, volume_urn, resolver, lexicon.standard)
 
     @staticmethod
     def openURN(urn):
@@ -143,18 +139,18 @@ class Container(object):
                     image = aff4.Image(resolver, urn=imageURN)
                     dataStream.parent = image
 
-                    localcache[urn] = PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
-                    return localcache[urn]
+                    return PhysicalImageContainer(volumeURN, resolver, lex, image, dataStream)
                 
 
     @staticmethod
-    def openURNtoContainer(urn):
-        try:
-            cached = localcache[urn]
-            return cached
-        except:
+    def openURNtoContainer(urn, mode=None):
             (version, lex) = Container.identifyURN(urn)
             resolver = data_store.MemoryDataStore(lex)
+
+            if mode != None and mode == "+":
+                resolver.Set(urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                             rdfvalue.XSDString("append"))
+
             with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
                 volumeURN = zip_file.urn
                 if lex == lexicon.standard:
@@ -172,19 +168,20 @@ class Container(object):
                                 image = aff4.Image(resolver, urn=imageURN)
                                 dataStream.parent = image
 
-                                localcache[urn] = PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
-                                return localcache[urn]
+                                return PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
+
                     else:
                         # it is a logical image
                         if version.is11():
                             # AFF4 logical images are defined at version 1.1
-                            localcache[urn] = LogicalImageContainer(version, volumeURN, resolver, lex)
-                            return localcache[urn]
+                            if mode != None and mode == "+":
+                                return WritableLogicalImageContainer(version, volumeURN, resolver, lex)
+                            else:
+                                return LogicalImageContainer(version, volumeURN, resolver, lex)
                         else:
                             # scudette's winpmem pre-std implementation is at 1.0
                             lex = lexicon.pmemlogical
-                            localcache[urn] = PreStdLogicalImageContainer(version, volumeURN, resolver, lex)
-                            return localcache[urn]
+                            return PreStdLogicalImageContainer(version, volumeURN, resolver, lex)
 
 
 
@@ -210,8 +207,18 @@ class Container(object):
                         except:
                             pass
 
-                        localcache[urn] = PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
-                        return localcache[urn]
+                        return PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
+
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Return ourselves to the resolver cache.
+        #self.resolver.Return()
+        self.resolver.Flush()
+        #self.resolver.Return(self.resolver)
+        #pass
 
 class PhysicalImageContainer(Container):
     def __init__(self, version, volumeURN, resolver, lex, image, dataStream):
@@ -236,9 +243,6 @@ class LogicalImageContainer(Container):
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
         #self.resolver.Return(self)
-        return self
-
-    def __enter__(self):
         return self
 
 class PreStdLogicalImageContainer(LogicalImageContainer):
@@ -275,13 +279,18 @@ class WritableLogicalImageContainer(Container):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             container_description_urn = self.urn.Append("container.description")
             volume.version = self.version
-            with volume.CreateMember(container_description_urn) as container_description_file:
-                container_description_file.Write(SmartStr(volume.urn.value))
 
+            # create the container description if we aren't appending
+            if not volume.ContainsMember(container_description_urn):
+                with volume.CreateMember(container_description_urn) as container_description_file:
+                    container_description_file.Write(SmartStr(volume.urn.value))
+
+            # create the version segment if we aren't appending
             version_urn = self.urn.Append("version.txt")
-            with volume.CreateMember(version_urn) as versionFile:
-                # AFF4 logical containers are at v1.1
-                versionFile.Write(SmartStr(str(self.version)))
+            if not volume.ContainsMember(version_urn):
+                with volume.CreateMember(version_urn) as versionFile:
+                    # AFF4 logical containers are at v1.1
+                    versionFile.Write(SmartStr(str(self.version)))
 
 
     def writeCompressedBlockStream(self, image_urn, filename, readstream):
@@ -319,10 +328,3 @@ class WritableLogicalImageContainer(Container):
             return True
         return False
 
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        # Return ourselves to the resolver cache.
-        self.resolver.Return(self)
-
-    def __enter__(self):
-        return self

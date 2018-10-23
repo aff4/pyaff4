@@ -24,6 +24,7 @@ import logging
 import io
 import zlib
 import struct
+import traceback
 
 from pyaff4 import aff4
 from pyaff4 import aff4_file
@@ -705,6 +706,15 @@ class ZipFile(aff4.AFF4Volume):
 
         return resolver.AFF4FactoryOpen(result.urn,  version=vers)
 
+    def ContainsMember(self, arn):
+        for member in self.members:
+            if member == arn:
+                return True
+        return False
+
+        #member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
+
+
     def CreateMember(self, child_urn):
         member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
 
@@ -739,6 +749,8 @@ class ZipFile(aff4.AFF4Volume):
 
         # Add the new object to the object cache.
         return self.resolver.CachePut(result)
+
+
 
     def OpenZipSegment(self, filename):
         # Is it already in the cache?

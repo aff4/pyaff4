@@ -50,16 +50,19 @@ class LogicalTest(unittest.TestCase):
                 self.assertEqual(1, len(images), "Only one logical image")
                 self.assertEqual(pathName, images[0].name(), "unicode filename should be preserved")
 
-                fragment = escaping.member_name_for_urn(images[0].urn.value, volume.urn, use_unicode=True)
+                fragment = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
 
                 self.assertEqual(arnPathFragment, fragment)
                 try:
                     with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
-                        txt = fd.read(10000000)
+                        txt = fd.ReadAll()
                         self.assertEqual("hello", txt, "content should be same")
                 except Exception:
                     traceback.print_exc()
                     self.fail()
+        except Exception:
+            traceback.print_exc()
+            self.fail()
 
         finally:
             os.unlink(containerName)
@@ -70,19 +73,19 @@ class LogicalTest(unittest.TestCase):
 
     def testUnixASCIINoSlashLogicalImage(self):
         containerName = "/tmp/test-unix1.aff4"
-        self.createAndReadSinglePathImage(containerName, u"foo/bar.txt", u"foo/bar.txt")
+        self.createAndReadSinglePathImage(containerName, u"foo/bar.txt", u"/foo/bar.txt")
 
     def testUnixASCIISlashLogicalImage(self):
         containerName = "/tmp/test-unix1.aff4"
-        self.createAndReadSinglePathImage(containerName, u"/foo/bar.txt", u"foo/bar.txt")
+        self.createAndReadSinglePathImage(containerName, u"/foo/bar.txt", u"/foo/bar.txt")
 
     def testUnixUnicodeLogicalImage(self):
         containerName = "/tmp/test-unicodepath.aff4"
-        self.createAndReadSinglePathImage(containerName, u"/犬/ネコ.txt", u"犬/ネコ.txt")
+        self.createAndReadSinglePathImage(containerName, u"/犬/ネコ.txt", u"/犬/ネコ.txt")
 
     def testWindowsDriveLogicalImage(self):
         containerName = "/tmp/test-windowsdrive.aff4"
-        self.createAndReadSinglePathImage(containerName, u"c:\ネコ.txt", u"c:/犬/ネコ.txt")
+        self.createAndReadSinglePathImage(containerName, u"c:\ネコ.txt", u"/c:/犬/ネコ.txt")
 
     def testAFF4ReservedSegmentCollision(self):
         containerName = "/tmp/test.aff4"
@@ -102,7 +105,7 @@ class LogicalTest(unittest.TestCase):
 
                 try:
                     with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
-                        txt = fd.read(10000000)
+                        txt = fd.ReadAll()
                         self.assertEqual("hello", txt, "escaped file returned")
                 except Exception:
                     traceback.print_exc()
@@ -110,6 +113,7 @@ class LogicalTest(unittest.TestCase):
 
         except Exception:
             traceback.print_exc()
+            self.fail()
 
         finally:
             os.unlink(containerName)
