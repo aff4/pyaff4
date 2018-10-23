@@ -248,10 +248,10 @@ class WritableLogicalImageContainer(Container):
             image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
 
         if length > self.maxSegmentResidentSize:
-            urn = self.writeCompressedBlockStream(image_urn, filename, readstream)
+            self.writeCompressedBlockStream(image_urn, filename, readstream)
         else:
-            urn = self.writeZipStream(image_urn, filename, readstream)
-            self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
+            self.writeZipStream(image_urn, filename, readstream)
+            #self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
 
         self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
         self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))

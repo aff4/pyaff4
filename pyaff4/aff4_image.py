@@ -35,7 +35,7 @@ from pyaff4 import hashes
 
 
 LOGGER = logging.getLogger("pyaff4")
-
+DEBUG = False
 
 class _CompressorStream(object):
     """A stream which chunks up another stream.
@@ -153,7 +153,10 @@ class AFF4Image(aff4.AFF4Stream):
     def WriteStream(self, source_stream, progress=None):
         """Copy data from a source stream into this stream."""
         if progress is None:
-            progress = aff4.DEFAULT_PROGRESS
+            if DEBUG:
+                progress = aff4.DEFAULT_PROGRESS
+            else:
+                progress = aff4.EMPTY_PROGRESS
 
         volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
         if not volume_urn:
