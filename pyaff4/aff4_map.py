@@ -353,10 +353,15 @@ class AFF4Map(aff4.AFF4Stream):
 
                 self.resolver.Close(idx_stream)
                 for target in self.targets:
-                    with self.resolver.AFF4FactoryOpen(target) as stream:
+                    # for cross containterne references, opening the target wont work
+                    # so we enclose this in a try/catch
+                    try:
+                        with self.resolver.AFF4FactoryOpen(target) as stream:
+                            pass
+                        self.resolver.Close(stream)
+                    except:
                         pass
 
-                    self.resolver.Close(stream)
 
         return super(AFF4Map, self).Flush()
 
