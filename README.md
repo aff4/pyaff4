@@ -13,29 +13,27 @@ The focus of this implementation at present is reading images conforming with th
 AFF4 Standard v1.0. Canonical images are provided in the AFF4 Reference Images github 
 project at https://github.com/aff4/ReferenceImages
 
-1. Reading ZipFile style volumes.
+1. Reading, writing & appending to ZipFile style volumes.
 2. Reading striped ZipFile volumes.
-2. Reading AFF4 Image streams using the deflate or snappy compressor.
-3. Reading RDF metadata using both YAML and Turtle.
+2. Reading & writing AFF4 ImageStreams using the deflate or snappy compressor.
+3. Reading RDF metadata using Turtle (and to some degree YAML).
 4. Verification of linear and block hashed images.
-5. Writing ZipFile style volumes.
+
 
 ## What is in progress
 
-1. Logical file acquisition.
+1. Reading & writing logical images. 
 
  ## What is not yet supported:
 
 The write support in the libraries is currently broken and being worked on. Other aspects of 
 the AFF4 that have not yet been implemented in this codebase include:
 
-1. Reading ZipFile style volumes.
-2. Reading striped ZipFile volumes.
-3. Reading AFF4 Image streams using the deflate or snappy compressor.
-4. Reading RDF metadata using both YAML and Turtle.
-5. Verification of linear and block hashed images.
-6. Writing ZipFile style volumes
-7. Appending to ZipFile volumes
+1. Encrypted AFF4 volumes.
+2. Persistent data store.
+3. HTTP backed streams.
+4. Support for signed statements or Bill of Materials.
+
 
 ## Notice
 
