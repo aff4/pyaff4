@@ -45,6 +45,8 @@ ZIP32_MAX_SIZE = 2**32 -1
 
 BUFF_SIZE = 64 * 1024
 
+# Flag for debugging zip. Should be false for production.
+ZIP_DEBUG = False
 
 class EndCentralDirectory(struct_parser.CreateStruct(
         "EndCentralDirectory_t",
@@ -851,30 +853,43 @@ class ZipFile(aff4.AFF4Volume):
                 LOGGER.info("Writing CD entry for %s", urn)
                 zip_info.WriteCDFileHeader(cd_stream)
 
-            locator = Zip64CDLocator(
-                offset_of_end_cd=(cd_stream.tell() + ecd_real_offset -
-                                  self.global_offset))
-
+            offset_of_end_cd = cd_stream.tell() + ecd_real_offset - self.global_offset
             size_of_cd = cd_stream.tell()
-
-            end_cd = Zip64EndCD(
-                size_of_header=Zip64EndCD.sizeof()-12,
-                number_of_entries_in_volume=total_entries,
-                number_of_entries_in_total=total_entries,
-                size_of_cd=size_of_cd,
-                offset_of_cd=locator.offset_of_end_cd - size_of_cd)
-
+            offset_of_cd = offset_of_end_cd - size_of_cd
             urn_string = self.urn.SerializeToString()
+
+            # the following is included for debugging the zip implementation.
+            # for small zip files, enable output to non-zip64 containers
+            # NOT TO BE USED IN PRODUCTION
+            if not ZIP_DEBUG or offset_of_cd > ZIP32_MAX_SIZE or size_of_cd > ZIP32_MAX_SIZE:
+                # only write zip64 headers if needed
+                locator = Zip64CDLocator(
+                    offset_of_end_cd=(offset_of_end_cd))
+
+                end_cd = Zip64EndCD(
+                    size_of_header=Zip64EndCD.sizeof()-12,
+                    number_of_entries_in_volume=total_entries,
+                    number_of_entries_in_total=total_entries,
+                    size_of_cd=size_of_cd,
+                    offset_of_cd=offset_of_cd)
+
+                LOGGER.info("Writing Zip64EndCD at %#x",
+                            cd_stream.tell() + ecd_real_offset)
+                cd_stream.write(end_cd.Pack())
+                cd_stream.write(locator.Pack())
+
             end = EndCentralDirectory(
                 total_entries_in_cd_on_disk=len(self.members),
                 total_entries_in_cd=len(self.members),
-                comment_len=len(urn_string))
+                comment_len=len(urn_string),
+                offset_of_cd = offset_of_cd,
+                size_of_cd = size_of_cd)
 
-            LOGGER.info("Writing Zip64EndCD at %#x",
-                        cd_stream.tell() + ecd_real_offset)
+            if size_of_cd > ZIP32_MAX_SIZE or not ZIP_DEBUG :
+                end.size_of_cd = 0xffffffff
 
-            cd_stream.write(end_cd.Pack())
-            cd_stream.write(locator.Pack())
+            if offset_of_end_cd > ZIP32_MAX_SIZE or not ZIP_DEBUG :
+                end.offset_of_cd = 0xffffffff
 
             LOGGER.info("Writing ECD at %#x",
                         cd_stream.tell() + ecd_real_offset)
