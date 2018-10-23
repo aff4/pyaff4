@@ -341,6 +341,9 @@ class URN(RDFValue):
         #return utils.SmartStr(self) == utils.SmartStr(other)
         return utils.SmartUnicode(self.value) == utils.SmartUnicode(other)
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __ne__(self, other):
         #return utils.SmartStr(self) == utils.SmartStr(other)
         return utils.SmartUnicode(self.value) != utils.SmartUnicode(other)

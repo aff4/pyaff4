@@ -15,8 +15,6 @@
 """An implementation of the ZipFile based AFF4 volume."""
 from __future__ import unicode_literals
 
-from curses.ascii import US
-
 from future import standard_library
 standard_library.install_aliases()
 from builtins import range
@@ -29,7 +27,6 @@ import struct
 
 from pyaff4 import aff4
 from pyaff4 import aff4_file
-from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry

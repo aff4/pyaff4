@@ -1,8 +1,8 @@
 
 import os
 import platform
-import lexicon
-import rdfvalue
+from pyaff4 import lexicon
+from pyaff4 import rdfvalue
 import time
 import tzlocal
 from datetime import datetime
@@ -21,9 +21,15 @@ class FSMetadata(object):
     def create(filename):
         s = os.stat(filename)
 
-        p =  platform.system()
+        p = platform.system()
         if p == "Windows":
-            pass
+            size = s.st_size
+            local_tz = tzlocal.get_localzone()
+            birthTime = datetime.fromtimestamp(s.st_ctime, local_tz)
+            lastWritten = datetime.fromtimestamp(s.st_mtime, local_tz)
+            accessed = datetime.fromtimestamp(s.st_atime, local_tz)
+
+            return WindowsFSMetadata(filename, filename, size, lastWritten, accessed, birthTime)
         elif p == "Darwin":
             # https://forensic4cast.com/2016/10/macos-file-movements/
             size = s.st_size
@@ -51,3 +57,15 @@ class MacOSFSMetadata(FSMetadata):
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
 
+class WindowsFSMetadata(FSMetadata):
+    def __init__(self, urn, name, size, lastWritten, lastAccessed, birthTime):
+        super(WindowsFSMetadata, self).__init__(urn, name, size)
+        self.lastWritten = lastWritten
+        self.lastAccessed = lastAccessed
+        self.birthTime = birthTime
+
+    def store(self, resolver):
+        resolver.Set(self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
+        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
+        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
+        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))

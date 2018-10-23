@@ -21,7 +21,7 @@ def meta(file):
     try:
         with resolver.AFF4FactoryOpen(metadataURN) as fd:
             txt = fd.read(10000000)
-            print txt
+            print(utils.SmartUnicode(txt))
     except:
         pass
 
@@ -155,7 +155,7 @@ def addPathNames(container_name, pathnames, recursive):
                     if volume.isAFF4Collision(pathname):
                         image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
                     else:
-                        image_urn = volume.urn.Append(pathname, quote=False)
+                        image_urn = volume.urn.Append(escaping.arnPathFragment_from_path(pathname), quote=False)
 
                     fsmeta.urn = image_urn
                     fsmeta.store(resolver)
@@ -166,7 +166,7 @@ def addPathNames(container_name, pathnames, recursive):
                         for child in os.listdir(pathname):
                             pathnames.append(os.path.join(pathname, child))
                 else:
-                    with open(pathname) as src:
+                    with open(pathname, "rb") as src:
                         hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
                         urn = volume.writeLogical(pathname, hasher, fsmeta.length)
                         fsmeta.urn = urn

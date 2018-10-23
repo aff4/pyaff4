@@ -34,7 +34,7 @@ def arnPathFragment_from_path(pathName):
             pathName = pathName[1:]
 
     for c in pathName:
-        if c >= 0 and c<= 0x1f:
+        if ord(c) >= 0 and ord(c)<= 0x1f:
             # control codes
             escaped_path.append("%%%02x" % ord(c))
         elif c == '\\':
