@@ -29,6 +29,7 @@ from pyaff4 import aff4
 from pyaff4 import escaping
 from pyaff4.aff4_metadata import RDFObject
 from pyaff4 import zip
+from pyaff4.version import Version
 
 import yaml
 import uuid
@@ -77,7 +78,7 @@ class Container(object):
     @staticmethod
     def identifyURN(urn):
         resolver = data_store.MemoryDataStore(lexicon.standard)
-        with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, Version(0,1,"pyaff4"), urn) as zip_file:
             if len(list(zip_file.members.keys())) == 0:
                 # it's a new zipfile
                 raise IOError("Not an AFF4 Volume")
@@ -87,14 +88,15 @@ class Container(object):
                 versionTxt = version.ReadAll()
                 resolver.Close(version)
                 version = parseProperties(versionTxt)
+                version = Version.create(version)
                 return (version, lexicon.standard)
             except:
                 if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
                     # Rekall defined the new AFF4 namespace post the Wirespeed paper
-                    return ({ "major" : "0", "minor": "0" }, lexicon.scudette)
+                    return (Version(1,0,"pyaff4"), lexicon.scudette)
                 else:
                     # Wirespeed (Evimetry) 1.x and Evimetry 2.x stayed with the original namespace
-                    return ({ "major" : "0", "minor": "1" }, lexicon.legacy)
+                    return (Version(0,1,"pyaff4"), lexicon.legacy)
 
     def isMap(self, stream):
         types = self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE)
@@ -113,10 +115,11 @@ class Container(object):
 
         resolver.Set(container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
 
-        zip_file = zip.ZipFile.NewZipFile(resolver, container_urn)
+        version = Version(1, 1, "pyaff4")
+        zip_file = zip.ZipFile.NewZipFile(resolver, version, container_urn)
 
         volume_urn = zip_file.urn
-        version = { "major" : "0", "minor": "1", "tool" : "pyaff4" }
+
         localcache[volume_urn] = WritableLogicalImageContainer(version, volume_urn, resolver, lexicon.standard)
         return localcache[volume_urn]
 
@@ -152,7 +155,7 @@ class Container(object):
         except:
             (version, lex) = Container.identifyURN(urn)
             resolver = data_store.MemoryDataStore(lex)
-            with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
+            with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
                 volumeURN = zip_file.urn
                 if lex == lexicon.standard:
                     images = list(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
@@ -173,7 +176,7 @@ class Container(object):
                                 return localcache[urn]
                     else:
                         # it is a logical image
-                        if version["major"] == "1" and version["minor"] == "1":
+                        if version.is11():
                             # AFF4 logical images are defined at version 1.1
                             localcache[urn] = LogicalImageContainer(version, volumeURN, resolver, lex)
                             return localcache[urn]
@@ -271,13 +274,14 @@ class WritableLogicalImageContainer(Container):
 
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             container_description_urn = self.urn.Append("container.description")
+            volume.version = self.version
             with volume.CreateMember(container_description_urn) as container_description_file:
                 container_description_file.Write(SmartStr(volume.urn.value))
 
             version_urn = self.urn.Append("version.txt")
             with volume.CreateMember(version_urn) as versionFile:
                 # AFF4 logical containers are at v1.1
-                versionFile.Write(SmartStr(u"major=1\nminor=1\ntool=pyaff4\n"))
+                versionFile.Write(SmartStr(str(self.version)))
 
 
     def writeCompressedBlockStream(self, image_urn, filename, readstream):

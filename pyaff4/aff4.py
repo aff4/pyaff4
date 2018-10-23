@@ -154,7 +154,7 @@ class AFF4VolumeProperties(object):
 
 
 class AFF4Object(object):
-    def __init__(self, resolver, urn=None):
+    def __init__(self, resolver, urn=None, *args, **kwargs):
         self.resolver = resolver
         self._dirty = False
 

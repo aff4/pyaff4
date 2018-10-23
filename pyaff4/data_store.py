@@ -302,7 +302,11 @@ class MemoryDataStore(object):
     def DumpToTurtle(self, volumeurn, stream=None, verbose=False):
         g = rdflib.Graph()
         g.bind("aff4", rdflib.Namespace(self.lexicon.base))
-        volumeNamespace = rdflib.Namespace(volumeurn.value)
+
+        # looks like rdflib has some problems with re-constituting subjects using @base
+        # comment out for now
+        #volumeNamespace = rdflib.Namespace(volumeurn.value + "/")
+        #volumeBase = volumeurn.value + "/"
 
         for urn, items in self.store.items():
             urn = rdflib.URIRef(utils.SmartUnicode(urn))
@@ -330,10 +334,11 @@ class MemoryDataStore(object):
                 for item in value:
                     g.add((urn, attr, item.GetRaptorTerm()))
 
-        result = g.serialize(format='turtle', base=volumeNamespace)
+        #result = g.serialize(format='turtle', base=volumeNamespace)
+        result = g.serialize(format='turtle')
         result = utils.SmartUnicode(result)
-        basestart = "@base <%s> .\r\n" % volumeurn.value
-        result = basestart + result
+        #basestart = "@base <%s> .\r\n" % (volumeBase)
+        #result = basestart + result
         if stream:
             stream.write(utils.SmartStr(result))
 
@@ -368,7 +373,7 @@ class MemoryDataStore(object):
                 str(b) == lexicon.AFF4_LEGACY_NAMESPACE):
                 self.aff4NS = b
 
-    def AFF4FactoryOpen(self, urn):
+    def AFF4FactoryOpen(self, urn, version=None):
         urn = rdfvalue.URN(urn)
 
         # Is the object cached?
@@ -402,7 +407,7 @@ class MemoryDataStore(object):
             if handler is None:
                 raise IOError("Unable to create object %s" % urn)
 
-            obj = handler(resolver=self, urn=urn)
+            obj = handler(resolver=self, urn=urn, version=version)
             obj.LoadFromURN()
 
         # Cache the object for next time.

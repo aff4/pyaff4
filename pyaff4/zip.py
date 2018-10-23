@@ -32,6 +32,7 @@ from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import struct_parser
 from pyaff4 import utils, escaping
+from pyaff4.version import Version
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -495,12 +496,16 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
 
 class ZipFile(aff4.AFF4Volume):
-    def __init__(self, *args, **kwargs):
-        super(ZipFile, self).__init__(*args, **kwargs)
+    def __init__(self,  *args, **kwargs):
+        super(ZipFile, self).__init__( *args, **kwargs)
         self.children = set()
         # The members of this zip file. Keys is member URN, value is zip info.
         self.members = {}
         self.global_offset = 0
+        try:
+            self.version = kwargs["version"]
+        except:
+            self.version = Version(0,0, "pyaff4")
 
     def parse_cd(self, backing_store_urn):
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
@@ -668,7 +673,7 @@ class ZipFile(aff4.AFF4Volume):
                 # Store this information in the resolver. Ths allows
                 # segments to be directly opened by URN.
                 member_urn = escaping.urn_from_member_name(
-                    zip_info.filename, self.urn)
+                    zip_info.filename, self.urn, self.version)
 
                 self.resolver.Set(
                     member_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
@@ -686,9 +691,11 @@ class ZipFile(aff4.AFF4Volume):
                                  entry.file_comment_length)
 
     @staticmethod
-    def NewZipFile(resolver, backing_store_urn):
+    def NewZipFile(resolver, vers, backing_store_urn):
         rdfvalue.AssertURN(backing_store_urn)
-        result = ZipFile(resolver, urn=None)
+        if vers == None:
+            vers = Version(0,1,"pyaff4")
+        result = ZipFile(resolver, urn=None, version=vers)
 
         resolver.Set(result.urn, lexicon.AFF4_TYPE,
                      rdfvalue.URN(lexicon.AFF4_ZIP_TYPE))
@@ -696,10 +703,10 @@ class ZipFile(aff4.AFF4Volume):
         resolver.Set(result.urn, lexicon.AFF4_STORED,
                      rdfvalue.URN(backing_store_urn))
 
-        return resolver.AFF4FactoryOpen(result.urn)
+        return resolver.AFF4FactoryOpen(result.urn,  version=vers)
 
     def CreateMember(self, child_urn):
-        member_filename = escaping.member_name_for_urn(child_urn, self.urn, use_unicode=USE_UNICODE)
+        member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
 
         return self.CreateZipSegment(member_filename, arn=child_urn)
 
@@ -707,7 +714,7 @@ class ZipFile(aff4.AFF4Volume):
         self.MarkDirty()
         segment_urn = arn
         if arn is None:
-            segment_urn = escaping.urn_from_member_name(filename, self.urn)
+            segment_urn = escaping.urn_from_member_name(filename, self.urn, self.version)
 
         # Is it in the cache?
         res = self.resolver.CacheGet(segment_urn)
@@ -735,7 +742,7 @@ class ZipFile(aff4.AFF4Volume):
 
     def OpenZipSegment(self, filename):
         # Is it already in the cache?
-        segment_urn = escaping.urn_from_member_name(filename, self.urn)
+        segment_urn = escaping.urn_from_member_name(filename, self.urn, self.version)
         if segment_urn not in self.members:
             raise IOError("Segment %s does not exist yet" % filename)
 
@@ -796,7 +803,7 @@ class ZipFile(aff4.AFF4Volume):
             # global_offset into account).
             zip_info = ZipInfo(
                 local_header_offset=backing_store.Tell() - self.global_offset,
-                filename=escaping.member_name_for_urn(member_urn, self.urn, use_unicode=USE_UNICODE),
+                filename=escaping.member_name_for_urn(member_urn, self.version, self.urn, use_unicode=USE_UNICODE),
                 file_size=0, crc32=0, compression_method=compression_method)
 
             # For now we do not support streamed writing so we need to seek back

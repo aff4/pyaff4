@@ -22,17 +22,19 @@ standard_library.install_aliases()
 import os
 import unittest
 
-from pyaff4 import data_store
+from pyaff4 import data_store, escaping
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import zip
-
-
+from pyaff4.version import Version
+import traceback
 
 class ZipTest(unittest.TestCase):
     filename = "/tmp/aff4_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
-    segment_name = "犬/ネコ.txt"
+    segment_name = "/犬/ネコ.txt"
+    unc_segment_name = "\\\\foo\\bar\\ネコ.txt"
+    period_start_segment_name = "./foo/bar/foo.txt"
     data1 = b"I am a segment!"
 
     def setUp(self):
@@ -40,12 +42,23 @@ class ZipTest(unittest.TestCase):
             resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+            with zip.ZipFile.NewZipFile(resolver, Version(1, 1, "pyaff4"), self.filename_urn) as zip_file:
                 self.volume_urn = zip_file.urn
-                segment_urn = self.volume_urn.Append(self.segment_name, quote=False)
+                segment_urn = self.volume_urn.Append(escaping.arnPathFragment_from_path(self.segment_name), quote=False)
 
                 with zip_file.CreateMember(segment_urn) as segment:
                     segment.Write(self.data1)
+
+                unc_segment_urn = self.volume_urn.Append(escaping.arnPathFragment_from_path(self.unc_segment_name), quote=False)
+
+                with zip_file.CreateMember(unc_segment_urn) as segment:
+                    segment.Write(self.data1)
+
+                period_start_segment_urn = self.volume_urn.Append(self.period_start_segment_name, quote=False)
+
+                with zip_file.CreateMember(period_start_segment_urn) as segment:
+                    segment.Write(self.data1)
+
 
 
     def tearDown(self):
@@ -56,14 +69,27 @@ class ZipTest(unittest.TestCase):
 
 
     def testOpenSegmentByURN(self):
-        resolver = data_store.MemoryDataStore()
+        try:
+            resolver = data_store.MemoryDataStore()
 
-        # This is required in order to load and parse metadata from this volume
-        # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
-            segment_urn = zip_file.urn.Append(self.segment_name, quote=False)
-        with resolver.AFF4FactoryOpen(segment_urn) as segment:
-            self.assertEquals(segment.Read(1000), self.data1 )
+            # This is required in order to load and parse metadata from this volume
+            # into a fresh empty resolver.
+            with zip.ZipFile.NewZipFile(resolver, Version(1, 1, "pyaff4"), self.filename_urn) as zip_file:
+                segment_urn = zip_file.urn.Append(escaping.arnPathFragment_from_path(self.segment_name), quote=False)
+                unc_segment_urn = zip_file.urn.Append(escaping.arnPathFragment_from_path(self.unc_segment_name), quote=False)
+                period_start_segment_urn = self.volume_urn.Append(
+                    escaping.arnPathFragment_from_path(self.period_start_segment_name), quote=False)
+
+            with resolver.AFF4FactoryOpen(segment_urn) as segment:
+                self.assertEquals(segment.Read(1000), self.data1 )
+            with resolver.AFF4FactoryOpen(unc_segment_urn) as segment:
+                self.assertEquals(segment.Read(1000), self.data1 )
+            with resolver.AFF4FactoryOpen(unc_segment_urn) as segment:
+                self.assertEquals(segment.Read(1000), self.data1)
+
+        except Exception:
+            traceback.print_exc()
+            self.fail()
 
 if __name__ == '__main__':
     unittest.main()

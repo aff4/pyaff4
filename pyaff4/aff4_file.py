@@ -160,7 +160,7 @@ class FileBackedObject(aff4.AFF4Stream):
         return self.fd.tell()
 
 
-def GenericFileHandler(resolver, urn):
+def GenericFileHandler(resolver, urn, *args, **kwargs):
     if os.path.isdir(urn.ToFilename()):
         directory_handler = registry.AFF4_TYPE_MAP[lexicon.AFF4_DIRECTORY_TYPE]
         result = directory_handler(resolver)

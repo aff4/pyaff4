@@ -108,6 +108,9 @@ class LogicalTest(unittest.TestCase):
                     traceback.print_exc()
                     self.fail("content of information.turtle is wrong")
 
+        except Exception:
+            traceback.print_exc()
+
         finally:
             os.unlink(containerName)
 
