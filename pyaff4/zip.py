@@ -165,7 +165,8 @@ class Zip64FileHeaderExtensibleField(object):
 
     def Pack(self):
         # Size of extra less the header.
-        self.Set("data_size", self.sizeof() - 4)
+        #self.Set("data_size", self.sizeof() - 4)
+        self.data_size = self.sizeof()
         return struct.pack(self.format_string(),
                            *[v for t, _, v in self.fields if v is not None])
 
