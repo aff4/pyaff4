@@ -17,7 +17,10 @@ project at https://github.com/aff4/ReferenceImages
 2. Reading AFF4 Image streams using the deflate or snappy compressor.
 3. Reading RDF metadata using Turtle (and in some instances YAML for backwards compatibility).
 
-## What is not yet supported.
+## What is in progress
+1. Logical file acquisition.
+
+ ## What is not yet supported:
 
 The write support in the libraries is currently broken and being worked on. Other aspects of 
 the AFF4 that have not yet been implemented in this codebase include:
@@ -28,7 +31,6 @@ the AFF4 that have not yet been implemented in this codebase include:
 4. Splitting an AFF4 Image across multiple volumes.
 5. Map streams.
 6. Support for signed statements or Bill of Materials.
-7. Logical file acquisition.
 
 ## Notice
 
