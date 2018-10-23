@@ -205,12 +205,6 @@ class MemoryDataStore(object):
 
     def __init__(self, lex=lexicon.standard):
         self.lexicon = lex
-        self.suppressed_rdftypes = dict()
-        self.suppressed_rdftypes[lexicon.AFF4_ZIP_SEGMENT_TYPE] = set((
-            lexicon.AFF4_STORED, lexicon.AFF4_TYPE))
-        self.suppressed_rdftypes[lexicon.AFF4_ZIP_TYPE] = set((
-            lexicon.AFF4_STORED, lexicon.AFF4_TYPE))
-
         self.store = collections.OrderedDict()
         self.ObjectCache = AFF4ObjectCache(10)
         self.flush_callbacks = {}
@@ -291,13 +285,22 @@ class MemoryDataStore(object):
     def Close(self, obj):
         self.ObjectCache.Remove(obj)
 
-    def _should_ignore(self, attr, type):
-        if not isinstance(type, list):
-            type = [type]
+    def _should_ignore(self, subject, predicate, object):
 
-        for t in type:
-            if attr in self.suppressed_rdftypes.get(t, ()):
+        if predicate == lexicon.AFF4_TYPE:
+            if object == lexicon.AFF4_ZIP_SEGMENT_TYPE or object == object == lexicon.AFF4_ZIP_TYPE:
                 return True
+            else:
+                return False
+
+        if predicate == lexicon.AFF4_STORED:
+            if not str(object).startswith(u"aff4://"):
+                return True
+            elif subject.startswith(object.SerializeToString()):
+                return True
+
+        return False
+
 
     def DumpToTurtle(self, volumeurn, stream=None, verbose=False):
         g = rdflib.Graph()
@@ -309,7 +312,7 @@ class MemoryDataStore(object):
         #volumeBase = volumeurn.value + "/"
 
         for urn, items in self.store.items():
-            urn = rdflib.URIRef(utils.SmartUnicode(urn))
+            urn = utils.SmartUnicode(urn)
             type = items.get(utils.SmartUnicode(lexicon.AFF4_TYPE))
             if type is None:
                 continue
@@ -324,15 +327,13 @@ class MemoryDataStore(object):
                     if attr.startswith(lexicon.AFF4_VOLATILE_NAMESPACE):
                         continue
 
-                    if self._should_ignore(attr, type):
-                        continue
-
-                attr = rdflib.URIRef(attr)
                 if not isinstance(value, list):
                     value = [value]
 
                 for item in value:
-                    g.add((urn, attr, item.GetRaptorTerm()))
+                    if self._should_ignore(urn, attr, item):
+                        continue
+                    g.add((rdflib.URIRef(urn), rdflib.URIRef(attr), item.GetRaptorTerm()))
 
         #result = g.serialize(format='turtle', base=volumeNamespace)
         result = g.serialize(format='turtle')
