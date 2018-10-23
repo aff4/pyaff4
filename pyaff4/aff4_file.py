@@ -112,6 +112,18 @@ class FileBackedObject(aff4.AFF4Stream):
         self.readptr += len(result)
         return result
 
+    def ReadAll(self):
+        res = b""
+        while True:
+            toRead = 32 * 1024
+            data = self.Read(toRead)
+            if data == None or len(data) == 0:
+                # EOF
+                return res
+            else:
+                res += data
+
+
     def WriteStream(self, stream, progress=None):
         """Copy the stream into this stream."""
         while True:

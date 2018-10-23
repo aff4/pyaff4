@@ -334,7 +334,7 @@ class MemoryDataStore(object):
         return result
 
     def LoadFromTurtle(self, stream):
-        data = stream.read(1000000)
+        data = stream.ReadAll()
         g = rdflib.Graph()
         g.parse(data=data, format="turtle")
 
