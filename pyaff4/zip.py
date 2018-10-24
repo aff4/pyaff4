@@ -24,15 +24,16 @@ import logging
 import io
 import zlib
 import struct
+import traceback
 
 from pyaff4 import aff4
 from pyaff4 import aff4_file
-from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import struct_parser
-from pyaff4 import utils
+from pyaff4 import utils, escaping
+from pyaff4.version import Version
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -45,6 +46,13 @@ ZIP32_MAX_SIZE = 2**32 -1
 
 BUFF_SIZE = 64 * 1024
 
+# Flag for debugging zip (uses pre Zip64 so we can open using more Zip tools. Should be false for production.
+ZIP_DEBUG = True
+
+# Use unicode filenames per Appendix D of APPNOTE.TXT ( bit 11 EFS)
+# produces zips that are openable correctly with Windows Explorer, WinRAR, and 7-ZIP
+#   incompatible with MacOS shell compressor and doesnt display will with unzip (infozip)
+USE_UNICODE = True
 
 class EndCentralDirectory(struct_parser.CreateStruct(
         "EndCentralDirectory_t",
@@ -157,7 +165,8 @@ class Zip64FileHeaderExtensibleField(object):
 
     def Pack(self):
         # Size of extra less the header.
-        self.Set("data_size", self.sizeof() - 4)
+        #self.Set("data_size", self.sizeof() - 4)
+        self.data_size = self.sizeof()
         return struct.pack(self.format_string(),
                            *[v for t, _, v in self.fields if v is not None])
 
@@ -280,15 +289,22 @@ class ZipInfo(object):
         if self.file_header_offset is None:
             self.file_header_offset = backing_store.Tell()
 
+        encodedFilename = self.filename
+        if USE_UNICODE:
+            encodedFilename = self.filename.encode("utf-8")
+
         header = ZipFileHeader(
             crc32=self.crc32,
             compress_size=self.compress_size,
             file_size=self.file_size,
-            file_name_length=len(self.filename),
+            file_name_length=len(encodedFilename),
             compression_method=self.compression_method,
             lastmodtime=self.lastmodtime,
             lastmoddate=self.lastmoddate,
             extra_field_len=0)
+
+        if USE_UNICODE:
+            header.flags = header.flags | (1 << 11)
 
         extra_header_64 = Zip64FileHeaderExtensibleField()
         if self.file_size > ZIP32_MAX_SIZE:
@@ -305,22 +321,27 @@ class ZipInfo(object):
 
         backing_store.Seek(self.file_header_offset)
         backing_store.Write(header.Pack())
-        backing_store.write(utils.SmartStr(self.filename))
+        backing_store.write(encodedFilename)
 
         if not extra_header_64.empty():
             backing_store.Write(extra_header_64.Pack())
 
     def WriteCDFileHeader(self, backing_store):
+        encodedFilename = self.filename
+        if USE_UNICODE:
+            encodedFilename = self.filename.encode("utf-8")
         header = CDFileHeader(
             compression_method=self.compression_method,
             file_size=self.file_size,
             compress_size=self.compress_size,
             relative_offset_local_header=self.local_header_offset,
             crc32=self.crc32,
-            file_name_length=len(self.filename),
+            file_name_length=len(encodedFilename),
             dostime=self.lastmodtime,
             dosdate=self.lastmoddate)
 
+        if USE_UNICODE:
+            header.flags = header.flags | (1 << 11)
         extra_header_64 = Zip64FileHeaderExtensibleField()
         if self.file_size > ZIP32_MAX_SIZE:
             header.file_size = 0xFFFFFFFF
@@ -340,7 +361,7 @@ class ZipInfo(object):
             header.extra_field_len = extra_header_64.sizeof()
 
         backing_store.write(header.Pack())
-        backing_store.write(utils.SmartStr(self.filename))
+        backing_store.write(encodedFilename)
 
         if not extra_header_64.empty():
             backing_store.write(extra_header_64.Pack())
@@ -415,9 +436,15 @@ class ZipFileSegment(aff4_file.FileBackedObject):
             if not file_header.IsValid():
                 raise IOError("Local file header invalid!")
 
-            # The filename should be null terminated.
-            file_header_filename = backing_store.Read(
-                file_header.file_name_length).split(b"\x00")[0]
+            file_header_filename = ""
+            if file_header.flags | (1 << 11):
+                # decode the filename to UTF-8 if the EFS bit (bit 11) is set
+                fn = backing_store.Read(file_header.file_name_length)
+                file_header_filename = fn.decode("utf-8")
+            else:
+                # The filename should be null terminated.
+                file_header_filename = backing_store.Read(
+                    file_header.file_name_length).split(b"\x00")[0]
 
             if file_header_filename != zip_info.filename:
                 msg = (u"Local filename %s different from "
@@ -471,12 +498,16 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
 
 class ZipFile(aff4.AFF4Volume):
-    def __init__(self, *args, **kwargs):
-        super(ZipFile, self).__init__(*args, **kwargs)
+    def __init__(self,  *args, **kwargs):
+        super(ZipFile, self).__init__( *args, **kwargs)
         self.children = set()
         # The members of this zip file. Keys is member URN, value is zip info.
         self.members = {}
         self.global_offset = 0
+        try:
+            self.version = kwargs["version"]
+        except:
+            self.version = Version(0,0, "pyaff4")
 
     def parse_cd(self, backing_store_urn):
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
@@ -499,6 +530,9 @@ class ZipFile(aff4.AFF4Volume):
                 backing_store.Seek(ecd_real_offset + end_cd.sizeof())
                 urn_string = backing_store.Read(end_cd.comment_len)
 
+                # trim trailing null if there
+                if urn_string[end_cd.comment_len-1] == chr(0):
+                    urn_string = urn_string[0:end_cd.comment_len-1]
                 LOGGER.info("Loaded AFF4 volume URN %s from zip file.",
                             urn_string)
 
@@ -599,8 +633,14 @@ class ZipFile(aff4.AFF4Volume):
                         "CDFileHeader at offset %#x invalid", entry_offset)
                     raise RuntimeError()
 
+                fn = backing_store.Read(entry.file_name_length)
+
+                # decode the filename to UTF-8 if the EFS bit (bit 11) is set
+                if entry.flags | (1 << 11):
+                    fn = fn.decode("utf-8")
+
                 zip_info = ZipInfo(
-                    filename=backing_store.Read(entry.file_name_length),
+                    filename=fn,
                     local_header_offset=entry.relative_offset_local_header,
                     compression_method=entry.compression_method,
                     compress_size=entry.compress_size,
@@ -634,8 +674,8 @@ class ZipFile(aff4.AFF4Volume):
 
                 # Store this information in the resolver. Ths allows
                 # segments to be directly opened by URN.
-                member_urn = aff4_utils.urn_from_member_name(
-                    zip_info.filename, self.urn)
+                member_urn = escaping.urn_from_member_name(
+                    zip_info.filename, self.urn, self.version)
 
                 self.resolver.Set(
                     member_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
@@ -653,9 +693,11 @@ class ZipFile(aff4.AFF4Volume):
                                  entry.file_comment_length)
 
     @staticmethod
-    def NewZipFile(resolver, backing_store_urn):
+    def NewZipFile(resolver, vers, backing_store_urn):
         rdfvalue.AssertURN(backing_store_urn)
-        result = ZipFile(resolver, urn=None)
+        if vers == None:
+            vers = Version(0,1,"pyaff4")
+        result = ZipFile(resolver, urn=None, version=vers)
 
         resolver.Set(result.urn, lexicon.AFF4_TYPE,
                      rdfvalue.URN(lexicon.AFF4_ZIP_TYPE))
@@ -663,15 +705,27 @@ class ZipFile(aff4.AFF4Volume):
         resolver.Set(result.urn, lexicon.AFF4_STORED,
                      rdfvalue.URN(backing_store_urn))
 
-        return resolver.AFF4FactoryOpen(result.urn)
+        return resolver.AFF4FactoryOpen(result.urn,  version=vers)
+
+    def ContainsMember(self, arn):
+        for member in self.members:
+            if member == arn:
+                return True
+        return False
+
+        #member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
+
 
     def CreateMember(self, child_urn):
-        member_filename = aff4_utils.member_name_for_urn(child_urn, self.urn)
-        return self.CreateZipSegment(member_filename)
+        member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
 
-    def CreateZipSegment(self, filename):
+        return self.CreateZipSegment(member_filename, arn=child_urn)
+
+    def CreateZipSegment(self, filename, arn=None):
         self.MarkDirty()
-        segment_urn = aff4_utils.urn_from_member_name(filename, self.urn)
+        segment_urn = arn
+        if arn is None:
+            segment_urn = escaping.urn_from_member_name(filename, self.urn, self.version)
 
         # Is it in the cache?
         res = self.resolver.CacheGet(segment_urn)
@@ -690,15 +744,18 @@ class ZipFile(aff4.AFF4Volume):
         result = ZipFileSegment(resolver=self.resolver, urn=segment_urn)
         result.LoadFromZipFile(self)
 
-        LOGGER.info("Creating ZipFileSegment %s",
-                    result.urn.SerializeToString())
+        # FIXME commenting due to unicode logging issue
+        #LOGGER.info(u"Creating ZipFileSegment %s",
+        #            result.urn.SerializeToString())
 
         # Add the new object to the object cache.
         return self.resolver.CachePut(result)
 
+
+
     def OpenZipSegment(self, filename):
         # Is it already in the cache?
-        segment_urn = aff4_utils.urn_from_member_name(filename, self.urn)
+        segment_urn = escaping.urn_from_member_name(filename, self.urn, self.version)
         if segment_urn not in self.members:
             raise IOError("Segment %s does not exist yet" % filename)
 
@@ -759,7 +816,7 @@ class ZipFile(aff4.AFF4Volume):
             # global_offset into account).
             zip_info = ZipInfo(
                 local_header_offset=backing_store.Tell() - self.global_offset,
-                filename=aff4_utils.member_name_for_urn(member_urn, self.urn),
+                filename=escaping.member_name_for_urn(member_urn, self.version, self.urn, use_unicode=USE_UNICODE),
                 file_size=0, crc32=0, compression_method=compression_method)
 
             # For now we do not support streamed writing so we need to seek back
@@ -824,7 +881,7 @@ class ZipFile(aff4.AFF4Volume):
             with self.CreateZipSegment(u"information.turtle") as turtle_segment:
                 turtle_segment.compression_method = ZIP_DEFLATE
 
-                self.resolver.DumpToTurtle(stream=turtle_segment)
+                self.resolver.DumpToTurtle(self.urn, stream=turtle_segment)
                 turtle_segment.Flush()
 
             # Write the central directory.
@@ -851,36 +908,49 @@ class ZipFile(aff4.AFF4Volume):
                 LOGGER.info("Writing CD entry for %s", urn)
                 zip_info.WriteCDFileHeader(cd_stream)
 
-            locator = Zip64CDLocator(
-                offset_of_end_cd=(cd_stream.tell() + ecd_real_offset -
-                                  self.global_offset))
-
+            offset_of_end_cd = cd_stream.tell() + ecd_real_offset - self.global_offset
             size_of_cd = cd_stream.tell()
-
-            end_cd = Zip64EndCD(
-                size_of_header=Zip64EndCD.sizeof()-12,
-                number_of_entries_in_volume=total_entries,
-                number_of_entries_in_total=total_entries,
-                size_of_cd=size_of_cd,
-                offset_of_cd=locator.offset_of_end_cd - size_of_cd)
-
+            offset_of_cd = offset_of_end_cd - size_of_cd
             urn_string = self.urn.SerializeToString()
+
+            # the following is included for debugging the zip implementation.
+            # for small zip files, enable output to non-zip64 containers
+            # NOT TO BE USED IN PRODUCTION
+            if not ZIP_DEBUG or offset_of_cd > ZIP32_MAX_SIZE or size_of_cd > ZIP32_MAX_SIZE:
+                # only write zip64 headers if needed
+                locator = Zip64CDLocator(
+                    offset_of_end_cd=(offset_of_end_cd))
+
+                end_cd = Zip64EndCD(
+                    size_of_header=Zip64EndCD.sizeof()-12,
+                    number_of_entries_in_volume=total_entries,
+                    number_of_entries_in_total=total_entries,
+                    size_of_cd=size_of_cd,
+                    offset_of_cd=offset_of_cd)
+
+                LOGGER.info("Writing Zip64EndCD at %#x",
+                            cd_stream.tell() + ecd_real_offset)
+                cd_stream.write(end_cd.Pack())
+                cd_stream.write(locator.Pack())
+
             end = EndCentralDirectory(
                 total_entries_in_cd_on_disk=len(self.members),
                 total_entries_in_cd=len(self.members),
-                comment_len=len(urn_string))
+                comment_len=len(urn_string),
+                offset_of_cd = offset_of_cd,
+                size_of_cd = size_of_cd)
 
-            LOGGER.info("Writing Zip64EndCD at %#x",
-                        cd_stream.tell() + ecd_real_offset)
+            if size_of_cd > ZIP32_MAX_SIZE or not ZIP_DEBUG :
+                end.size_of_cd = 0xffffffff
 
-            cd_stream.write(end_cd.Pack())
-            cd_stream.write(locator.Pack())
+            if offset_of_end_cd > ZIP32_MAX_SIZE or not ZIP_DEBUG :
+                end.offset_of_cd = 0xffffffff
 
             LOGGER.info("Writing ECD at %#x",
                         cd_stream.tell() + ecd_real_offset)
 
             cd_stream.write(end.Pack())
-            cd_stream.write(urn_string)
+            cd_stream.write(utils.SmartStr(urn_string))
 
             # Now copy the cd_stream into the backing_store in one write
             # operation.

@@ -30,6 +30,7 @@ XSD_NAMESPACE = "http://www.w3.org/2001/XMLSchema#"
 RDF_NAMESPACE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 AFF4_MEMORY_NAMESPACE = "http://aff4.org/Schema#memory/"
 AFF4_DISK_NAMESPACE = "http://aff4.org/Schema#disk/"
+AFF4_MACOS_NAMESPACE = "http://aff4.org/Schema#macos/"
 
 
 # Attributes in this namespace will never be written to persistant
@@ -91,6 +92,10 @@ AFF4_STREAM_ORIGINAL_FILENAME = (AFF4_NAMESPACE + "original_filename")
 # ZipFileSegment
 AFF4_ZIP_SEGMENT_TYPE = (AFF4_NAMESPACE + "zip_segment")
 
+# ZipStoredLogicalStream
+AFF4_ZIP_SEGMENT_IMAGE_TYPE = (AFF4_NAMESPACE + "ZipSegmentImage")
+AFF4_FILEIMAGE = (AFF4_NAMESPACE + "FileImage")
+
 # AFF4 Image Stream - stores a stream using Bevies.
 AFF4_IMAGE_TYPE = (AFF4_NAMESPACE + "ImageStream")
 AFF4_LEGACY_IMAGE_TYPE = (AFF4_LEGACY_NAMESPACE + "stream")
@@ -145,11 +150,16 @@ HASH_SHA1 = rdflib.URIRef("http://aff4.org/Schema#SHA1")
 HASH_MD5 = rdflib.URIRef("http://aff4.org/Schema#MD5")
 HASH_BLAKE2B = rdflib.URIRef("http://aff4.org/Schema#Blake2b")
 
+
+
 HASH_BLOCKMAPHASH_SHA512 = rdflib.URIRef("http://aff4.org/Schema#blockMapHashSHA512")
 
 class Lexicon(object):
     def __init__(self):
         pass
+
+    def of(self, end):
+        return self.base + end
 
 class StdLexicon(Lexicon):
     base = AFF4_NAMESPACE
@@ -176,6 +186,16 @@ class StdLexicon(Lexicon):
     OSXKernelPhysicalOffset = base + "OSXKernelPhysicalOffset"
     OSXKALSRSlide = base + "OSXKALSRSlide"
     OSXDTBPhysicalOffset = base + "OSXDTBPhysicalOffset"
+
+class Std11Lexicon(StdLexicon):
+    base = AFF4_NAMESPACE
+    FileImage = base + "FileImage"
+    FolderImage = base + "FolderImage"
+    lastWritten = (AFF4_NAMESPACE + "lastWritten")
+    lastAccessed = (AFF4_NAMESPACE + "lastAccessed")
+    recordChanged = (AFF4_NAMESPACE + "recordChanged")
+    birthTime = (AFF4_NAMESPACE + "birthTime")
+    pathName = (AFF4_NAMESPACE + "originalFileName")
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE
@@ -211,10 +231,16 @@ class ScudetteLexicon(Lexicon):
     category  = base + "category"
     memoryPhysical = "http://aff4.org/Schema#memory/physical"
 
+# early logical imaging support for pmem
+class PmemLogicalPreStd(StdLexicon):
+    pathName = (AFF4_NAMESPACE + "original_filename")
+
+
 legacy = LegacyLexicon()
 standard = StdLexicon()
 scudette = ScudetteLexicon()
-
+standard11 = Std11Lexicon()
+pmemlogical = PmemLogicalPreStd()
 
 def AutoResolveAttribute(resolver, urn, attribute):
     """Iterate over all lexicons to autodetect the attribute."""

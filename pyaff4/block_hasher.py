@@ -101,10 +101,10 @@ class Validator(object):
         self.delegate = None
 
     def validateContainer(self, urn):
-        lex = container.Container.identifyURN(urn)
+        (version, lex) = container.Container.identifyURN(urn)
         resolver = data_store.MemoryDataStore(lex)
 
-        with zip.ZipFile.NewZipFile(resolver, urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
             if lex == lexicon.standard:
                 self.delegate = InterimStdValidator(resolver, lex, self.listener)
             elif lex == lexicon.legacy:
@@ -117,11 +117,11 @@ class Validator(object):
     def validateContainerMultiPart(self, urn_a, urn_b):
         # in this simple example, we assume that both files passed are
         # members of the Container
-        lex = container.Container.identifyURN(urn_a)
+        (version, lex) = container.Container.identifyURN(urn_a)
         resolver = data_store.MemoryDataStore(lex)
 
-        with zip.ZipFile.NewZipFile(resolver, urn_a) as zip_filea:
-            with zip.ZipFile.NewZipFile(resolver, urn_b) as zip_fileb:
+        with zip.ZipFile.NewZipFile(resolver, version, urn_a) as zip_filea:
+            with zip.ZipFile.NewZipFile(resolver, version, urn_b) as zip_fileb:
                 if lex == lexicon.standard:
                     self.delegate = InterimStdValidator(resolver, lex, self.listener)
                 elif lex == lexicon.legacy:
@@ -469,14 +469,18 @@ class InterimStdValidator(Validator):
                     # Merkel tree inner nodes
                     current_hash = hashes.new(hash_datatype)
 
-                    # FIXME: This is a flaw in the scheme since there
-                    # is no reasonable order specified. We temporarily
-                    # sort the results to get the test to pass but
-                    # this needs to be properly addressed.
-
-                    # We rely on the natural ordering of the map URN's
+                    # The canonical striped images and Evimetry rely on the natural ordering
+                    # (string comparison) of the map URN's
                     # as they are stored in the map to order the
                     # blockMapHashes in the Merkel tree.
+                    #
+                    # For example for a striped image composed of two containers, we would have one map per
+                    # container. c1  -- >  aff4://363ac10c-8d8d-4905-ac25-a14aaddd8a41
+                    #            c2  -->   aff4://2dd04819-73c8-40e3-a32b-fdddb0317eac
+                    # At this level of the merkel tree, we order the concatenated hashes based on
+                    # the map URI, so we would calculate the hash from c2 then c1
+                    # TODO: update the specification to reflect this rule
+
                     for parent_map, calculated_hash in sorted(calculated_hashes.items()):
                         current_hash.update(calculated_hash.digest())
 

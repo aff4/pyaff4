@@ -35,7 +35,7 @@ from pyaff4 import hashes
 
 
 LOGGER = logging.getLogger("pyaff4")
-
+DEBUG = False
 
 class _CompressorStream(object):
     """A stream which chunks up another stream.
@@ -72,11 +72,17 @@ class _CompressorStream(object):
         elif self.owner.compression == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
             compressed_chunk = chunk
 
-        self.bevy_index.append((self.bevy_length, len(compressed_chunk)))
-        self.bevy_length += len(compressed_chunk)
+        compressedLen = len(compressed_chunk)
         self.chunk_count_in_bevy += 1
 
-        return compressed_chunk
+        if compressedLen < self.owner.chunk_size - 16:
+            self.bevy_index.append((self.bevy_length, compressedLen))
+            self.bevy_length += compressedLen
+            return compressed_chunk
+        else:
+            self.bevy_index.append((self.bevy_length, self.owner.chunk_size))
+            self.bevy_length += self.owner.chunk_size
+            return chunk
 
 
 class AFF4Image(aff4.AFF4Stream):
@@ -88,7 +94,7 @@ class AFF4Image(aff4.AFF4Stream):
             # it.
             volume.children.add(image_urn)
 
-            resolver.Set(image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
+            resolver.Add(image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
                 lexicon.AFF4_IMAGE_TYPE))
 
             resolver.Set(image_urn, lexicon.AFF4_STORED,
@@ -103,17 +109,17 @@ class AFF4Image(aff4.AFF4Stream):
 
         self.lexicon = self.resolver.lexicon
 
-        self.chunk_size = int(lexicon.AutoResolveAttribute(
-            self.resolver, self.urn, "chunkSize")  or 32*1024)
+        self.chunk_size = int(self.resolver.Get(
+            self.urn, self.lexicon.chunkSize) or 32 * 1024)
 
-        self.chunks_per_segment = int(lexicon.AutoResolveAttribute(
-            self.resolver, self.urn, "chunksPerSegment") or 1024)
+        self.chunks_per_segment = int(self.resolver.Get(
+            self.urn, self.lexicon.chunksPerSegment) or 1024)
 
-        self.size = int(lexicon.AutoResolveAttribute(
-            self.resolver, self.urn, "streamSize") or 0)
+        sz = self.resolver.Get(self.urn, self.lexicon.streamSize) or 0
+        self.size = int(sz)
 
-        self.compression = (lexicon.AutoResolveAttribute(
-            self.resolver, self.urn, "compressionMethod")  or
+        self.compression = (self.resolver.Get(
+            self.urn, self.lexicon.compressionMethod) or
             lexicon.AFF4_IMAGE_COMPRESSION_ZLIB)
 
         # A buffer for overlapped writes which do not fit into a chunk.
@@ -147,7 +153,10 @@ class AFF4Image(aff4.AFF4Stream):
     def WriteStream(self, source_stream, progress=None):
         """Copy data from a source stream into this stream."""
         if progress is None:
-            progress = aff4.DEFAULT_PROGRESS
+            if DEBUG:
+                progress = aff4.DEFAULT_PROGRESS
+            else:
+                progress = aff4.EMPTY_PROGRESS
 
         volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
         if not volume_urn:
@@ -246,7 +255,7 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_length = 0
 
     def _write_metadata(self):
-        self.resolver.Set(self.urn, lexicon.AFF4_TYPE,
+        self.resolver.Add(self.urn, lexicon.AFF4_TYPE,
                           rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
 
         self.resolver.Set(self.urn, lexicon.AFF4_IMAGE_CHUNK_SIZE,
@@ -305,6 +314,17 @@ class AFF4Image(aff4.AFF4Stream):
         self.readptr += len(result)
 
         return result
+
+    def ReadAll(self):
+        res = b""
+        while True:
+            toRead = 32 * 1024
+            data = self.Read(toRead)
+            if data == None or len(data) == 0:
+                # EOF
+                return res
+            else:
+                res += data
 
     def _parse_bevy_index(self, bevy):
         """Read and return the bevy's index.
@@ -413,7 +433,6 @@ class AFF4Image(aff4.AFF4Stream):
         if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_ZLIB :
             if len(cbuffer) == self.chunk_size:
                 return cbuffer
-
             return zlib.decompress(cbuffer)
 
         # Backwards compatibility with Scudette's AFF4 implementation.

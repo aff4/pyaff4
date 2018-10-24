@@ -20,6 +20,7 @@ from pyaff4 import aff4
 from pyaff4 import data_store
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
+from pyaff4 import streams
 import unittest
 
 import io
@@ -56,9 +57,10 @@ class DataStoreTest(unittest.TestCase):
             rdfvalue.XSDString("bar"))
 
     def testTurtleSerialization(self):
-        data = self.store.DumpToTurtle(verbose=True)
+        data = self.store.DumpToTurtle(None, verbose=True)
         new_store = data_store.MemoryDataStore()
-        new_store.LoadFromTurtle(io.BytesIO(data))
+        stream = io.BytesIO(data.encode('utf-8'))
+        new_store.LoadFromTurtle(stream)
         res = new_store.Get(self.hello_urn, rdfvalue.URN(
             lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY))
         self.assertEquals(res, b"foo")

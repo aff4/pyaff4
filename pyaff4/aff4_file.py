@@ -27,6 +27,7 @@ from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
+from pyaff4 import utils
 
 BUFF_SIZE = 64 * 1024
 
@@ -112,6 +113,18 @@ class FileBackedObject(aff4.AFF4Stream):
         self.readptr += len(result)
         return result
 
+    def ReadAll(self):
+        res = b""
+        while True:
+            toRead = 32 * 1024
+            data = self.Read(toRead)
+            if data == None or len(data) == 0:
+                # EOF
+                return res
+            else:
+                res += data
+
+
     def WriteStream(self, stream, progress=None):
         """Copy the stream into this stream."""
         while True:
@@ -125,10 +138,14 @@ class FileBackedObject(aff4.AFF4Stream):
     def Write(self, data):
         self.MarkDirty()
 
-        if self.fd.tell() != self.readptr:
-            self.fd.seek(self.readptr)
+        # On OSX, the following test doesn't work
+        # so we need to do the seek every time
+        # if self.fd.tell() != self.readptr:
+        #    self.fd.seek(self.readptr)
+        # TODO: make this platform aware
+        self.fd.seek(self.readptr)
 
-        self.fd.write(data)
+        self.fd.write(utils.SmartStr(data))
         # self.fd.flush()
         self.readptr += len(data)
 
@@ -148,7 +165,7 @@ class FileBackedObject(aff4.AFF4Stream):
         return self.fd.tell()
 
 
-def GenericFileHandler(resolver, urn):
+def GenericFileHandler(resolver, urn, *args, **kwargs):
     if os.path.isdir(urn.ToFilename()):
         directory_handler = registry.AFF4_TYPE_MAP[lexicon.AFF4_DIRECTORY_TYPE]
         result = directory_handler(resolver)

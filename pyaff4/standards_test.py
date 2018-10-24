@@ -28,6 +28,7 @@ from pyaff4 import plugins
 from pyaff4 import rdfvalue
 from pyaff4 import zip
 from pyaff4 import hashes
+from pyaff4 import version
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -53,7 +54,7 @@ class StandardsTest(unittest.TestCase):
     def testLocateImage(self):
         resolver = data_store.MemoryDataStore()
 
-        with zip.ZipFile.NewZipFile(resolver, self.stdLinearURN) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.stdLinearURN) as zip_file:
             for subject in resolver.QueryPredicateObject(
                     "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
                     "http://aff4.org/Schema#DiskImage"):
@@ -79,7 +80,7 @@ class StandardsTest(unittest.TestCase):
     def testReadMap(self):
         resolver = data_store.MemoryDataStore()
 
-        with zip.ZipFile.NewZipFile(resolver, self.stdLinearURN) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.stdLinearURN) as zip_file:
             imageStream = resolver.AFF4FactoryOpen(
                 "aff4://c215ba20-5648-4209-a793-1f918c723610")
 
@@ -91,7 +92,7 @@ class StandardsTest(unittest.TestCase):
     def testReadImageStream(self):
         resolver = data_store.MemoryDataStore()
 
-        with zip.ZipFile.NewZipFile(resolver, self.stdLinearURN) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.stdLinearURN) as zip_file:
             mapStream = resolver.AFF4FactoryOpen(
                 "aff4://c215ba20-5648-4209-a793-1f918c723610")
 

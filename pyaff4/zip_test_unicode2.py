@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+#
+
 from __future__ import unicode_literals
 # Copyright 2015 Google Inc. All rights reserved.
 #
@@ -17,12 +20,10 @@ from __future__ import unicode_literals
 from future import standard_library
 standard_library.install_aliases()
 import os
-import io
 import unittest
 
 from pyaff4 import data_store
 from pyaff4 import lexicon
-from pyaff4 import plugins
 from pyaff4 import rdfvalue
 from pyaff4 import zip
 from pyaff4 import version
@@ -31,32 +32,20 @@ from pyaff4 import version
 class ZipTest(unittest.TestCase):
     filename = "/tmp/aff4_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
-    segment_name = "Foobar.txt"
-    streamed_segment = "streamed.txt"
+    segment_name = "\\犬\\ネコ.txt"
     data1 = b"I am a segment!"
-    data2 = b"I am another segment!"
 
     def setUp(self):
         with data_store.MemoryDataStore() as resolver:
             resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
+            with zip.ZipFile.NewZipFile(resolver, version.aff4v11, self.filename_urn) as zip_file:
                 self.volume_urn = zip_file.urn
-                segment_urn = self.volume_urn.Append(self.segment_name)
 
-                with zip_file.CreateMember(segment_urn) as segment:
+                with zip_file.CreateZipSegment(self.segment_name, arn=None) as segment:
                     segment.Write(self.data1)
 
-                with zip_file.CreateMember(segment_urn) as segment2:
-                    segment2.Seek(0, 2)
-                    segment2.Write(self.data2)
-
-                streamed_urn = self.volume_urn.Append(self.streamed_segment)
-                with zip_file.CreateMember(streamed_urn) as streamed:
-                    streamed.compression_method = zip.ZIP_DEFLATE
-                    src = io.BytesIO(self.data1)
-                    streamed.WriteStream(src)
 
     def tearDown(self):
         try:
@@ -64,26 +53,16 @@ class ZipTest(unittest.TestCase):
         except (IOError, OSError):
             pass
 
-    def testStreamedSegment(self):
-        resolver = data_store.MemoryDataStore()
-
-        # This is required in order to load and parse metadata from this volume
-        # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
-            segment_urn = zip_file.urn.Append(self.streamed_segment)
-
-        with resolver.AFF4FactoryOpen(segment_urn) as segment:
-            self.assertEquals(segment.Read(1000), self.data1)
 
     def testOpenSegmentByURN(self):
         resolver = data_store.MemoryDataStore()
 
         # This is required in order to load and parse metadata from this volume
         # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
-            segment_urn = zip_file.urn.Append(self.segment_name)
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v11, self.filename_urn) as zip_file:
+            segment_urn = zip_file.urn.Append(self.segment_name, quote=False)
         with resolver.AFF4FactoryOpen(segment_urn) as segment:
-            self.assertEquals(segment.Read(1000), self.data1 + self.data2)
+            self.assertEquals(segment.Read(1000), self.data1 )
 
 if __name__ == '__main__':
     unittest.main()
