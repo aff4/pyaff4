@@ -26,7 +26,7 @@ from pyaff4 import data_store
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import zip
-
+from pyaff4 import version
 
 
 class ZipTest(unittest.TestCase):
@@ -40,7 +40,7 @@ class ZipTest(unittest.TestCase):
             resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+            with zip.ZipFile.NewZipFile(resolver, version.aff4v11, self.filename_urn) as zip_file:
                 self.volume_urn = zip_file.urn
 
                 with zip_file.CreateZipSegment(self.segment_name, arn=None) as segment:
@@ -59,7 +59,7 @@ class ZipTest(unittest.TestCase):
 
         # This is required in order to load and parse metadata from this volume
         # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v11, self.filename_urn) as zip_file:
             segment_urn = zip_file.urn.Append(self.segment_name, quote=False)
         with resolver.AFF4FactoryOpen(segment_urn) as segment:
             self.assertEquals(segment.Read(1000), self.data1 )

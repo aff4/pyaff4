@@ -25,7 +25,7 @@ from pyaff4 import lexicon
 from pyaff4 import plugins
 from pyaff4 import rdfvalue
 from pyaff4 import zip
-
+from pyaff4 import version
 
 
 class ZipTest(unittest.TestCase):
@@ -41,7 +41,7 @@ class ZipTest(unittest.TestCase):
             resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+            with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
                 self.volume_urn = zip_file.urn
                 segment_urn = self.volume_urn.Append(self.segment_name)
 
@@ -69,7 +69,7 @@ class ZipTest(unittest.TestCase):
 
         # This is required in order to load and parse metadata from this volume
         # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
             segment_urn = zip_file.urn.Append(self.streamed_segment)
 
         with resolver.AFF4FactoryOpen(segment_urn) as segment:
@@ -80,7 +80,7 @@ class ZipTest(unittest.TestCase):
 
         # This is required in order to load and parse metadata from this volume
         # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
             segment_urn = zip_file.urn.Append(self.segment_name)
         with resolver.AFF4FactoryOpen(segment_urn) as segment:
             self.assertEquals(segment.Read(1000), self.data1 + self.data2)

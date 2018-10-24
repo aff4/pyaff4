@@ -20,7 +20,7 @@ from pyaff4 import aff4_utils
 from pyaff4 import data_store
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
-
+from pyaff4 import container
 from pyaff4 import plugins
 
 
@@ -32,6 +32,7 @@ class AFF4DirectoryTest(unittest.TestCase):
         aff4_utils.RemoveDirectory(self.root_path)
 
     def setUp(self):
+        version = container.Version(1, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
             root_urn = rdfvalue.URN.NewURNFromFilename(self.root_path)
 
@@ -39,7 +40,7 @@ class AFF4DirectoryTest(unittest.TestCase):
                          rdfvalue.XSDString("truncate"))
 
             with aff4_directory.AFF4Directory.NewAFF4Directory(
-                    resolver, root_urn) as volume:
+                    resolver, version, root_urn) as volume:
 
                 segment_urn = volume.urn.Append(self.segment_name)
                 with volume.CreateMember(segment_urn) as member:
@@ -49,10 +50,11 @@ class AFF4DirectoryTest(unittest.TestCase):
                         rdfvalue.XSDString(self.root_path + self.segment_name))
 
     def testCreateMember(self):
+        version = container.Version(1, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
             root_urn = rdfvalue.URN.NewURNFromFilename(self.root_path)
             with aff4_directory.AFF4Directory.NewAFF4Directory(
-                    resolver, root_urn) as directory:
+                    resolver, version, root_urn) as directory:
 
                 # Check for member.
                 child_urn = directory.urn.Append(self.segment_name)

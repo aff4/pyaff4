@@ -431,6 +431,8 @@ class AFF4Image(aff4.AFF4Stream):
         bevy.Seek(chunk_offset, 0)
         cbuffer = bevy.Read(chunk_size)
         if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_ZLIB :
+            if len(cbuffer) == self.chunk_size:
+                return cbuffer
             return zlib.decompress(cbuffer)
 
         # Backwards compatibility with Scudette's AFF4 implementation.

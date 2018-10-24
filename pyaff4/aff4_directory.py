@@ -23,6 +23,7 @@ from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import utils
+from pyaff4 import escaping
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -32,8 +33,9 @@ class AFF4Directory(aff4.AFF4Volume):
     root_path = ""
 
     @classmethod
-    def NewAFF4Directory(cls, resolver, root_urn):
+    def NewAFF4Directory(cls, resolver, version, root_urn):
         result = AFF4Directory(resolver)
+        result.version = version
         result.root_path = root_urn.ToFilename()
 
         mode = resolver.Get(root_urn, lexicon.AFF4_STREAM_WRITE_MODE)
@@ -70,8 +72,8 @@ class AFF4Directory(aff4.AFF4Volume):
         # represent files and directories as the same path component we can not
         # allow slashes in the filename. Otherwise we will fail to create
         # e.g. stream/0000000 and stream/0000000/index.
-        filename = aff4_utils.member_name_for_urn(
-            child_urn, self.urn, slash_ok=False)
+        filename = escaping.member_name_for_urn(
+            child_urn, self.version, base_urn=self.urn, slash_ok=False)
 
         # We are allowed to create any files inside the directory volume.
         self.resolver.Set(child_urn, lexicon.AFF4_TYPE,

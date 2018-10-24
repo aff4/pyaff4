@@ -1,3 +1,17 @@
+# Copyright 2018 Schatz Forensic Pty Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License.  You may obtain a copy of
+# the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
 from pyaff4 import data_store
 from pyaff4 import hashes
 from pyaff4 import lexicon
@@ -5,9 +19,12 @@ from pyaff4 import rdfvalue
 from pyaff4 import aff4_map
 from pyaff4.container import Container
 from pyaff4 import zip
-import unittest
 from pyaff4 import utils
+from pyaff4 import version
+
+import unittest
 import os
+
 
 """
 Creates an container with virtual file called "pdf1" which is backed by a byte range in another image. 
@@ -25,7 +42,7 @@ class ReferenceTest(unittest.TestCase):
             self.lexicon = lexicon.standard
 
 
-            with zip.ZipFile.NewZipFile(resolver, rdfvalue.URN.FromFileName(self.stdLinear)) as image_container:
+            with zip.ZipFile.NewZipFile(resolver, version.aff4v10, rdfvalue.URN.FromFileName(self.stdLinear)) as image_container:
                 # there is generally only one Image in a container. Get the underlying Map
                 imageURN = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, self.lexicon.Image))
                 datastreams = list(resolver.QuerySubjectPredicate(imageURN, self.lexicon.dataStream))
@@ -44,7 +61,7 @@ class ReferenceTest(unittest.TestCase):
                         destFileURN = rdfvalue.URN.FromFileName(self.fileName)
                         resolver2.Set(destFileURN, lexicon.AFF4_STREAM_WRITE_MODE,
                                      rdfvalue.XSDString(u"truncate"))
-                        with zip.ZipFile.NewZipFile(resolver2, destFileURN) as image_container:
+                        with zip.ZipFile.NewZipFile(resolver2, version.aff4v10, destFileURN) as image_container:
                             self.volume_urn = image_container.urn
 
                             # create a "version.txt" file so readers can tell it is an AFF4 Standard v1.0 container
@@ -71,14 +88,14 @@ class ReferenceTest(unittest.TestCase):
         fileSize = 629087
 
         # take the lexicon from our new container
-        lex = Container.identify(self.fileName)
+        (version, lex) = Container.identify(self.fileName)
 
         # setup a resolver
         resolver = data_store.MemoryDataStore(lex)
 
         # open the two containers within the same resolver (needed so the transitive links work)
-        with zip.ZipFile.NewZipFile(resolver, rdfvalue.URN.FromFileName(self.stdLinear)) as targetContainer:
-            with zip.ZipFile.NewZipFile(resolver, rdfvalue.URN.FromFileName(self.fileName)) as sourceContainer:
+        with zip.ZipFile.NewZipFile(resolver, version, rdfvalue.URN.FromFileName(self.stdLinear)) as targetContainer:
+            with zip.ZipFile.NewZipFile(resolver, version, rdfvalue.URN.FromFileName(self.fileName)) as sourceContainer:
 
                 # open the virtual file and read
                 image_urn = sourceContainer.urn.Append("pdf1")

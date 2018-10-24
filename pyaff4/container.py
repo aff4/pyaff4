@@ -81,21 +81,21 @@ class Container(object):
                     # it's a new zipfile
                     raise IOError("Not an AFF4 Volume")
 
-                with zip_file.OpenZipSegment("version.txt") as version_segment:
-                    try:
+                try:
+                    with zip_file.OpenZipSegment("version.txt") as version_segment:
                         # AFF4 Std v1.0 introduced the version file
                         versionTxt = version_segment.ReadAll()
                         #resolver.Close(version)
                         version = parseProperties(versionTxt)
                         version = Version.create(version)
                         return (version, lexicon.standard)
-                    except:
-                        if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
-                            # Rekall defined the new AFF4 namespace post the Wirespeed paper
-                            return (Version(1,0,"pyaff4"), lexicon.scudette)
-                        else:
-                            # Wirespeed (Evimetry) 1.x and Evimetry 2.x stayed with the original namespace
-                            return (Version(0,1,"pyaff4"), lexicon.legacy)
+                except:
+                    if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
+                        # Rekall defined the new AFF4 namespace post the Wirespeed paper
+                        return (Version(1,0,"pyaff4"), lexicon.scudette)
+                    else:
+                        # Wirespeed (Evimetry) 1.x and Evimetry 2.x stayed with the original namespace
+                        return (Version(0,1,"pyaff4"), lexicon.legacy)
 
     def isMap(self, stream):
         types = self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE)

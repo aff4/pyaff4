@@ -22,7 +22,7 @@ from pyaff4 import data_store
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import zip
-
+from pyaff4 import container
 
 class AFF4MapTest(unittest.TestCase):
     filename = u"/tmp/aff4_test.zip"
@@ -36,11 +36,12 @@ class AFF4MapTest(unittest.TestCase):
             pass
 
     def setUp(self):
+        version = container.Version(1, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
             resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+            with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
                 self.volume_urn = zip_file.urn
                 self.image_urn = self.volume_urn.Append(self.image_name)
 
@@ -83,10 +84,10 @@ class AFF4MapTest(unittest.TestCase):
 
     def testAddRange(self):
         resolver = data_store.MemoryDataStore()
-
+        version = container.Version(1, 1, "pyaff4")
         # This is required in order to load and parse metadata from this volume
         # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
             image_urn = zip_file.urn.Append(self.image_name)
 
         with resolver.AFF4FactoryOpen(image_urn) as map:
@@ -175,10 +176,10 @@ class AFF4MapTest(unittest.TestCase):
 
     def testCreateMapStream(self):
         resolver = data_store.MemoryDataStore()
-
+        version = container.Version(1, 1, "pyaff4")
         # This is required in order to load and parse metadata from this volume
         # into a fresh empty resolver.
-        with zip.ZipFile.NewZipFile(resolver, self.filename_urn) as zip_file:
+        with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
             image_urn = zip_file.urn.Append(self.image_name)
             image_urn_2 = image_urn.Append("streamed")
 

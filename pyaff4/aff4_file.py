@@ -27,6 +27,7 @@ from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
+from pyaff4 import utils
 
 BUFF_SIZE = 64 * 1024
 
@@ -144,7 +145,7 @@ class FileBackedObject(aff4.AFF4Stream):
         # TODO: make this platform aware
         self.fd.seek(self.readptr)
 
-        self.fd.write(data)
+        self.fd.write(utils.SmartStr(data))
         # self.fd.flush()
         self.readptr += len(data)
 

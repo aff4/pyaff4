@@ -312,19 +312,25 @@ class URN(RDFValue):
         if quote:
             component = urllib.parse.quote(component)
 
-        # Work around usual posixpath.join bug.
-        #component = component.lstrip("/")
-        #new_path = posixpath.normpath(posixpath.join(
-        #   "/", components.path, component))
-        new_path = None
-        if components.path != u"":
-            new_path = components.path + "/" + component
-        else:
-            new_path = "/" + component
-        components = components._replace(path=new_path)
+        if components.scheme.startswith("http"):
+            new_path = posixpath.normpath(posixpath.join(
+                "/", components.path, component))
+            components = components._replace(path=new_path)
+            return URN(urllib.parse.urlunparse(components))
+        elif components.scheme == "aff4":
+            if components.path != u"":
+                new_path = posixpath.normpath(posixpath.join(
+                    "/", components.path, component))
+            else:
+                new_path = posixpath.normpath(component)
+                new_path = "/" + new_path
 
-        # we dont rely on the basic urllib as our IRI scheme is not a regular URL scheme
-        return URN(u"%s://%s%s" % (components.scheme, components.hostname, components.path))
+            components = components._replace(path=new_path)
+
+            # we dont rely on the basic urllib as our IRI scheme is not a regular URL scheme
+            return URN(u"%s://%s%s" % (components.scheme, components.hostname, components.path))
+        else:
+            raise Exception("Not implemented")
 
     def RelativePath(self, urn):
         urn_value = str(urn)

@@ -6,7 +6,7 @@ class Version(object):
 
     @staticmethod
     def create(dic):
-        return Version(int(dic["major"]),int(dic["major"]),dic["tool"])
+        return Version(int(dic["major"]),int(dic["minor"]),dic["tool"])
 
     def is10(self):
         if self.major == 1 and self.minor == 0:
@@ -31,3 +31,6 @@ class Version(object):
 
     def __str__(self):
         return u"major=%d\nminor=%d\ntool=%s\n" % (self.major, self.minor, self.tool)
+
+aff4v10 = Version(1, 0, "pyaff4")
+aff4v11 = Version(1, 1, "pyaff4")

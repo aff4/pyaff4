@@ -28,7 +28,7 @@ from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import stream_factory
 from pyaff4 import utils
-
+from pyaff4 import streams
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -345,8 +345,9 @@ class MemoryDataStore(object):
 
         return result
 
+
     def LoadFromTurtle(self, stream):
-        data = stream.ReadAll()
+        data = streams.ReadAll(stream)
         g = rdflib.Graph()
         g.parse(data=data, format="turtle")
 
