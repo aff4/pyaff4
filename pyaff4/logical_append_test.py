@@ -45,17 +45,17 @@ class LogicalAppendTest(unittest.TestCase):
             resolver = data_store.MemoryDataStore()
             urn = None
             with container.Container.createURN(resolver, container_urn) as volume:
-                src = io.BytesIO("hello")
+                src = io.BytesIO("hello".encode('utf-8'))
                 urn = volume.writeLogical(pathA, src, 10)
 
             urn = None
             with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
-                src = io.BytesIO("hello2")
+                src = io.BytesIO("hello2".encode('utf-8'))
                 urn = volume.writeLogical(pathB, src, 12)
 
             with container.Container.openURNtoContainer(container_urn) as volume:
                 images = list(volume.images())
-                images.sort()
+                sorted(images, key=lambda x: x.urn )
                 self.assertEqual(2, len(images), "Only two logical images")
 
                 fragmentA = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
@@ -67,10 +67,10 @@ class LogicalAppendTest(unittest.TestCase):
                 try:
                     with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
                         txt = fd.ReadAll()
-                        self.assertEqual("hello", txt, "content should be same")
+                        self.assertEqual(b"hello", txt, "content should be same")
                     with volume.resolver.AFF4FactoryOpen(images[1].urn) as fd:
                         txt = fd.ReadAll()
-                        self.assertEqual("hello2", txt, "content should be same")
+                        self.assertEqual(b"hello2", txt, "content should be same")
                 except Exception:
                     traceback.print_exc()
                     self.fail()

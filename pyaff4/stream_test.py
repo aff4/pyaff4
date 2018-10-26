@@ -18,9 +18,9 @@ import unittest
 
 from pyaff4 import data_store
 from pyaff4 import lexicon
-from pyaff4 import plugins
 from pyaff4 import rdfvalue
-
+import tempfile
+import traceback
 
 class StreamTest(unittest.TestCase):
     def streamTest(self, stream):
@@ -68,16 +68,21 @@ class StreamTest(unittest.TestCase):
                           stream.Read(1000))
 
     def testFileBackedStream(self):
-        filename = rdfvalue.URN.FromFileName("/tmp/test_filename.bin")
+        filename = tempfile.gettempdir() + "/test_filename.zip"
+        fileURI = rdfvalue.URN.FromFileName(filename)
         resolver = data_store.MemoryDataStore()
         try:
             resolver.Set(filename, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with resolver.AFF4FactoryOpen(filename) as file_stream:
+            with resolver.AFF4FactoryOpen(fileURI) as file_stream:
                 self.streamTest(file_stream)
+        except:
+            traceback.print_exc()
+            self.fail()
+
         finally:
-            os.unlink(filename.Parse().path)
+            os.unlink(filename)
 
 
 if __name__ == '__main__':

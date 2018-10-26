@@ -164,6 +164,8 @@ class FileBackedObject(aff4.AFF4Stream):
         self.fd.seek(0, 2)
         return self.fd.tell()
 
+    def Close(self):
+        self.fd.close()
 
 def GenericFileHandler(resolver, urn, *args, **kwargs):
     if os.path.isdir(urn.ToFilename()):

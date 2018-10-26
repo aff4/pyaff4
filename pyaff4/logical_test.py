@@ -18,8 +18,11 @@ from pyaff4 import data_store, container, logical
 from pyaff4 import escaping
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue, linear_hasher, hashes
-import unittest, traceback
-import os, io
+import unittest
+import traceback
+import os
+import io
+import tempfile
 
 """
 Tests logical file creation
@@ -43,11 +46,11 @@ class LogicalTest(unittest.TestCase):
                         writer_arn = writer.urn
 
                         # add in some data using the Push API, hashing while we go
-                        data = "helloworld"
+                        data = u"helloworld"
                         writer.Write(data)
-                        hasher.update(data)
+                        hasher.update(data.encode("utf-8"))
                         writer.Write(data)
-                        hasher.update(data)
+                        hasher.update(data.encode("utf-8"))
 
                         # write in the hashes before auto-close
                         for h in hasher.hashes:
@@ -67,7 +70,7 @@ class LogicalTest(unittest.TestCase):
                 try:
                     with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
                         txt = fd.ReadAll()
-                        self.assertEqual("helloworldhelloworld", txt, "content should be same")
+                        self.assertEqual(b"helloworldhelloworld", txt, "content should be same")
                 except Exception:
                     traceback.print_exc()
                     self.fail()
@@ -85,14 +88,15 @@ class LogicalTest(unittest.TestCase):
             with data_store.MemoryDataStore() as resolver:
                 urn = None
                 with container.Container.createURN(resolver, container_urn) as volume:
-                    src = io.BytesIO("hello")
+                    src = io.BytesIO("hello".encode('utf-8'))
                     urn = volume.writeLogical(pathName, src, 10)
 
 
             with container.Container.openURNtoContainer(container_urn) as volume:
                 images = list(volume.images())
                 self.assertEqual(1, len(images), "Only one logical image")
-                self.assertEqual(pathName, images[0].name(), "unicode filename should be preserved")
+                imagename = images[0].name()
+                self.assertEqual(pathName, imagename, "unicode filename should be preserved")
 
                 fragment = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
 
@@ -100,7 +104,7 @@ class LogicalTest(unittest.TestCase):
                 try:
                     with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
                         txt = fd.ReadAll()
-                        self.assertEqual("hello", txt, "content should be same")
+                        self.assertEqual(b"hello", txt, "content should be same")
                 except Exception:
                     traceback.print_exc()
                     self.fail()
@@ -112,52 +116,52 @@ class LogicalTest(unittest.TestCase):
             os.unlink(containerName)
 
     def testWindowsUNCLogicalImagePush(self):
-        containerName = "/tmp/test-unc.aff4"
+        containerName = tempfile.gettempdir() + "/test-unc.aff4"
         self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
 
     def testWindowsUNCLogicalImage(self):
-        containerName = "/tmp/test-unc.aff4"
+        containerName = tempfile.gettempdir() + "/test-unc.aff4"
         self.createAndReadSinglePathImage(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
 
     def testUnixASCIINoSlashLogicalImage(self):
-        containerName = "/tmp/test-unix1.aff4"
+        containerName = tempfile.gettempdir() + "/test-unix1.aff4"
         self.createAndReadSinglePathImage(containerName, u"foo/bar.txt", u"/foo/bar.txt")
 
     def testUnixASCIISlashLogicalImage(self):
-        containerName = "/tmp/test-unix1.aff4"
+        containerName = tempfile.gettempdir() + "/test-unix1.aff4"
         self.createAndReadSinglePathImage(containerName, u"/foo/bar.txt", u"/foo/bar.txt")
 
     def testUnixUnicodeLogicalImage(self):
-        containerName = "/tmp/test-unicodepath.aff4"
+        containerName = tempfile.gettempdir() + "/test-unicodepath.aff4"
         self.createAndReadSinglePathImage(containerName, u"/犬/ネコ.txt", u"/犬/ネコ.txt")
 
     def testWindowsDriveLogicalImage(self):
-        containerName = "/tmp/test-windowsdrive.aff4"
-        self.createAndReadSinglePathImage(containerName, u"c:\ネコ.txt", u"/c:/犬/ネコ.txt")
+        containerName = tempfile.gettempdir() + "/test-windowsdrive.aff4"
+        self.createAndReadSinglePathImage(containerName, u"c:\\犬\\ネコ.txt", u"/c:/犬/ネコ.txt")
 
     def testAFF4ReservedSegmentCollision(self):
-        containerName = "/tmp/test.aff4"
+        containerName = tempfile.gettempdir() + "/test.aff4"
         try:
             container_urn = rdfvalue.URN.FromFileName(containerName)
             with data_store.MemoryDataStore() as resolver:
-                urn = None
                 with container.Container.createURN(resolver, container_urn) as volume:
-                    src = io.BytesIO("hello")
-                    urn = volume.writeLogical(u"information.turtle", src, 10)
-
+                    src = io.BytesIO(u"hello".encode('utf-8'))
+                    volume.writeLogical(u"information.turtle", src, 10)
 
             with container.Container.openURNtoContainer(container_urn) as volume:
                 images = list(volume.images())
                 self.assertEqual(1, len(images), "Only one logical image")
                 self.assertEqual("information.turtle", images[0].name(), "information.turtle should be escaped")
 
-                try:
-                    with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+
+                with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    try:
                         txt = fd.ReadAll()
-                        self.assertEqual("hello", txt, "escaped file returned")
-                except Exception:
-                    traceback.print_exc()
-                    self.fail("content of information.turtle is wrong")
+                        self.assertEqual(b"hello", txt, "escaped file returned")
+                        pass
+                    except Exception:
+                        traceback.print_exc()
+                        self.fail("content of information.turtle is wrong")
 
         except Exception:
             traceback.print_exc()

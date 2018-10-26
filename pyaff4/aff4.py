@@ -136,6 +136,9 @@ class NoneObject(object):
         # Do not allow exceptions to be propagated through us.
         return True
 
+    def Close(self):
+        pass
+
 
 # Keep track of all the AFF4 objects which are alive right now. This helps in
 # debugging memory leaks.

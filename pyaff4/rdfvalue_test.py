@@ -25,36 +25,36 @@ class URNTest(unittest.TestCase):
         url = "http://code.google.com/p/snappy/"
         test = rdfvalue.URN(url)
         self.assertEquals(test.SerializeToString(),
-                          b"http://code.google.com/p/snappy/")
+                          "http://code.google.com/p/snappy/")
 
     def testAppend(self):
         test = rdfvalue.URN("http://www.google.com")
         aff4volume = rdfvalue.URN("aff4://volumeguid/image/0000")
 
         self.assertEquals(aff4volume.Append("index").SerializeToString(),
-                          b"aff4://volumeguid/image/0000/index")
+                          "aff4://volumeguid/image/0000/index")
 
         self.assertEquals(test.Append("foobar").SerializeToString(),
-                          b"http://www.google.com/foobar")
+                          "http://www.google.com/foobar")
 
         self.assertEquals(test.Append("/foobar").SerializeToString(),
-                          b"http://www.google.com/foobar")
+                          "http://www.google.com/foobar")
 
         self.assertEquals(test.Append("..").SerializeToString(),
-                          b"http://www.google.com/")
+                          "http://www.google.com/")
 
         self.assertEquals(test.Append("../../../..").SerializeToString(),
-                          b"http://www.google.com/")
+                          "http://www.google.com/")
 
         self.assertEquals(test.Append("aa/bb/../..").SerializeToString(),
-                          b"http://www.google.com/")
+                          "http://www.google.com/")
 
         self.assertEquals(test.Append("aa//../c").SerializeToString(),
-                          b"http://www.google.com/c")
+                          "http://www.google.com/c")
 
         self.assertEquals(
             test.Append("aa///////////.///./c").SerializeToString(),
-            b"http://www.google.com/aa/c")
+            "http://www.google.com/aa/c")
 
 
 if __name__ == '__main__':
