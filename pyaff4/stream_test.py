@@ -70,13 +70,14 @@ class StreamTest(unittest.TestCase):
     def testFileBackedStream(self):
         filename = tempfile.gettempdir() + "/test_filename.zip"
         fileURI = rdfvalue.URN.FromFileName(filename)
-        resolver = data_store.MemoryDataStore()
+
         try:
-            resolver.Set(filename, lexicon.AFF4_STREAM_WRITE_MODE,
+            with data_store.MemoryDataStore() as resolver:
+                resolver.Set(fileURI, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
-            with resolver.AFF4FactoryOpen(fileURI) as file_stream:
-                self.streamTest(file_stream)
+                with resolver.AFF4FactoryOpen(fileURI) as file_stream:
+                    self.streamTest(file_stream)
         except:
             traceback.print_exc()
             self.fail()

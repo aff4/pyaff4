@@ -29,6 +29,7 @@ from pyaff4 import registry
 from pyaff4 import stream_factory
 from pyaff4 import utils
 from pyaff4 import streams
+from pyaff4 import aff4_file
 
 LOGGER = logging.getLogger("pyaff4")
 
