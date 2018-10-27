@@ -281,6 +281,9 @@ class AFF4Image(aff4.AFF4Stream):
 
         return super(AFF4Image, self).Flush()
 
+    def Close(self):
+        pass
+
     def Read(self, length):
         length = int(length)
         if length == 0:
