@@ -80,8 +80,7 @@ class LogicalAppendTest(unittest.TestCase):
             self.fail()
 
         finally:
-            pass
-            #os.unlink(containerName)
+            os.unlink(containerName)
 
 
 
