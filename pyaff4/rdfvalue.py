@@ -162,7 +162,7 @@ class XSDInteger(RDFValue):
         return int(self.value)
 
     def __cmp__(self, o):
-        return self.value - o
+        return self.value - o.value
 
     def __add__(self, o):
         return self.value + o
