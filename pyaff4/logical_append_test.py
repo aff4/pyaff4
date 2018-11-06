@@ -114,7 +114,7 @@ class LogicalAppendTest(unittest.TestCase):
 
             with container.Container.openURNtoContainer(container_urn) as volume:
                 images = list(volume.images())
-                sorted(images, key=lambda x: x.urn )
+                sorted(images, key=lambda x: x.pathName )
                 self.assertEqual(2, len(images), "Only two logical images")
 
                 fragmentA = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
