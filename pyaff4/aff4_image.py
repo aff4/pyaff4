@@ -150,6 +150,9 @@ class AFF4Image(aff4.AFF4Stream):
         if flush:
             self.resolver.Close(bevy_index_segment)
 
+    def Length(self):
+        return self.size
+
     def WriteStream(self, source_stream, progress=None):
         """Copy data from a source stream into this stream."""
         if progress is None:
