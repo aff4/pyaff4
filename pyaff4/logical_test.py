@@ -35,13 +35,14 @@ class LogicalTest(unittest.TestCase):
         pass
 
     # create a single path image using the Push API (block by block writing)
-    def createAndReadSinglePathImagePush(self, containerName, pathName, arnPathFragment):
+    def createAndReadSinglePathImagePush(self, containerName, pathName, arnPathFragment, minImageStreamSize):
         try:
             hasher = linear_hasher.PushHasher([lexicon.HASH_SHA1, lexicon.HASH_MD5])
 
             container_urn = rdfvalue.URN.FromFileName(containerName)
             with data_store.MemoryDataStore() as resolver:
                 with container.Container.createURN(resolver, container_urn) as volume:
+                    volume.maxSegmentResidentSize = minImageStreamSize
                     with volume.newLogicalStream(pathName, 20) as writer:
                         writer_arn = writer.urn
 
@@ -115,9 +116,17 @@ class LogicalTest(unittest.TestCase):
         finally:
             os.unlink(containerName)
 
-    def testWindowsUNCLogicalImagePush(self):
+    def testWindowsUNCLogicalImagePushImageStream(self):
+        containerName = tempfile.gettempdir() + "/test-imagetream.aff4"
+        self.createAndReadSinglePathImageImageStream(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
+
+    def testWindowsUNCLogicalImagePushZipSegment(self):
         containerName = tempfile.gettempdir() + "/test-unc.aff4"
-        self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
+        self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt", 1024)
+
+    def testWindowsUNCLogicalImagePushImageStream(self):
+        containerName = tempfile.gettempdir() + "/test-unc.aff4"
+        self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt", 2)
 
     def testWindowsUNCLogicalImage(self):
         containerName = tempfile.gettempdir() + "/test-unc.aff4"
