@@ -19,7 +19,7 @@ from builtins import next
 from builtins import str
 from builtins import object
 
-from pyaff4.utils import SmartStr
+from pyaff4.utils import SmartStr, SmartUnicode
 from pyaff4 import data_store, aff4_image
 from pyaff4 import hashes
 from pyaff4 import lexicon
@@ -43,6 +43,7 @@ class Image(object):
         self.dataStream = dataStream
 
 def parseProperties(propertiesText):
+    propertiesText = SmartUnicode(propertiesText)
     res = {}
     for line in propertiesText.split("\n"):
         try:

@@ -196,7 +196,7 @@ def extract(container_name, imageURNs, destFolder):
         urn = None
 
         with container.Container.openURNtoContainer(container_urn) as volume:
-            printVolumeInfo(file, volume)
+            printVolumeInfo(container_name, volume)
             resolver = volume.resolver
             for imageUrn in imageURNs:
                 imageUrn = utils.SmartUnicode(imageUrn)
