@@ -721,7 +721,6 @@ class ZipFile(aff4.AFF4Volume):
 
     def CreateMember(self, child_urn):
         member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
-
         return self.CreateZipSegment(member_filename, arn=child_urn)
 
     def CreateZipSegment(self, filename, arn=None):

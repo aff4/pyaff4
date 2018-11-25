@@ -244,7 +244,7 @@ class LogicalImageContainer(Container):
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
         self.resolver.Flush()
-        #return self
+        return self
 
 class PreStdLogicalImageContainer(LogicalImageContainer):
     def __init__(self, version, volumeURN, resolver, lex):
@@ -273,7 +273,6 @@ class WritableLogicalImageContainer(Container):
     # logical images geater than this size are stored in ImageStreams
     # smaller ones in Zip Segments
     maxSegmentResidentSize = 1 * 1024 * 1024
-    #maxSegmentResidentSize = 2
 
     def __init__(self, version, volumeURN, resolver, lex):
         super(WritableLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)

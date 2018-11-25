@@ -162,7 +162,6 @@ class LogicalTest(unittest.TestCase):
                 self.assertEqual(1, len(images), "Only one logical image")
                 self.assertEqual("information.turtle", images[0].name(), "information.turtle should be escaped")
 
-
                 with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
                     try:
                         txt = fd.ReadAll()
