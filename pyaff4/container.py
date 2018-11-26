@@ -30,6 +30,7 @@ from pyaff4 import escaping
 from pyaff4.aff4_metadata import RDFObject
 from pyaff4 import zip
 from pyaff4.version import Version
+from pyaff4 import utils
 
 import yaml
 import uuid
@@ -87,7 +88,7 @@ class Container(object):
                         # AFF4 Std v1.0 introduced the version file
                         versionTxt = version_segment.ReadAll()
                         #resolver.Close(version)
-                        version = parseProperties(versionTxt)
+                        version = parseProperties(versionTxt.decode("utf-8"))
                         version = Version.create(version)
                         return (version, lexicon.standard)
                 except:
@@ -243,7 +244,7 @@ class LogicalImageContainer(Container):
 
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
-        #self.resolver.Return(self)
+        self.resolver.Flush()
         return self
 
 class PreStdLogicalImageContainer(LogicalImageContainer):
@@ -273,7 +274,6 @@ class WritableLogicalImageContainer(Container):
     # logical images geater than this size are stored in ImageStreams
     # smaller ones in Zip Segments
     maxSegmentResidentSize = 1 * 1024 * 1024
-    #maxSegmentResidentSize = 5
 
     def __init__(self, version, volumeURN, resolver, lex):
         super(WritableLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)

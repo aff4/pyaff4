@@ -35,27 +35,28 @@ class LogicalAppendTest(unittest.TestCase):
     def setUp(self):
         pass
 
-    def testCreateAndAppendSinglePathImage(self):
+    def testCreateAndAppendSinglePathImageLarge2(self):
         try:
-            containerName = "/tmp/test-append.aff4"
+            containerName = "test-append-large2.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
-
+            largedata = io.BytesIO(os.urandom(1100000))
             container_urn = rdfvalue.URN.FromFileName(containerName)
             resolver = data_store.MemoryDataStore()
             urn = None
             with container.Container.createURN(resolver, container_urn) as volume:
-                src = io.BytesIO("hello")
+                src = io.BytesIO("hello".encode('utf-8'))
                 urn = volume.writeLogical(pathA, src, 10)
 
             urn = None
             with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
-                src = io.BytesIO("hello2")
-                urn = volume.writeLogical(pathB, src, 12)
+
+                src = largedata
+                urn = volume.writeLogical(pathB, src, 110000)
 
             with container.Container.openURNtoContainer(container_urn) as volume:
                 images = list(volume.images())
-                images.sort()
+                images = sorted(images, key=lambda x: utils.SmartUnicode(x.pathName), reverse=False)
                 self.assertEqual(2, len(images), "Only two logical images")
 
                 fragmentA = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
@@ -67,10 +68,127 @@ class LogicalAppendTest(unittest.TestCase):
                 try:
                     with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
                         txt = fd.ReadAll()
-                        self.assertEqual("hello", txt, "content should be same")
+                        self.assertEqual(b"hello", txt, "content should be same")
+                    with volume.resolver.AFF4FactoryOpen(images[1].urn) as fd:
+                        index = 0
+                        while index < 110000:
+                            fd.Seek(index)
+                            bufa = fd.Read(1000)
+                            largedata.seek(index)
+                            bufb = largedata.read(1000)
+                            index = index + 1000
+                            self.assertEqual(bufa, bufb, "content should be same")
+                except Exception:
+                    traceback.print_exc()
+                    self.fail()
+
+        except:
+            traceback.print_exc()
+            self.fail()
+
+        finally:
+            pass
+            # os.unlink(containerName)
+
+    def testCreateAndAppendSinglePathImageLarge(self):
+        try:
+            length = 10000
+            containerName = "test-append-large.aff4"
+            pathA = u"/a.txt"
+            pathB = u"/b.txt"
+            largedata = io.BytesIO(os.urandom(1100000))
+            container_urn = rdfvalue.URN.FromFileName(containerName)
+            resolver = data_store.MemoryDataStore()
+            urn = None
+            with container.Container.createURN(resolver, container_urn) as volume:
+                src = io.BytesIO("hello".encode('utf-8'))
+                urn = volume.writeLogical(pathA, src, 10)
+
+            urn = None
+            with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+                src = largedata
+
+                with volume.newLogicalStream(pathB, length) as image:
+                    image.chunk_size = 10
+                    image.chunks_per_segment = 3
+
+                    index = 0
+                    while index < length:
+                        src.seek(index)
+                        image.Write(src.read(1000))
+                        index = index + 1000
+
+                    foo = 11
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                images = sorted(images, key=lambda x: utils.SmartUnicode(x.pathName), reverse=False)
+                self.assertEqual(2, len(images), "Only two logical images")
+
+                fragmentA = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+                fragmentB = escaping.member_name_for_urn(images[1].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+
+                if fragmentA != u"/a.txt":
+                    ffffff = 1
+
+                self.assertEqual(pathA, fragmentA)
+                self.assertEqual(pathB, fragmentB)
+
+                try:
+                    with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                        txt = fd.ReadAll()
+                        self.assertEqual(b"hello", txt, "content should be same")
+                    with volume.resolver.AFF4FactoryOpen(images[1].urn) as fd:
+                        blen = fd.Length()
+                        self.assertEqual(length, blen)
+                except Exception:
+                    traceback.print_exc()
+                    self.fail()
+
+        except:
+            traceback.print_exc()
+            self.fail()
+
+        finally:
+            pass
+            # os.unlink(containerName)
+
+    def testCreateAndAppendSinglePathImage(self):
+        try:
+            containerName = "/tmp/test-append.aff4"
+            pathA = u"/a.txt"
+            pathB = u"/b.txt"
+
+            container_urn = rdfvalue.URN.FromFileName(containerName)
+            resolver = data_store.MemoryDataStore()
+            urn = None
+            with container.Container.createURN(resolver, container_urn) as volume:
+                src = io.BytesIO("hello".encode('utf-8'))
+                urn = volume.writeLogical(pathA, src, 10)
+
+            urn = None
+            with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+                src = io.BytesIO("hello2".encode('utf-8'))
+                urn = volume.writeLogical(pathB, src, 12)
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                images = sorted(images, key=lambda x: utils.SmartUnicode(x.pathName), reverse=False)
+                self.assertEqual(2, len(images), "Only two logical images")
+
+                fragmentA = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+                fragmentB = escaping.member_name_for_urn(images[1].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+
+                self.assertEqual(pathA, fragmentA)
+                self.assertEqual(pathB, fragmentB)
+
+                try:
+                    with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                        txt = fd.ReadAll()
+                        self.assertEqual(b"hello", txt, "content should be same")
                     with volume.resolver.AFF4FactoryOpen(images[1].urn) as fd:
                         txt = fd.ReadAll()
-                        self.assertEqual("hello2", txt, "content should be same")
+                        self.assertEqual(b"hello2", txt, "content should be same")
                 except Exception:
                     traceback.print_exc()
                     self.fail()

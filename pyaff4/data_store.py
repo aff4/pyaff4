@@ -29,6 +29,7 @@ from pyaff4 import registry
 from pyaff4 import stream_factory
 from pyaff4 import utils
 from pyaff4 import streams
+from pyaff4 import aff4_file
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -194,7 +195,10 @@ class AFF4ObjectCache(object):
 
         # Now delete all entries.
         for it in list(self.lru_map.values()):
+            aff4o = it.aff4_obj
+            aff4o.Close()
             it.unlink()
+
 
         # Clear the map.
         self.lru_map.clear()
@@ -491,13 +495,12 @@ class MemoryDataStore(object):
                             yield o
 
     def SelectSubjectsByPrefix(self, prefix):
-        # Keys are bytes.
-        prefix = utils.SmartStr(prefix)
+        prefix = utils.SmartUnicode(prefix)
         for subject in self.store:
             if subject.startswith(prefix):
                 yield rdfvalue.URN(subject)
 
     def QueryPredicatesBySubject(self, subject):
-        subject = utils.SmartStr(subject)
+        subject = utils.SmartUnicode(subject)
         for pred, value in list(self.store.get(subject, {}).items()):
             yield (rdfvalue.URN().UnSerializeFromString(pred), value)

@@ -496,6 +496,9 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
         super(ZipFileSegment, self).Flush()
 
+    def Close(self):
+        pass
+
 
 class ZipFile(aff4.AFF4Volume):
     def __init__(self,  *args, **kwargs):
@@ -718,7 +721,6 @@ class ZipFile(aff4.AFF4Volume):
 
     def CreateMember(self, child_urn):
         member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
-
         return self.CreateZipSegment(member_filename, arn=child_urn)
 
     def CreateZipSegment(self, filename, arn=None):
@@ -956,6 +958,8 @@ class ZipFile(aff4.AFF4Volume):
             # operation.
             backing_store.write(cd_stream.getvalue())
 
+    def Close(self):
+        pass
 
 registry.AFF4_TYPE_MAP[lexicon.AFF4_ZIP_TYPE] = ZipFile
 registry.AFF4_TYPE_MAP[lexicon.AFF4_ZIP_SEGMENT_TYPE] = ZipFileSegment

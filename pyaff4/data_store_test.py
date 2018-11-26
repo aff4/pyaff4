@@ -91,9 +91,9 @@ class AFF4ObjectCacheTest(unittest.TestCase):
         result = cache.GetKeys()
 
         # Keys are stored as serialized urns.
-        self.assertEquals(result[0], b"file:///c")
-        self.assertEquals(result[1], b"file:///b")
-        self.assertEquals(result[2], b"file:///a")
+        self.assertEquals(result[0], "file:///c")
+        self.assertEquals(result[1], "file:///b")
+        self.assertEquals(result[2], "file:///a")
 
         # This removes the object from the cache and places it in the in_use
         # list.
@@ -102,13 +102,13 @@ class AFF4ObjectCacheTest(unittest.TestCase):
         # Keys are stored as serialized urns.
         result = cache.GetKeys()
         self.assertEquals(len(result), 2)
-        self.assertEquals(result[0], b"file:///c")
-        self.assertEquals(result[1], b"file:///b")
+        self.assertEquals(result[0], "file:///c")
+        self.assertEquals(result[1], "file:///b")
 
         # Keys are stored as serialized urns.
         in_use = cache.GetInUse()
         self.assertEquals(len(in_use), 1)
-        self.assertEquals(in_use[0], b"file:///a")
+        self.assertEquals(in_use[0], "file:///a")
 
         # Now we return the object. It should now appear in the lru lists.
         cache.Return(obj1)
@@ -116,9 +116,9 @@ class AFF4ObjectCacheTest(unittest.TestCase):
         result = cache.GetKeys()
         self.assertEquals(len(result), 3)
 
-        self.assertEquals(result[0], b"file:///a")
-        self.assertEquals(result[1], b"file:///c")
-        self.assertEquals(result[2], b"file:///b")
+        self.assertEquals(result[0], "file:///a")
+        self.assertEquals(result[1], "file:///c")
+        self.assertEquals(result[2], "file:///b")
 
         in_use = cache.GetInUse()
         self.assertEquals(len(in_use), 0)
@@ -128,9 +128,9 @@ class AFF4ObjectCacheTest(unittest.TestCase):
         result = cache.GetKeys()
         self.assertEquals(len(result), 3)
 
-        self.assertEquals(result[0], b"file:///d")
-        self.assertEquals(result[1], b"file:///a")
-        self.assertEquals(result[2], b"file:///c")
+        self.assertEquals(result[0], "file:///d")
+        self.assertEquals(result[1], "file:///a")
+        self.assertEquals(result[2], "file:///c")
 
         # b is now expired so not in cache.
         self.assertEquals(cache.Get("file:///b"), None)

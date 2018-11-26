@@ -349,7 +349,7 @@ class AFF4Map(aff4.AFF4Stream):
                 self.resolver.Close(map_stream)
                 with volume.CreateMember(self.urn.Append("idx")) as idx_stream:
                     idx_stream.Write(b"\n".join(
-                        [x.SerializeToString() for x in self.targets]))
+                        [x.SerializeToString().encode("utf-8") for x in self.targets]))
 
                 self.resolver.Close(idx_stream)
                 for target in self.targets:
@@ -435,6 +435,9 @@ class AFF4Map(aff4.AFF4Stream):
         self.targets = []
         self.target_idx_map.clear()
         self.tree.clear()
+
+    def Close(self):
+        pass
 
 
 # Rekall/libAFF4 accidentally swapped the struct in Evimetry's update map

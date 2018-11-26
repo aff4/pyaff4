@@ -41,7 +41,7 @@ class AFF4ImageTest(unittest.TestCase):
             pass
 
     def setUp(self):
-        version = container.Version(1, 1, "pyaff4")
+        version = container.Version(0, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
             resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
