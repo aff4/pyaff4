@@ -77,7 +77,12 @@ class Container(object):
 
     @staticmethod
     def identifyURN(urn):
-        with data_store.MemoryDataStore(lexicon.standard) as resolver:
+        if data_store.HAS_HDT:
+            ds = data_store.HDTAssistedDataStore
+        else:
+            ds = data_store.MemoryDataStore
+
+        with ds(lexicon.standard) as resolver:
             with zip.ZipFile.NewZipFile(resolver, Version(0,1,"pyaff4"), urn) as zip_file:
                 if len(list(zip_file.members.keys())) == 0:
                     # it's a new zipfile
@@ -119,7 +124,7 @@ class Container(object):
         version = Version(1, 1, "pyaff4")
         with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
             volume_urn = zip_file.urn
-            return WritableLogicalImageContainer(version, volume_urn, resolver, lexicon.standard)
+            return WritableHashBasedImageContainer(version, volume_urn, resolver, lexicon.standard)
 
     @staticmethod
     def openURN(urn):
@@ -147,7 +152,11 @@ class Container(object):
     @staticmethod
     def openURNtoContainer(urn, mode=None):
             (version, lex) = Container.identifyURN(urn)
-            resolver = data_store.MemoryDataStore(lex)
+            if data_store.HAS_HDT:
+                ds = data_store.HDTAssistedDataStore
+            else:
+                ds = data_store.MemoryDataStore
+            resolver = ds(lex)
 
             if mode != None and mode == "+":
                 resolver.Set(urn, lexicon.AFF4_STREAM_WRITE_MODE,
@@ -177,7 +186,7 @@ class Container(object):
                         if version.is11():
                             # AFF4 logical images are defined at version 1.1
                             if mode != None and mode == "+":
-                                return WritableLogicalImageContainer(version, volumeURN, resolver, lex)
+                                return WritableHashBasedImageContainer(version, volumeURN, resolver, lex)
                             else:
                                 return LogicalImageContainer(version, volumeURN, resolver, lex)
                         else:
@@ -236,7 +245,7 @@ class LogicalImageContainer(Container):
         _images = self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
         for image in _images:
             pathName = next(self.resolver.QuerySubjectPredicate(image, lexicon.standard11.pathName))
-            yield aff4.LogicalImage(self.resolver, self.urn, image, pathName)
+            yield aff4.LogicalImage(self, self.resolver, self.urn, image, pathName)
 
     def open(self, urn):
         pathName = next(self.resolver.QuerySubjectPredicate(urn, lexicon.standard11.pathName))
@@ -245,7 +254,7 @@ class LogicalImageContainer(Container):
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
         self.resolver.Flush()
-        return self
+        #return self
 
 class PreStdLogicalImageContainer(LogicalImageContainer):
     def __init__(self, version, volumeURN, resolver, lex):
@@ -381,3 +390,58 @@ class WritableLogicalImageContainer(Container):
             return True
         return False
 
+class WritableHashBasedImageContainer(WritableLogicalImageContainer):
+
+    def __init__(self, version, volumeURN, resolver, lex):
+        super(WritableHashBasedImageContainer, self).__init__(version, volumeURN, resolver, lex)
+        block_store_stream_id = "aff4://%s" % uuid.uuid4()
+        self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, block_store_stream_id, self.urn)
+        self.block_store_stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
+
+    def writeLogicalStreamHashBased(self, filename, readstream, length):
+        logical_file_id = None
+        if self.isAFF4Collision(filename):
+            logical_file_id = rdfvalue.URN("aff4://%s" % uuid.uuid4())
+        else:
+            logical_file_id = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
+
+        chunk_size = self.block_store_stream.chunk_size
+        with aff4_map.AFF4Map.NewAFF4Map(
+                self.resolver, logical_file_id, self.urn) as logical_file_map:
+            file_offset = 0
+            while file_offset < length:
+                toread = min(length-file_offset, chunk_size)
+                chunk = readstream.read(toread)
+
+                # pad the chunk to chunksize if it is small
+                if len(chunk) < chunk_size:
+                    chunk = chunk + b"\x00" * (chunk_size - len(chunk))
+
+                h = hashes.new(lexicon.HASH_SHA512)
+                h.update(chunk)
+                hashid = rdfvalue.URN("aff4:sha512:" + h.hexdigest())
+
+                # check if this hash is in the container already
+                existing_bytestream_reference_id =  self.resolver.Get(hashid, rdfvalue.URN(lexicon.standard.dataStream))
+                if existing_bytestream_reference_id == None:
+                    block_stream_address = self.block_store_stream.Tell()
+                    self.block_store_stream.Write(chunk)
+
+                    chunk_reference_id = self.block_store_stream.urn.SerializeToString() + "[0x%x:0x%x]" % (block_stream_address, toread)
+                    chunk_reference_id = rdfvalue.URN(chunk_reference_id)
+                    self.resolver.Add(hashid, rdfvalue.URN(lexicon.standard.dataStream), chunk_reference_id)
+
+                logical_file_map.AddRange(file_offset, 0, toread, hashid)
+
+                file_offset += toread
+
+
+        self.resolver.Add(logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(logical_file_id, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        return logical_file_id
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Return ourselves to the resolver cache.
+        self.resolver.Return(self.block_store_stream)
+        return super(WritableHashBasedImageContainer, self).__exit__(exc_type, exc_value, traceback)

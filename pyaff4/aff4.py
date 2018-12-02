@@ -157,9 +157,10 @@ class AFF4VolumeProperties(object):
 
 
 class AFF4Object(object):
-    def __init__(self, resolver, urn=None, *args, **kwargs):
+    def __init__(self, resolver, urn=None, version=None, *args, **kwargs):
         self.resolver = resolver
         self._dirty = False
+        self.version = version
 
         if urn is None:
             urn = "aff4://%s" % uuid.uuid4()
@@ -222,10 +223,11 @@ class Image(AFF4Object):
 
 class LogicalImage(AFF4Object):
 
-    def __init__(self, resolver, volume, urn, pathName):
+    def __init__(self, container, resolver, volume, urn, pathName):
         super(LogicalImage, self).__init__(resolver, urn)
         self.volume = volume
         self.pathName = pathName
+        self.container = container
 
     def name(self):
         return self.pathName

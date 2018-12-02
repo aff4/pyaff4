@@ -145,7 +145,7 @@ class LinearHasher2:
     def hash(self, image):
 
         storedHashes = list(self.resolver.QuerySubjectPredicate(image.urn, lexicon.standard.hash))
-        with self.resolver.AFF4FactoryOpen(image.urn) as stream:
+        with self.resolver.AFF4FactoryOpen(image.urn, version=image.container.version) as stream:
             datatypes = [h.datatype for h in storedHashes]
             stream2 = StreamHasher(stream, datatypes)
             self.readall2(stream2)

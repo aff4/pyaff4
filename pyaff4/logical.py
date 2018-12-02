@@ -18,7 +18,10 @@ from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 import time
 import tzlocal
+import pytz
 from datetime import datetime
+from dateutil.parser import parse
+import traceback
 
 class FSMetadata(object):
     def __init__(self, urn, name, length):
@@ -29,6 +32,26 @@ class FSMetadata(object):
     def store(self, resolver):
         resolver.Set(self.urn, rdfvalue.URN(lexicon.size), rdfvalue.XSDInteger(self.length))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.name), rdfvalue.XSDInteger(self.name))
+
+    @staticmethod
+    def createFromTarInfo(filename, tarinfo):
+        size = tarinfo.size
+        local_tz = tzlocal.get_localzone()
+        lastWritten = datetime.fromtimestamp(tarinfo.mtime, local_tz)
+        accessed = datetime.fromtimestamp(int(tarinfo.pax_headers["atime"]), local_tz)
+        recordChanged = datetime.fromtimestamp(int(tarinfo.pax_headers["ctime"]), local_tz)
+        # addedDate  ?? todo
+        return UnixMetadata(filename, filename, size, lastWritten, accessed, recordChanged)
+
+    @staticmethod
+    def createFromSFTPAttr(filename, attr):
+        size = attr.st_size
+        local_tz = tzlocal.get_localzone()
+        lastWritten = datetime.fromtimestamp(attr.st_mtime, local_tz)
+        accessed = datetime.fromtimestamp(attr.st_atime, local_tz)
+        #recordChanged = datetime.fromtimestamp(attr.st_ctime, local_tz)
+        # addedDate  ?? todo
+        return UnixMetadata(filename, filename, size, lastWritten, accessed, 0)
 
     @staticmethod
     def create(filename):
@@ -60,10 +83,9 @@ class FSMetadata(object):
             recordChanged = datetime.fromtimestamp(s.st_ctime, local_tz)
             return LinuxFSMetadata(filename, filename, size, lastWritten, accessed, recordChanged)
 
-
-class LinuxFSMetadata(FSMetadata):
+class UnixMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
-        super(LinuxFSMetadata, self).__init__(urn, name, size)
+        super(UnixMetadata, self).__init__(urn, name, size)
         self.lastWritten = lastWritten
         self.lastAccessed = lastAccessed
         self.recordChanged = recordChanged
@@ -73,21 +95,19 @@ class LinuxFSMetadata(FSMetadata):
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
+
+class LinuxFSMetadata(UnixMetadata):
+    def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
+        super(LinuxFSMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged)
 
 
 class MacOSFSMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
         super(MacOSFSMetadata, self).__init__(urn, name, size)
-        self.lastWritten = lastWritten
-        self.lastAccessed = lastAccessed
-        self.recordChanged = recordChanged
         self.birthTime = birthTime
 
     def store(self, resolver):
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
+        super(MacOSFSMetadata, self).store(resolver)
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
 
@@ -103,3 +123,22 @@ class WindowsFSMetadata(FSMetadata):
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
+
+def resetTimestampsPosix(destFile, lastWritten, lastAccessed, recordChanged, birthTime):
+    try:
+        lw = parse(lastWritten.value)
+        la = parse(lastWritten.value)
+        os.utime(destFile, ((la - epoch).total_seconds(), (lw - epoch).total_seconds()))
+    except Exception, err:
+        traceback.print_exc()
+
+# default implementation does nothing at present on non posix environments
+def resetTimestampsNone(destFile, lastWritten, lastAccessed, recordChanged, birthTime):
+    pass
+
+resetTimestamps = resetTimestampsNone
+epoch = datetime(1970, 1, 1, tzinfo=pytz.utc)
+
+p = platform.system()
+if p == "Darwin" or p == "Linux":
+    resetTimestamps = resetTimestampsPosix

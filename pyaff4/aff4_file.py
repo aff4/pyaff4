@@ -36,6 +36,9 @@ LOGGER = logging.getLogger("pyaff4")
 
 
 class FileBackedObject(aff4.AFF4Stream):
+    def __init__(self,  *args, **kwargs):
+        super(FileBackedObject, self).__init__( *args, **kwargs)
+
     def _GetFilename(self):
         filename = self.resolver.Get(self.urn, lexicon.AFF4_FILE_NAME)
         if filename:
@@ -147,7 +150,9 @@ class FileBackedObject(aff4.AFF4Stream):
 
         self.fd.write(utils.SmartStr(data))
         # self.fd.flush()
-        self.readptr += len(data)
+
+        self.size = len(data)
+        self.readptr += self.size
 
     def Flush(self):
         if self.IsDirty():

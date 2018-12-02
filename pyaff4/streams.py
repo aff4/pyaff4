@@ -22,3 +22,13 @@ def ReadAll(stream):
             return res
         else:
             res += data
+
+def WriteAll(fromstream, tostream):
+    while True:
+        toRead = 32 * 1024
+        data = fromstream.read(toRead)
+        if data == None or len(data) == 0:
+            # EOF
+            return
+        else:
+            tostream.write(data)

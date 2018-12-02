@@ -414,7 +414,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
     def LoadFromURN(self):
         owner_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
-        with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
+        with self.resolver.AFF4FactoryOpen(owner_urn, version=self.version) as owner:
             self.LoadFromZipFile(owner)
 
     def LoadFromZipFile(self, owner):
@@ -500,9 +500,9 @@ class ZipFileSegment(aff4_file.FileBackedObject):
         pass
 
 
-class ZipFile(aff4.AFF4Volume):
+class BasicZipFile(aff4.AFF4Volume):
     def __init__(self,  *args, **kwargs):
-        super(ZipFile, self).__init__( *args, **kwargs)
+        super(BasicZipFile, self).__init__( *args, **kwargs)
         self.children = set()
         # The members of this zip file. Keys is member URN, value is zip info.
         self.members = {}
@@ -662,15 +662,20 @@ class ZipFile(aff4.AFF4Volume):
                         entry, extrabuf)
                     extrabuf = extrabuf[readbytes:]
 
-                    if extra.header_id == 1:
-                        if extra.Get("relative_offset_local_header") is not None:
-                            zip_info.local_header_offset = (
-                                extra.Get("relative_offset_local_header"))
-                        if extra.Get("file_size") is not None:
-                            zip_info.file_size = extra.Get("file_size")
-                        if extra.Get("compress_size") is not None:
-                            zip_info.compress_size = extra.Get("compress_size")
-                            #break
+                    # AFF4 requres Zip64, but we still want to be able to read 3rd party
+                    # zip files, so just try/catch around reads of the extensible field
+                    try:
+                        if extra.header_id == 1:
+                            if extra.Get("relative_offset_local_header") is not None:
+                                zip_info.local_header_offset = (
+                                    extra.Get("relative_offset_local_header"))
+                            if extra.Get("file_size") is not None:
+                                zip_info.file_size = extra.Get("file_size")
+                            if extra.Get("compress_size") is not None:
+                                zip_info.compress_size = extra.Get("compress_size")
+                                #break
+                    except:
+                        pass
 
                 LOGGER.info("Found file %s @ %#x", zip_info.filename,
                             zip_info.local_header_offset)
@@ -753,11 +758,13 @@ class ZipFile(aff4.AFF4Volume):
         # Add the new object to the object cache.
         return self.resolver.CachePut(result)
 
-
-
     def OpenZipSegment(self, filename):
         # Is it already in the cache?
         segment_urn = escaping.urn_from_member_name(filename, self.urn, self.version)
+        return self.OpenMember(segment_urn)
+
+    def OpenMember(self, segment_urn):
+        # Is it already in the cache?
         if segment_urn not in self.members:
             raise IOError("Segment %s does not exist yet" % filename)
 
@@ -765,6 +772,7 @@ class ZipFile(aff4.AFF4Volume):
 
         if res:
             LOGGER.info("Openning ZipFileSegment (cached) %s", res.urn)
+            res.Reset()
             return res
 
         result = ZipFileSegment(resolver=self.resolver, urn=segment_urn)
@@ -788,9 +796,7 @@ class ZipFile(aff4.AFF4Volume):
             # append an AFF4 volume to it, or make a new file.
             return
 
-        # Load the turtle metadata.
-        with self.OpenZipSegment("information.turtle") as fd:
-            self.resolver.LoadFromTurtle(fd)
+        self.resolver.loadMetadata(self)
 
     def StreamAddMember(self, member_urn, stream,
                         compression_method=ZIP_STORED,
@@ -829,8 +835,11 @@ class ZipFile(aff4.AFF4Volume):
                 compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
                                               zlib.DEFLATED, -15)
                 while True:
-                    data = stream.read(BUFF_SIZE)
-                    if not data:
+                    try:
+                        data = stream.read(BUFF_SIZE)
+                        if not data:
+                            break
+                    except IOError, e:
                         break
 
                     c_data = compressor.compress(data)
@@ -880,16 +889,12 @@ class ZipFile(aff4.AFF4Volume):
                     self.children.remove(child)
 
             # Add the turtle file to the volume.
-            with self.CreateZipSegment(u"information.turtle") as turtle_segment:
-                turtle_segment.compression_method = ZIP_DEFLATE
-
-                self.resolver.DumpToTurtle(self.urn, stream=turtle_segment)
-                turtle_segment.Flush()
+            self.resolver.DumpToTurtle(self)
 
             # Write the central directory.
             self.write_zip64_CD()
 
-        super(ZipFile, self).Flush()
+        super(BasicZipFile, self).Flush()
 
     def write_zip64_CD(self):
         backing_store_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
@@ -961,5 +966,19 @@ class ZipFile(aff4.AFF4Volume):
     def Close(self):
         pass
 
+class ZipFile(BasicZipFile):
+    def __init__(self,  *args, **kwargs):
+        super(ZipFile, self).__init__( *args, **kwargs)
+
+    def LoadFromURN(self):
+        super(ZipFile, self).LoadFromURN()
+        if len(self.members) == 0:
+            return
+        # Load the turtle metadata.
+        #with self.OpenZipSegment("information.turtle") as fd:
+        #    self.resolver.LoadFromTurtle(fd)
+        #self.resolver.Close(fd)
+
 registry.AFF4_TYPE_MAP[lexicon.AFF4_ZIP_TYPE] = ZipFile
 registry.AFF4_TYPE_MAP[lexicon.AFF4_ZIP_SEGMENT_TYPE] = ZipFileSegment
+registry.AFF4_TYPE_MAP["StandardZip"] = BasicZipFile

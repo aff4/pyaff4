@@ -391,7 +391,7 @@ class AFF4Image(aff4.AFF4Stream):
             bevy_id = old_div(chunk_id, self.chunks_per_segment)
             bevy_urn = self.urn.Append("%08d" % bevy_id)
 
-            with self.resolver.AFF4FactoryOpen(bevy_urn) as bevy:
+            with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
                 while chunks_to_read > 0:
                     r = self.cache.get(chunk_id)
                     if r != None:

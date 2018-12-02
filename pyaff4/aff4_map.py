@@ -21,7 +21,7 @@ import collections
 import intervaltree
 import logging
 import struct
-
+import sys
 
 from pyaff4 import aff4
 from pyaff4 import aff4_image
@@ -181,6 +181,10 @@ class AFF4Map(aff4.AFF4Stream):
         self.target_idx_map = {}
         self.tree = intervaltree.IntervalTree()
         self.last_target = None
+        try:
+            self.version = kwargs["version"]
+        except:
+            pass
 
     @staticmethod
     def NewAFF4Map(resolver, image_urn, volume_urn):
@@ -244,7 +248,7 @@ class AFF4Map(aff4.AFF4Stream):
             length_to_read_in_target = min(length, range.map_end - self.readptr)
 
             try:
-                with self.resolver.AFF4FactoryOpen(target) as target_stream:
+                with self.resolver.AFF4FactoryOpen(target, version=self.version) as target_stream:
                     target_stream.Seek(
                         range.target_offset_at_map_offset(self.readptr))
 
@@ -259,10 +263,7 @@ class AFF4Map(aff4.AFF4Stream):
                 length -= length_to_read_in_target
                 self.readptr += length_to_read_in_target
 
-        if result:
-            return result
-
-        return b"\x00" * length
+        return result
 
     def Size(self):
         return self.tree.end()
@@ -356,6 +357,9 @@ class AFF4Map(aff4.AFF4Stream):
                     # for cross containterne references, opening the target wont work
                     # so we enclose this in a try/catch
                     try:
+                        # dont do this for hash references
+                        if target.SerializeToString().startswith("aff4:sha512"):
+                            continue
                         with self.resolver.AFF4FactoryOpen(target) as stream:
                             pass
                         self.resolver.Close(stream)
@@ -457,11 +461,11 @@ class AFF4Map2(AFF4Map):
         # Parse the map out of the map stream. If the stream does not exist yet
         # we just start with an empty map.
         try:
-            with self.resolver.AFF4FactoryOpen(map_idx_urn) as map_idx:
+            with self.resolver.AFF4FactoryOpen(map_idx_urn, version=self.version) as map_idx:
                 self.targets = [rdfvalue.URN(utils.SmartUnicode(x))
                                 for x in map_idx.Read(map_idx.Size()).splitlines()]
 
-            with self.resolver.AFF4FactoryOpen(map_urn) as map_stream:
+            with self.resolver.AFF4FactoryOpen(map_urn, version=self.version) as map_stream:
                 format_str = "<QQQI"
                 bufsize = map_stream.Size()
                 buf = map_stream.Read(bufsize)
@@ -504,6 +508,69 @@ class AFF4Map2(AFF4Map):
 
         except IOError:
             pass
+
+class ByteRangeARN(aff4.AFF4Stream):
+
+    def __init__(self, version, resolver=None, urn=None):
+        super(ByteRangeARN, self).__init__(
+            resolver=resolver, urn=urn)
+        (target, rangepair) = urn.SerializeToString().split("[")
+        rangepair = rangepair[0:len(rangepair)-1]
+        (offset, length) = rangepair.split(":")
+        self.target = target
+        self.offset = int(offset,16)
+        self.length = int(length,16)
+        self.version = version
+
+
+    def Read(self, length):
+        result = b""
+        assert self.readptr == 0
+        length_to_read_in_target = min(length, self.length)
+        try:
+            with self.resolver.AFF4FactoryOpen(self.target, version=self.version) as target_stream:
+                target_stream.Seek(self.offset)
+                buffer = target_stream.Read(length_to_read_in_target)
+                assert len(buffer) == length_to_read_in_target
+                result += buffer
+        except IOError:
+            LOGGER.debug("*** Stream %s not found. Substituting zeros. ***",
+                         target_stream)
+            result += b"\x00" * length_to_read_in_target
+        finally:
+            length -= length_to_read_in_target
+            self.readptr += length_to_read_in_target
+        return result
+
+    def Write(self, data):
+        raise NotImplementedError()
+
+    def WriteStream(self, source):
+        raise NotImplementedError()
+
+    def Tell(self):
+        return self.readptr
+
+    def Size(self):
+        return sys.maxsize
+
+    def read(self, length=1024*1024):
+        return self.Read(length)
+
+    def seek(self, offset, whence=0):
+        self.Seek(offset, whence=whence)
+
+    def write(self, data):
+        self.Write(data)
+
+    def tell(self):
+        return self.Tell()
+
+    def flush(self):
+        self.Flush()
+
+    def Prepare(self):
+        self.Seek(0)
 
 registry.AFF4_TYPE_MAP[lexicon.AFF4_MAP_TYPE] = AFF4Map2
 registry.AFF4_TYPE_MAP[lexicon.AFF4_LEGACY_MAP_TYPE] = AFF4Map

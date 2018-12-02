@@ -11,18 +11,24 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+# author bradley@evimetry.com
+
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
+from builtins import next
+from builtins import str
+from builtins import object
 
 import argparse
 import sys, os, errno, shutil, uuid
 
-from pyaff4 import container
+from pyaff4 import container, version
 from pyaff4 import lexicon, logical, escaping
 from pyaff4 import rdfvalue, hashes, utils
-from pyaff4 import block_hasher, data_store, linear_hasher
+from pyaff4 import block_hasher, data_store, linear_hasher, zip
 
-# here's the beginnings of a command line app for manipulating AFF4 images
-# more of a PoC code example for now.
-# author bradley@evimetry.com
 
 VERBOSE = False
 TERSE = False
@@ -152,15 +158,66 @@ def verify(file):
             print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
             hasher.hash(image)
 
+def ingestZipfile(container_name, zipfile, append):
+    # TODO: check path in exists
+    with data_store.MemoryDataStore() as resolver:
+        basefilename = os.path.basename(zipfile)
+        if basefilename.endswith(".bag.zip"):
+            basefilename = basefilename[0:len(basefilename) - len(".bag.zip")]
 
+        container_urn = rdfvalue.URN.FromFileName(container_name)
+        urn = None
 
-def addPathNames(container_name, pathnames, recursive):
+        if not os.path.exists(container_name):
+            volume = container.Container.createURN(resolver, container_urn)
+            print("Creating AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+        else:
+            volume = container.Container.openURNtoContainer(container_urn, mode="+", resolver=resolver)
+            print("Appending to AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+
+        with volume as volume:
+            filename_arn = rdfvalue.URN.FromFileName(zipfile)
+            # the following coaxes our ZIP implementation to treat this file
+            # as a regular old zip
+            result = zip.BasicZipFile(resolver, urn=None, version=version.aff4v10)
+            resolver.Set(result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
+            resolver.Set(result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
+
+            with resolver.AFF4FactoryOpen(result.urn, version=version.aff4v10) as zip_file:
+                for member in zip_file.members:
+                    info = zip_file.members[member]
+                    pathname = basefilename +  member.SerializeToString()[len(result.urn.SerializeToString()):]
+                    print(pathname)
+
+                    with resolver.AFF4FactoryOpen(member, version=version.aff4v10) as src:
+
+                        hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
+                        urn = volume.writeLogicalStreamHashBased(pathname, hasher, info.file_size)
+                        #fsmeta.urn = urn
+                        #fsmeta.store(resolver)
+                        for h in hasher.hashes:
+                            hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
+                            resolver.Add(urn, rdfvalue.URN(lexicon.standard.hash), hh)
+
+        return urn
+
+def addPathNames(container_name, pathnames, recursive, append, hashbased):
     with data_store.MemoryDataStore() as resolver:
         container_urn = rdfvalue.URN.FromFileName(container_name)
         urn = None
-        with container.Container.createURN(resolver, container_urn) as volume:
+
+        if append == False:
+            volume = container.Container.createURN(resolver, container_urn)
             print("Creating AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+        else:
+            volume = container.Container.openURNtoContainer(container_urn, mode="+", resolver=resolver)
+            print("Appending to AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+
+        with volume as volume:
             for pathname in pathnames:
+                if not os.path.exists(pathname):
+                    print("Path %s not found. Skipping.")
+                    continue
                 pathname = utils.SmartUnicode(pathname)
                 print ("\tAdding: %s" % pathname)
                 fsmeta = logical.FSMetadata.create(pathname)
@@ -182,7 +239,10 @@ def addPathNames(container_name, pathnames, recursive):
                 else:
                     with open(pathname, "rb") as src:
                         hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
-                        urn = volume.writeLogicalStream(pathname, hasher, fsmeta.length)
+                        if hashbased == False:
+                            urn = volume.writeLogicalStream(pathname, hasher, fsmeta.length)
+                        else:
+                            urn = volume.writeLogicalStreamHashBased(pathname, hasher, fsmeta.length)
                         fsmeta.urn = urn
                         fsmeta.store(resolver)
                         for h in hasher.hashes:
@@ -190,13 +250,48 @@ def addPathNames(container_name, pathnames, recursive):
                             resolver.Add(urn, rdfvalue.URN(lexicon.standard.hash), hh)
         return urn
 
+def extractAll(container_name, destFolder):
+    container_urn = rdfvalue.URN.FromFileName(container_name)
+    urn = None
+
+    with container.Container.openURNtoContainer(container_urn) as volume:
+        printVolumeInfo(file, volume)
+        resolver = volume.resolver
+        for imageUrn in resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard11.FileImage):
+            imageUrn = utils.SmartUnicode(imageUrn)
+
+            pathName = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.pathName)).value
+            if pathName.startswith("/"):
+                pathName = "." + pathName
+            with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
+                if destFolder != "-":
+                    destFile = os.path.join(destFolder, pathName)
+                    if not os.path.exists(os.path.dirname(destFile)):
+                        try:
+                            os.makedirs(os.path.dirname(destFile))
+                        except OSError as exc:  # Guard against race condition
+                            if exc.errno != errno.EEXIST:
+                                raise
+                    with open(destFile, "w") as destStream:
+                        shutil.copyfileobj(srcStream, destStream)
+                        print ("\tExtracted %s to %s" % (pathName, destFile))
+
+                    lastWritten = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.lastWritten))
+                    lastAccessed = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.lastAccessed))
+                    recordChanged = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.recordChanged))
+                    birthTime = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.birthTime))
+                    logical.resetTimestamps(destFile, lastWritten, lastAccessed, recordChanged, birthTime)
+
+                else:
+                    shutil.copyfileobj(srcStream, sys.stdout)
+
 def extract(container_name, imageURNs, destFolder):
     with data_store.MemoryDataStore() as resolver:
         container_urn = rdfvalue.URN.FromFileName(container_name)
         urn = None
 
         with container.Container.openURNtoContainer(container_urn) as volume:
-            printVolumeInfo(container_name, volume)
+            printVolumeInfo(file, volume)
             resolver = volume.resolver
             for imageUrn in imageURNs:
                 imageUrn = utils.SmartUnicode(imageUrn)
@@ -239,6 +334,14 @@ def main(argv):
                         help='create an AFF4 logical container containing srcFiles')
     parser.add_argument('-x', "--extract", action="store_true",
                         help='extract objects from the container')
+    parser.add_argument('-X', "--extract-all", action="store_true",
+                        help='extract ALL objects from the container')
+    parser.add_argument('-H', "--hash", action="store_true",
+                        help='use hash based imaging for storing content')
+    parser.add_argument('-a', "--append", action="store_true",
+                        help='append to an existing image')
+    parser.add_argument('-i', "--ingest", action="store_true",
+                        help='ingest a zip file into a hash based image')
     parser.add_argument('aff4container', help='the pathname of the AFF4 container')
     parser.add_argument('srcFiles', nargs="*", help='source files and folders to add as logical image')
 
@@ -251,7 +354,7 @@ def main(argv):
 
     if args.create_logical == True:
         dest = args.aff4container
-        addPathNames(dest, args.srcFiles, args.recursive)
+        addPathNames(dest, args.srcFiles, args.recursive, args.append, args.hash)
     elif  args.meta == True:
         dest = args.aff4container
         meta(dest)
@@ -264,6 +367,12 @@ def main(argv):
     elif args.extract == True:
         dest = args.aff4container
         extract(dest, args.srcFiles, args.folder)
+    elif args.extract_all == True:
+        dest = args.aff4container
+        extractAll(dest, args.srcFiles[0])
+    elif args.ingest == True:
+        dest = args.aff4container
+        ingestZipfile(dest, args.srcFiles[0], False)
 
 
 if __name__ == "__main__":

@@ -16,11 +16,16 @@ from __future__ import unicode_literals
 
 from builtins import str
 from builtins import object
+from os.path import expanduser
 import collections
 import logging
 import rdflib
 import re
 import six
+import os
+import tempfile
+import subprocess
+import sys
 
 from pyaff4 import aff4
 from pyaff4 import lexicon
@@ -29,11 +34,20 @@ from pyaff4 import registry
 from pyaff4 import stream_factory
 from pyaff4 import utils
 from pyaff4 import streams
-from pyaff4 import aff4_file
+from pyaff4 import aff4_map
+from pyaff4 import escaping
+from pyaff4 import turtle
+from pyaff4.zip import ZIP_DEFLATE
 
 LOGGER = logging.getLogger("pyaff4")
+HAS_HDT = False
+try:
+    from hdt import HDTDocument
+    HAS_HDT = True
+except:
+    pass
 
-
+#HAS_HDT = False
 def CHECK(condition, error):
     if not condition:
         raise RuntimeError(error)
@@ -305,8 +319,112 @@ class MemoryDataStore(object):
 
         return False
 
+    def DumpToTurtle(self, zipcontainer):
+        infoARN = escaping.urn_from_member_name(u"information.turtle", zipcontainer.urn, zipcontainer.version)
+        if not zipcontainer.ContainsMember(infoARN):
+            with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
+                turtle_segment.compression_method = ZIP_DEFLATE
 
-    def DumpToTurtle(self, volumeurn, stream=None, verbose=False):
+                result = self._DumpToTurtle(zipcontainer.urn)
+                turtle_segment.write(utils.SmartStr(result))
+                turtle_segment.Flush()
+        else:
+            # append to an existng container
+            explodedTurtleDirectivesARN = escaping.urn_from_member_name(u"information.turtle/directives", zipcontainer.urn, zipcontainer.version)
+            if not zipcontainer.ContainsMember(explodedTurtleDirectivesARN):
+                # this is the first append operation. Create the chunked turtle structures
+                with zipcontainer.OpenZipSegment(u"information.turtle") as turtle_segment:
+                    currentturtle = utils.SmartUnicode(streams.ReadAll(turtle_segment))
+                    (directives_txt, triples_txt) = turtle.toDirectivesAndTripes(currentturtle)
+                    with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
+                        directives_segment.compression_method = ZIP_DEFLATE
+                        directives_segment.write(utils.SmartStr(directives_txt))
+                        directives_segment.Flush()
+                    with zipcontainer.CreateZipSegment(u"information.turtle/%08d" % 0) as turtle_segment:
+                        turtle_segment.compression_method = ZIP_DEFLATE
+                        turtle_segment.write(utils.SmartStr(triples_txt))
+                        turtle_segment.Flush()
+                    self.Close(turtle_segment)
+
+                (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicode(self._DumpToTurtle(zipcontainer.urn)))
+                directives_difference = turtle.difference(directives_txt, current_directives_txt)
+                if not len(directives_difference) == 0:
+                    directives_txt = directives_txt + "\r\n" + directives_difference
+                    with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
+                        directives_segment.compression_method = ZIP_DEFLATE
+                        directives_segment.write(utils.SmartStr(directives_txt))
+                        directives_segment.Flush()
+
+                current_turtle_chunk_arn = rdfvalue.URN(u"%s/information.turtle/%08d" % (zipcontainer.urn, 1))
+                with zipcontainer.CreateMember(current_turtle_chunk_arn) as turtle_segment:
+                    turtle_segment.compression_method = ZIP_DEFLATE
+                    turtle_segment.write(utils.SmartStr(current_triples_txt))
+                    turtle_segment.Flush()
+                self.Close(turtle_segment)
+
+                with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
+                    turtle_segment.compression_method = ZIP_DEFLATE
+                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n"))
+
+                    turtleContainerIndex = 0
+                    while True:
+                        current_turtle_chunk_arn = rdfvalue.URN(u"%s/information.turtle/%08d" % (zipcontainer.urn, turtleContainerIndex))
+
+                        if zipcontainer.ContainsMember(current_turtle_chunk_arn):
+                            with zipcontainer.OpenMember(current_turtle_chunk_arn) as turtle_chunk_segment:
+                                turtle_chunk_txt = streams.ReadAll(turtle_chunk_segment)
+                                turtle_segment.write(utils.SmartStr(turtle_chunk_txt + "\r\n"))
+                            turtleContainerIndex += 1
+
+                        else:
+                            break
+                    turtle_segment.Flush()
+            else:
+                # more than one append as already occurred
+                turtleContainerIndex = 2
+                while True:
+                    turtleARN = escaping.urn_from_member_name(u"information.turtle/%08d" % turtleContainerIndex,
+                                                                                zipcontainer.urn, zipcontainer.version)
+                    if not zipcontainer.ContainsMember(turtleARN):
+                        break
+
+                with zipcontainer.OpenZipSegment(u"information.turtle/directives") as directives_segment:
+                    directives_txt = streams.ReadAll(directives_segment)
+
+                (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicodeself._DumpToTurtle(zipcontainer.urn))
+                directives_difference = turtle.difference(directives_txt, current_directives_txt)
+
+                if not directives_difference == "":
+                    directives_txt = directives_txt + "\r\n" + directives_difference
+                    with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
+                        directives_segment.compression_method = ZIP_DEFLATE
+                        directives_segment.write(utils.SmartStr(directives_txt))
+                        directives_segment.Flush()
+
+                with zipcontainer.CreateZipSegment(u"information.turtle/%08d" % turtleContainerIndex) as turtle_segment:
+                    turtle_segment.compression_method = ZIP_DEFLATE
+                    turtle_segment.write(utils.SmartStr(current_triples_txt))
+                    turtle_segment.Flush()
+
+                with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
+                    turtle_segment.compression_method = ZIP_DEFLATE
+                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n"))
+
+                    turtleContainerIndex = 0
+                    while True:
+                        turtleARN = escaping.urn_from_member_name(u"information.turtle/%08d" % turtleContainerIndex,
+                                                                  zipcontainer.urn, zipcontainer.version)
+                        if zipcontainer.ContainsMember(turtleARN):
+                            with zipcontainer.OpenZipSegment(
+                                u"information.turtle/%08d" % turtleContainerIndex) as turtle_chunk_segment:
+                                turtle_chunk_txt = streams.ReadAll(turtle_chunk_segment)
+                                turtle_segment.write(utils.SmartStr(turtle_chunk_txt + "\r\n"))
+                            turtleContainerIndex += 1
+                        else:
+                            break
+                    turtle_segment.Flush()
+
+    def _DumpToTurtle(self, volumeurn, verbose=False):
         g = rdflib.Graph()
         g.bind("aff4", rdflib.Namespace(self.lexicon.base))
 
@@ -318,8 +436,11 @@ class MemoryDataStore(object):
         for urn, items in self.store.items():
             urn = utils.SmartUnicode(urn)
             type = items.get(utils.SmartUnicode(lexicon.AFF4_TYPE))
+
+            # only dump objects and pseudo map entries
             if type is None:
-                continue
+                if not urn.startswith(u"aff4:sha512:"):
+                    continue
 
             for attr, value in list(items.items()):
                 attr = utils.SmartUnicode(attr)
@@ -344,11 +465,13 @@ class MemoryDataStore(object):
         result = utils.SmartUnicode(result)
         #basestart = "@base <%s> .\r\n" % (volumeBase)
         #result = basestart + result
-        if stream:
-            stream.write(utils.SmartStr(result))
 
         return result
 
+    def loadMetadata(self, zip):
+        # Load the turtle metadata.
+        with zip.OpenZipSegment("information.turtle") as fd:
+            self.LoadFromTurtle(fd)
 
     def LoadFromTurtle(self, stream):
         data = streams.ReadAll(stream)
@@ -391,6 +514,13 @@ class MemoryDataStore(object):
 
         if self.streamFactory.isSymbolicStream(urn):
             obj = self.streamFactory.createSymbolic(urn)
+        elif urn.SerializeToString().startswith("aff4:sha512"):
+            bytestream_reference_id = self.Get(urn, rdfvalue.URN(lexicon.standard.dataStream))
+            cached_obj = self.ObjectCache.Get(bytestream_reference_id)
+            if cached_obj:
+                cached_obj.Prepare()
+                return cached_obj
+            obj = aff4_map.ByteRangeARN(version, resolver=self, urn=bytestream_reference_id)
         else:
             uri_types = self.Get(urn, lexicon.AFF4_TYPE)
 
@@ -504,3 +634,103 @@ class MemoryDataStore(object):
         subject = utils.SmartUnicode(subject)
         for pred, value in list(self.store.get(subject, {}).items()):
             yield (rdfvalue.URN().UnSerializeFromString(pred), value)
+
+# With large information.turtle files, the in-memory database performs
+# horribly. This is a faster way. http://www.rdfhdt.org
+class HDTAssistedDataStore(MemoryDataStore):
+    def __init__(self, lex=lexicon.standard):
+        super(HDTAssistedDataStore, self).__init__(lex=lex)
+
+    def loadMetadata(self, zip):
+        # Load the turtle metadata.
+        aff4cache = os.path.join(expanduser("~"), ".aff4")
+        cached_turtle = os.path.join(aff4cache, "%s.hdt" % str(zip.urn)[7:])
+        if not os.path.exists(cached_turtle):
+            try:
+                rdf2hdt = "/usr/local/bin/rdf2hdt"
+                temp = tempfile.NamedTemporaryFile(delete=False)
+                with zip.OpenZipSegment("information.turtle") as fd:
+                    print(dir(temp))
+                    streams.WriteAll(fd, temp)
+                temp.close()
+                try:
+                    cmd = rdf2hdt + " -f turtle " + temp.name + " " + cached_turtle
+                    retcode = subprocess.call(cmd, shell=True)
+                    if retcode < 0:
+                        print("rdf2hdt failed", -retcode, file=sys.stderr)
+                    else:
+                        pass
+                except OSError as e:
+                    print("Execution failed:", e, file=sys.stderr)
+                os.unlink(temp.name)
+            except:
+                raise Exception("rdf2dht failed. Please make data_store.HAS_HDT=False until this is fixed. ")
+
+        # assume we have a HDT cache of turtle at this point
+        self.hdt = HDTDocument(cached_turtle)
+    # this implementation currently not tested
+    # and it is super ugly. We are materializing all triples just to
+    # list all the subjects.
+    # TODO: Implement subject iterator in pyHDT
+    def QuerySubject(self, subject_regex=None):
+        subject_regex = re.compile(utils.SmartStr(subject_regex))
+        (triples, cardinality) = self.hdt.search_triples("", "?", "?")
+        seen_subject = []
+
+        for (s,p,o) in triples:
+            if subject_regex is not None and subject_regex.match(s):
+                if s not in seen_subject:
+                    seen_subject.add(s)
+                    yield rdfvalue.URN().UnSerializeFromString(s)
+
+        for s in super(HDTAssistedDataStore, self).QuerySubject(subject_regex=subject_regex):
+            if s not in seen_subject:
+                seen_subject.add(s)
+                yield s
+
+    # not yet implemented
+    def QueryPredicate(self, predicate):
+        return super(HDTAssistedDataStore, self).QueryPredicate(predicate)
+
+    def QueryPredicateObject(self, predicate, object):
+        (triples, cardinality) = self.hdt.search_triples("", predicate, object)
+
+        for (s,p,o) in triples:
+            yield rdfvalue.URN(s)
+
+        for subject in super(HDTAssistedDataStore, self).QueryPredicateObject(predicate, object):
+            yield subject
+
+    def QuerySubjectPredicate(self, subject, predicate):
+        subject = utils.SmartUnicode(subject)
+        predicate = utils.SmartUnicode(predicate)
+        (triples, cardinality) = self.hdt.search_triples(subject, predicate, "")
+
+        for (s,p,o) in triples:
+            if o.startswith("\""):
+                # it is a literal
+                (v,t) = o.split("^^")
+                v = v.replace("\"", "")
+                t = t[1:len(t)-1]
+
+                datatype = rdflib.URIRef(t)
+                if datatype in registry.RDF_TYPE_MAP:
+                    o = registry.RDF_TYPE_MAP[datatype](v)
+                else:
+                    # Default to a string literal.
+                    o = rdfvalue.XSDString(v)
+            elif o.startswith("<"):
+                o = rdfvalue.URN(utils.SmartUnicode(v))
+            else:
+                raise Exception("unsupported")
+
+            yield o
+
+        for o in super(HDTAssistedDataStore, self).QuerySubjectPredicate(subject, predicate):
+            yield o
+
+    def SelectSubjectsByPrefix(self, prefix):
+        return super(HDTAssistedDataStore, self).SelectSubjectsByPrefix(prefix)
+
+    def QueryPredicatesBySubject(self, subject):
+        return super(HDTAssistedDataStore, self).QueryPredicatesBySubject(subject)

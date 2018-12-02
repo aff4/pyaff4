@@ -373,6 +373,7 @@ registry.RDF_TYPE_MAP.update({
     rdflib.XSD.integer: XSDInteger,
     rdflib.XSD.int: XSDInteger,
     rdflib.XSD.long: XSDInteger,
+    rdflib.XSD.datetime: XSDDateTime,
     rdflib.URIRef("http://aff4.org/Schema#SHA512"): SHA512Hash,
     rdflib.URIRef("http://aff4.org/Schema#SHA256"): SHA256Hash,
     rdflib.URIRef("http://aff4.org/Schema#SHA1"): SHA1Hash,
