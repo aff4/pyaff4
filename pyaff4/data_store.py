@@ -26,6 +26,9 @@ import os
 import tempfile
 import subprocess
 import sys
+import types
+
+from itertools import chain
 
 from pyaff4 import aff4
 from pyaff4 import lexicon
@@ -38,6 +41,7 @@ from pyaff4 import aff4_map
 from pyaff4 import escaping
 from pyaff4 import turtle
 from pyaff4.zip import ZIP_DEFLATE
+from pyaff4.lexicon import transient_graph
 
 LOGGER = logging.getLogger("pyaff4")
 HAS_HDT = False
@@ -224,6 +228,7 @@ class MemoryDataStore(object):
     def __init__(self, lex=lexicon.standard):
         self.lexicon = lex
         self.store = collections.OrderedDict()
+        self.transient_store = collections.OrderedDict()
         self.ObjectCache = AFF4ObjectCache(10)
         self.flush_callbacks = {}
 
@@ -250,40 +255,6 @@ class MemoryDataStore(object):
     def DeleteSubject(self, subject):
         self.store.pop(rdfvalue.URN(subject), None)
 
-    # FIXME: This is a big API breaking change - we simply can not
-    # change the type we are returning from Get() depending on random
-    # factors. We need to make the store _always_ hold a list for all
-    # members.
-    def Add(self, subject, attribute, value):
-        subject = rdfvalue.URN(subject).SerializeToString()
-        attribute = rdfvalue.URN(attribute).SerializeToString()
-        CHECK(isinstance(value, rdfvalue.RDFValue), "Value must be an RDFValue")
-
-        if attribute not in self.store.setdefault(
-                subject, collections.OrderedDict()):
-            self.store.get(subject)[attribute] = value
-        else:
-            oldvalue = self.store.get(subject)[attribute]
-            t = type(oldvalue)
-            if  t != type([]):
-                if value != oldvalue:
-                    self.store.get(subject)[attribute] = [oldvalue, value]
-            else:
-                if value not in oldvalue:
-                    oldvalue.append(value)
-
-    def Set(self, subject, attribute, value):
-        subject = rdfvalue.URN(subject).SerializeToString()
-        attribute = rdfvalue.URN(attribute).SerializeToString()
-        CHECK(isinstance(value, rdfvalue.RDFValue), "Value must be an RDFValue")
-
-        self.store.setdefault(subject, {})[attribute] = value
-
-    def Get(self, subject, attribute):
-        subject = rdfvalue.URN(subject).SerializeToString()
-        attribute = rdfvalue.URN(attribute).SerializeToString()
-        vals = self.store.get(subject, {})
-        return vals.get(attribute)
 
     def CacheGet(self, urn):
         result = self.ObjectCache.Get(urn)
@@ -328,8 +299,10 @@ class MemoryDataStore(object):
                 result = self._DumpToTurtle(zipcontainer.urn)
                 turtle_segment.write(utils.SmartStr(result))
                 turtle_segment.Flush()
+            turtle_segment.Close()
         else:
             # append to an existng container
+            self.invalidateCachedMetadata(zipcontainer)
             explodedTurtleDirectivesARN = escaping.urn_from_member_name(u"information.turtle/directives", zipcontainer.urn, zipcontainer.version)
             if not zipcontainer.ContainsMember(explodedTurtleDirectivesARN):
                 # this is the first append operation. Create the chunked turtle structures
@@ -340,11 +313,13 @@ class MemoryDataStore(object):
                         directives_segment.compression_method = ZIP_DEFLATE
                         directives_segment.write(utils.SmartStr(directives_txt))
                         directives_segment.Flush()
-                    with zipcontainer.CreateZipSegment(u"information.turtle/%08d" % 0) as turtle_segment:
-                        turtle_segment.compression_method = ZIP_DEFLATE
-                        turtle_segment.write(utils.SmartStr(triples_txt))
-                        turtle_segment.Flush()
-                    self.Close(turtle_segment)
+                    directives_segment.Close()
+                    with zipcontainer.CreateZipSegment(u"information.turtle/%08d" % 0) as turtle_chunk_segment:
+                        turtle_chunk_segment.compression_method = ZIP_DEFLATE
+                        turtle_chunk_segment.write(utils.SmartStr(triples_txt))
+                        turtle_chunk_segment.Flush()
+                    self.Close(turtle_chunk_segment)
+                turtle_segment.Close()
 
                 (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicode(self._DumpToTurtle(zipcontainer.urn)))
                 directives_difference = turtle.difference(directives_txt, current_directives_txt)
@@ -354,6 +329,7 @@ class MemoryDataStore(object):
                         directives_segment.compression_method = ZIP_DEFLATE
                         directives_segment.write(utils.SmartStr(directives_txt))
                         directives_segment.Flush()
+                    directives_segment.Close()
 
                 current_turtle_chunk_arn = rdfvalue.URN(u"%s/information.turtle/%08d" % (zipcontainer.urn, 1))
                 with zipcontainer.CreateMember(current_turtle_chunk_arn) as turtle_segment:
@@ -364,7 +340,7 @@ class MemoryDataStore(object):
 
                 with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
                     turtle_segment.compression_method = ZIP_DEFLATE
-                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n"))
+                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n\r\n"))
 
                     turtleContainerIndex = 0
                     while True:
@@ -379,6 +355,7 @@ class MemoryDataStore(object):
                         else:
                             break
                     turtle_segment.Flush()
+                turtle_segment.Close()
             else:
                 # more than one append as already occurred
                 turtleContainerIndex = 2
@@ -400,15 +377,17 @@ class MemoryDataStore(object):
                         directives_segment.compression_method = ZIP_DEFLATE
                         directives_segment.write(utils.SmartStr(directives_txt))
                         directives_segment.Flush()
+                    directives_segment.Close()
 
                 with zipcontainer.CreateZipSegment(u"information.turtle/%08d" % turtleContainerIndex) as turtle_segment:
                     turtle_segment.compression_method = ZIP_DEFLATE
                     turtle_segment.write(utils.SmartStr(current_triples_txt))
                     turtle_segment.Flush()
+                turtle_segment.Close()
 
                 with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
                     turtle_segment.compression_method = ZIP_DEFLATE
-                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n"))
+                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n\r\n"))
 
                     turtleContainerIndex = 0
                     while True:
@@ -423,6 +402,7 @@ class MemoryDataStore(object):
                         else:
                             break
                     turtle_segment.Flush()
+                turtle_segment.Close()
 
     def _DumpToTurtle(self, volumeurn, verbose=False):
         g = rdflib.Graph()
@@ -471,9 +451,9 @@ class MemoryDataStore(object):
     def loadMetadata(self, zip):
         # Load the turtle metadata.
         with zip.OpenZipSegment("information.turtle") as fd:
-            self.LoadFromTurtle(fd)
+            self.LoadFromTurtle(fd, zip.urn)
 
-    def LoadFromTurtle(self, stream):
+    def LoadFromTurtle(self, stream, volume_arn):
         data = streams.ReadAll(stream)
         g = rdflib.Graph()
         g.parse(data=data, format="turtle")
@@ -494,7 +474,7 @@ class MemoryDataStore(object):
                 # Default to a string literal.
                 value = rdfvalue.XSDString(value)
 
-            self.Add(urn, attr, value)
+            self.Add(volume_arn, urn, attr, value)
 
         # look for the AFF4 namespace defined in the turtle
         for (_, b) in g.namespace_manager.namespaces():
@@ -522,12 +502,13 @@ class MemoryDataStore(object):
                 return cached_obj
             obj = aff4_map.ByteRangeARN(version, resolver=self, urn=bytestream_reference_id)
         else:
-            uri_types = self.Get(urn, lexicon.AFF4_TYPE)
+            uri_types = self.Get(lexicon.any, urn, lexicon.AFF4_TYPE)
 
             handler = None
 
             # TODO: this could be cleaner. RDF properties have multiple values
-            if type(uri_types) == type([]):
+
+            if type(uri_types) == types.ListType or type(uri_types) == types.GeneratorType:
                 for typ in uri_types:
                     handler = registry.AFF4_TYPE_MAP.get(typ)
                     if handler is not None:
@@ -580,16 +561,92 @@ class MemoryDataStore(object):
         except:
             return False
 
-    def QuerySubject(self, subject_regex=None):
+    # FIXME: This is a big API breaking change - we simply can not
+    # change the type we are returning from Get() depending on random
+    # factors. We need to make the store _always_ hold a list for all
+    # members.
+    def Add(self, graph, subject, attribute, value):
+        subject = rdfvalue.URN(subject).SerializeToString()
+        attribute = rdfvalue.URN(attribute).SerializeToString()
+        CHECK(isinstance(value, rdfvalue.RDFValue), "Value must be an RDFValue")
+
+        if graph == transient_graph:
+            store = self.transient_store
+        else:
+            store = self.store
+
+        if attribute not in store.setdefault(
+                subject, collections.OrderedDict()):
+            store.get(subject)[attribute] = value
+        else:
+            oldvalue = store.get(subject)[attribute]
+            t = type(oldvalue)
+            if  t != type([]):
+                if value != oldvalue:
+                    store.get(subject)[attribute] = [oldvalue, value]
+            else:
+                if value not in oldvalue:
+                    oldvalue.append(value)
+
+    def Set(self, graph, subject, attribute, value):
+        subject = rdfvalue.URN(subject).SerializeToString()
+        attribute = rdfvalue.URN(attribute).SerializeToString()
+        CHECK(isinstance(value, rdfvalue.RDFValue), "Value must be an RDFValue")
+
+        if graph == transient_graph:
+            store = self.transient_store
+        else:
+            store = self.store
+
+        store.setdefault(subject, {})[attribute] = value
+
+    def Get(self, graph, subject, attribute):
+        subject = rdfvalue.URN(subject).SerializeToString()
+        attribute = rdfvalue.URN(attribute).SerializeToString()
+
+        if graph == lexicon.any or graph == None:
+            resa = self.transient_store.get(subject, {}).get(attribute)
+            resb = self.store.get(subject, {}).get(attribute)
+            if resa == None:
+                return resb
+            elif resb == None:
+                return resa
+            else:
+                return resa.append(resb)
+        elif graph == transient_graph:
+            return self.transient_store.get(subject, {}).get(attribute)
+        else:
+            return self.store.get(subject, {}).get(attribute)
+
+        #vals = store.get(subject, {})
+        #return vals.get(attribute)
+
+    def QuerySubject(self, graph, subject_regex=None):
         subject_regex = re.compile(utils.SmartStr(subject_regex))
-        for subject in self.store:
+
+        if graph == lexicon.any or graph == None:
+            storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
+        elif graph == transient_graph:
+            storeitems = six.iteritems(self.transient_store)
+        else:
+            storeitems = six.iteritems(self.store)
+
+        for subject in storeitems:
             if subject_regex is not None and subject_regex.match(subject):
                 yield rdfvalue.URN().UnSerializeFromString(subject)
 
-    def QueryPredicate(self, predicate):
+    def QueryPredicate(self, graph, predicate):
         """Yields all subjects which have this predicate."""
         predicate = utils.SmartStr(predicate)
-        for subject, data in six.iteritems(self.store):
+
+        if graph == lexicon.any or graph == None:
+            storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
+        elif graph == transient_graph:
+            storeitems = six.iteritems(self.transient_store)
+        else:
+            storeitems = six.iteritems(self.store)
+
+        for subject, data in storeitems:
             for pred, values in six.iteritems(data):
                 if pred == predicate:
                     if type(values) != type([]):
@@ -600,9 +657,17 @@ class MemoryDataStore(object):
                                value)
 
 
-    def QueryPredicateObject(self, predicate, object):
+    def QueryPredicateObject(self, graph, predicate, object):
         predicate = utils.SmartUnicode(predicate)
-        for subject, data in list(self.store.items()):
+
+        if graph == lexicon.any or graph == None:
+            storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
+        elif graph == transient_graph:
+            storeitems = six.iteritems(self.transient_store)
+        else:
+            storeitems = six.iteritems(self.store)
+
+        for subject, data in list(storeitems):
             for pred, value in list(data.items()):
                 if pred == predicate:
                     if type(value) != type([]):
@@ -611,10 +676,18 @@ class MemoryDataStore(object):
                     if object in value:
                         yield rdfvalue.URN(subject)
 
-    def QuerySubjectPredicate(self, subject, predicate):
+    def QuerySubjectPredicate(self, graph, subject, predicate):
         subject = utils.SmartUnicode(subject)
         predicate = utils.SmartUnicode(predicate)
-        for s, data in six.iteritems(self.store):
+
+        if graph == lexicon.any or graph == None:
+            storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
+        elif graph == transient_graph:
+            storeitems = six.iteritems(self.transient_store)
+        else:
+            storeitems = six.iteritems(self.store)
+
+        for s, data in storeitems:
             if s == subject:
                 for pred, value in six.iteritems(data):
                     if pred == predicate:
@@ -624,22 +697,48 @@ class MemoryDataStore(object):
                         for o in value:
                             yield o
 
-    def SelectSubjectsByPrefix(self, prefix):
+    def SelectSubjectsByPrefix(self, graph, prefix):
         prefix = utils.SmartUnicode(prefix)
-        for subject in self.store:
+
+        if graph == lexicon.any or graph == None:
+            storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
+        elif graph == transient_graph:
+            storeitems = six.iteritems(self.transient_store)
+        else:
+            storeitems = six.iteritems(self.store)
+
+        for subject, predicateDict in storeitems:
             if subject.startswith(prefix):
                 yield rdfvalue.URN(subject)
 
-    def QueryPredicatesBySubject(self, subject):
+    def QueryPredicatesBySubject(self, graph, subject):
         subject = utils.SmartUnicode(subject)
-        for pred, value in list(self.store.get(subject, {}).items()):
+
+        if graph == transient_graph:
+            store = self.transient_store
+        else:
+            store = self.store
+
+        for pred, value in list(store.get(subject, {}).items()):
             yield (rdfvalue.URN().UnSerializeFromString(pred), value)
+
+    def invalidateCachedMetadata(self, zip):
+        pass
 
 # With large information.turtle files, the in-memory database performs
 # horribly. This is a faster way. http://www.rdfhdt.org
 class HDTAssistedDataStore(MemoryDataStore):
     def __init__(self, lex=lexicon.standard):
         super(HDTAssistedDataStore, self).__init__(lex=lex)
+        self.hdt = None
+
+    def invalidateCachedMetadata(self, zip):
+        aff4cache = os.path.join(expanduser("~"), ".aff4")
+        cached_turtle = os.path.join(aff4cache, "%s.hdt" % str(zip.urn)[7:])
+        cached_turtle_index = cached_turtle + ".index.v1-1"
+        for f in [cached_turtle, cached_turtle_index]:
+            if os.path.exists(f):
+                os.unlink(f)
 
     def loadMetadata(self, zip):
         # Load the turtle metadata.
@@ -672,7 +771,10 @@ class HDTAssistedDataStore(MemoryDataStore):
     # and it is super ugly. We are materializing all triples just to
     # list all the subjects.
     # TODO: Implement subject iterator in pyHDT
-    def QuerySubject(self, subject_regex=None):
+    def QuerySubject(self, graph, subject_regex=None):
+        if graph == transient_graph:
+            yield super(HDTAssistedDataStore, self).QuerySubject(transient_graph, subject_regex)
+
         subject_regex = re.compile(utils.SmartStr(subject_regex))
         (triples, cardinality) = self.hdt.search_triples("", "?", "?")
         seen_subject = []
@@ -683,25 +785,45 @@ class HDTAssistedDataStore(MemoryDataStore):
                     seen_subject.add(s)
                     yield rdfvalue.URN().UnSerializeFromString(s)
 
-        for s in super(HDTAssistedDataStore, self).QuerySubject(subject_regex=subject_regex):
+        for s in super(HDTAssistedDataStore, self).QuerySubject(graph, subject_regex=subject_regex):
             if s not in seen_subject:
                 seen_subject.add(s)
                 yield s
 
     # not yet implemented
-    def QueryPredicate(self, predicate):
-        return super(HDTAssistedDataStore, self).QueryPredicate(predicate)
+    def QueryPredicate(self, graph, predicate):
+        if graph == transient_graph:
+            yield super(HDTAssistedDataStore, self).QueryPredicate(transient_graph, predicate)
 
-    def QueryPredicateObject(self, predicate, object):
+        yield super(HDTAssistedDataStore, self).QueryPredicate(graph, predicate)
+
+    def QueryPredicateObject(self, graph, predicate, object):
         (triples, cardinality) = self.hdt.search_triples("", predicate, object)
 
         for (s,p,o) in triples:
             yield rdfvalue.URN(s)
 
-        for subject in super(HDTAssistedDataStore, self).QueryPredicateObject(predicate, object):
+        for subject in super(HDTAssistedDataStore, self).QueryPredicateObject(graph, predicate, object):
             yield subject
 
-    def QuerySubjectPredicate(self, subject, predicate):
+    def Get(self, graph, subject, attribute):
+        if self.hdt == None:
+            return super(HDTAssistedDataStore, self).Get(graph, subject, attribute)
+        else:
+            # we use a set here as we some implementations might pass up an object from
+            # the persisted graph and the transient graph. The set lets us remove duplicates
+            res = set(self.QuerySubjectPredicate(graph, subject, attribute))
+            if len(res) == 1:
+                return list(res)[0]
+            return list(res)
+
+    def QuerySubjectPredicate(self, graph, subject, predicate):
+        for o in super(HDTAssistedDataStore, self).QuerySubjectPredicate(graph, subject, predicate):
+            yield o
+
+        if self.hdt == None:
+            return
+
         subject = utils.SmartUnicode(subject)
         predicate = utils.SmartUnicode(predicate)
         (triples, cardinality) = self.hdt.search_triples(subject, predicate, "")
@@ -720,17 +842,23 @@ class HDTAssistedDataStore(MemoryDataStore):
                     # Default to a string literal.
                     o = rdfvalue.XSDString(v)
             elif o.startswith("<"):
-                o = rdfvalue.URN(utils.SmartUnicode(v))
+                o = rdfvalue.URN(utils.SmartUnicode(o))
+            elif o.startswith("aff4://"):
+                o = rdfvalue.URN(utils.SmartUnicode(o))
             else:
-                raise Exception("unsupported")
+                o = rdfvalue.URN(utils.SmartUnicode(o))
 
             yield o
 
-        for o in super(HDTAssistedDataStore, self).QuerySubjectPredicate(subject, predicate):
-            yield o
 
-    def SelectSubjectsByPrefix(self, prefix):
-        return super(HDTAssistedDataStore, self).SelectSubjectsByPrefix(prefix)
+    def SelectSubjectsByPrefix(self, graph, prefix):
+        if graph == transient_graph:
+            yield super(HDTAssistedDataStore, self).SelectSubjectsByPrefix(transient_graph, prefix)
 
-    def QueryPredicatesBySubject(self, subject):
-        return super(HDTAssistedDataStore, self).QueryPredicatesBySubject(subject)
+        yield super(HDTAssistedDataStore, self).SelectSubjectsByPrefix(graph, prefix)
+
+    def QueryPredicatesBySubject(self, graph, subject):
+        if graph == transient_graph:
+            yield super(HDTAssistedDataStore, self).QueryPredicatesBySubject(transient_graph, subject)
+
+        yield super(HDTAssistedDataStore, self).QueryPredicatesBySubject(graph, subject)

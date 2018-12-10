@@ -73,7 +73,7 @@ class StreamTest(unittest.TestCase):
 
         try:
             with data_store.MemoryDataStore() as resolver:
-                resolver.Set(fileURI, lexicon.AFF4_STREAM_WRITE_MODE,
+                resolver.Set(lexicon.transient_graph, fileURI, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
                 with resolver.AFF4FactoryOpen(fileURI) as file_stream:

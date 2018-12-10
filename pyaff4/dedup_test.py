@@ -53,7 +53,7 @@ class DedupeTest(unittest.TestCase):
                     urn = volume.writeLogicalStreamHashBased(frag1path, stream, 4*1024)
                     for h in stream.hashes:
                         hh = hashes.newImmutableHash(h.hexdigest(), stream.hashToType[h])
-                        resolver.Add(urn, rdfvalue.URN(lexicon.standard.hash), hh)
+                        resolver.Add(volume.urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
 
             frag2path = os.path.join(self.testImagesPath, "paper-hash_based_disk_imaging_using_aff4.pdf.frag.2")
 
@@ -63,7 +63,7 @@ class DedupeTest(unittest.TestCase):
                     urn = volume.writeLogicalStreamHashBased(frag2path, stream, 2*4*1024)
                     for h in stream.hashes:
                         hh = hashes.newImmutableHash(h.hexdigest(), stream.hashToType[h])
-                        resolver.Add(urn, rdfvalue.URN(lexicon.standard.hash), hh)
+                        resolver.Add(volume.urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
 
         except:
             traceback.print_exc()

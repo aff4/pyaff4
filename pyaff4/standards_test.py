@@ -55,21 +55,21 @@ class StandardsTest(unittest.TestCase):
         resolver = data_store.MemoryDataStore()
 
         with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.stdLinearURN) as zip_file:
-            for subject in resolver.QueryPredicateObject(
+            for subject in resolver.QueryPredicateObject(zip_file.urn,
                     "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
                     "http://aff4.org/Schema#DiskImage"):
                 self.assertEquals(
                     subject,
                     "aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb")
 
-            for subject in resolver.QueryPredicateObject(
+            for subject in resolver.QueryPredicateObject(zip_file.urn,
                     "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
                     "http://aff4.org/Schema#Image"):
                 self.assertEquals(
                     subject,
                     "aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb")
 
-            for subject in resolver.QueryPredicateObject(
+            for subject in resolver.QueryPredicateObject(zip_file.urn,
                     "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
                     "http://aff4.org/Schema#ContiguousImage"):
                 self.assertEquals(

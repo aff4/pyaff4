@@ -46,6 +46,7 @@ class LinearHasher(object):
             else:
                 raise ValueError
 
+            self.delegate.volume_arn = zip_file.urn
             return self.delegate.doHash(mapURI, hashDataType)
 
     def hashMulti(self, urna, urnb, mapURI, hashDataType):
@@ -61,6 +62,7 @@ class LinearHasher(object):
                 else:
                     raise ValueError
 
+                self.delegate.volume_arn = zip_filea.urn
                 return self.delegate.doHash(mapURI, hashDataType)
 
     def doHash(self, mapURI, hashDataType):
@@ -106,7 +108,7 @@ class LinearHasher(object):
         raise Exception("IllegalState")
 
     def isMap(self, stream):
-        for type in self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
+        for type in self.resolver.QuerySubjectPredicate(self.volume_arn, stream, lexicon.AFF4_TYPE):
             if self.lexicon.map == type:
                 return True
 
@@ -144,7 +146,7 @@ class LinearHasher2:
 
     def hash(self, image):
 
-        storedHashes = list(self.resolver.QuerySubjectPredicate(image.urn, lexicon.standard.hash))
+        storedHashes = list(self.resolver.QuerySubjectPredicate(image.container.urn, image.urn, lexicon.standard.hash))
         with self.resolver.AFF4FactoryOpen(image.urn, version=image.container.version) as stream:
             datatypes = [h.datatype for h in storedHashes]
             stream2 = StreamHasher(stream, datatypes)

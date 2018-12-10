@@ -56,7 +56,7 @@ class LogicalTest(unittest.TestCase):
                         # write in the hashes before auto-close
                         for h in hasher.hashes:
                             hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
-                            volume.resolver.Add(writer_arn, rdfvalue.URN(lexicon.standard.hash), hh)
+                            volume.resolver.Add(volume.urn, writer_arn, rdfvalue.URN(lexicon.standard.hash), hh)
 
 
 
@@ -121,15 +121,15 @@ class LogicalTest(unittest.TestCase):
         self.createAndReadSinglePathImageImageStream(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
 
     def testWindowsUNCLogicalImagePushZipSegment(self):
-        containerName = tempfile.gettempdir() + "/test-unc.aff4"
+        containerName = tempfile.gettempdir() + "/test-unc1.aff4"
         self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt", 1024)
 
     def testWindowsUNCLogicalImagePushImageStream(self):
-        containerName = tempfile.gettempdir() + "/test-unc.aff4"
+        containerName = tempfile.gettempdir() + "/test-unc2.aff4"
         self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt", 2)
 
     def testWindowsUNCLogicalImage(self):
-        containerName = tempfile.gettempdir() + "/test-unc.aff4"
+        containerName = tempfile.gettempdir() + "/test-unc3.aff4"
         self.createAndReadSinglePathImage(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
 
     def testUnixASCIINoSlashLogicalImage(self):
@@ -137,7 +137,7 @@ class LogicalTest(unittest.TestCase):
         self.createAndReadSinglePathImage(containerName, u"foo/bar.txt", u"/foo/bar.txt")
 
     def testUnixASCIISlashLogicalImage(self):
-        containerName = tempfile.gettempdir() + "/test-unix1.aff4"
+        containerName = tempfile.gettempdir() + "/test-unix2.aff4"
         self.createAndReadSinglePathImage(containerName, u"/foo/bar.txt", u"/foo/bar.txt")
 
     def testUnixUnicodeLogicalImage(self):

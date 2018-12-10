@@ -38,7 +38,7 @@ class ZipTest(unittest.TestCase):
 
     def setUp(self):
         with data_store.MemoryDataStore() as resolver:
-            resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+            resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
             with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:

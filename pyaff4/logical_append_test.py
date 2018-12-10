@@ -119,6 +119,7 @@ class LogicalAppendTest(unittest.TestCase):
                         index = index + 1000
 
                     foo = 11
+                image.Close()
 
             with container.Container.openURNtoContainer(container_urn) as volume:
                 images = list(volume.images())
@@ -158,6 +159,11 @@ class LogicalAppendTest(unittest.TestCase):
             containerName = "/tmp/test-append.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
+
+            try:
+                os.unlink(containerName)
+            except:
+                pass
 
             container_urn = rdfvalue.URN.FromFileName(containerName)
             resolver = data_store.MemoryDataStore()

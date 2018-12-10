@@ -36,7 +36,7 @@ class AFF4DirectoryTest(unittest.TestCase):
         with data_store.MemoryDataStore() as resolver:
             root_urn = rdfvalue.URN.NewURNFromFilename(self.root_path)
 
-            resolver.Set(root_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+            resolver.Set(lexicon.transient_graph, root_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
             with aff4_directory.AFF4Directory.NewAFF4Directory(
@@ -45,7 +45,7 @@ class AFF4DirectoryTest(unittest.TestCase):
                 segment_urn = volume.urn.Append(self.segment_name)
                 with volume.CreateMember(segment_urn) as member:
                     member.Write(b"Hello world")
-                    resolver.Set(
+                    resolver.Set(lexicon.transient_graph,
                         member.urn, lexicon.AFF4_STREAM_ORIGINAL_FILENAME,
                         rdfvalue.XSDString(self.root_path + self.segment_name))
 

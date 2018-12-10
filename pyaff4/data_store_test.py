@@ -30,38 +30,38 @@ class DataStoreTest(unittest.TestCase):
     def setUp(self):
         self.hello_urn = rdfvalue.URN("aff4://hello")
         self.store = data_store.MemoryDataStore()
-        self.store.Set(
+        self.store.Set(None,
             self.hello_urn, rdfvalue.URN(lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY),
             rdfvalue.XSDString("foo"))
 
-        self.store.Set(
+        self.store.Set(None,
             self.hello_urn, rdfvalue.URN(lexicon.AFF4_TYPE),
             rdfvalue.XSDString("bar"))
 
     def testDataStore(self):
-        result = self.store.Get(self.hello_urn, rdfvalue.URN(
+        result = self.store.Get(None,self.hello_urn, rdfvalue.URN(
             lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY))
         self.assertEquals(type(result), rdfvalue.XSDString)
 
         self.assertEquals(result.SerializeToString(), b"foo")
 
-        self.store.Set(
+        self.store.Set(None,
             self.hello_urn, rdfvalue.URN(lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY),
             rdfvalue.XSDString("bar"))
 
         # In the current implementation a second Set() overwrites the previous
         # value.
         self.assertEquals(
-            self.store.Get(self.hello_urn, rdfvalue.URN(
+            self.store.Get(None,self.hello_urn, rdfvalue.URN(
                 lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY)),
             rdfvalue.XSDString("bar"))
 
     def testTurtleSerialization(self):
-        data = self.store.DumpToTurtle(None, verbose=True)
+        data = self.store._DumpToTurtle(None, verbose=True)
         new_store = data_store.MemoryDataStore()
         stream = io.BytesIO(data.encode('utf-8'))
-        new_store.LoadFromTurtle(stream)
-        res = new_store.Get(self.hello_urn, rdfvalue.URN(
+        new_store.LoadFromTurtle(stream, None)
+        res = new_store.Get(None,self.hello_urn, rdfvalue.URN(
             lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY))
         self.assertEquals(res, b"foo")
 

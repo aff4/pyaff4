@@ -111,7 +111,7 @@ class Validator(object):
                 self.delegate = PreStdValidator(resolver, lex, self.listener)
             else:
                 raise ValueError
-
+            self.delegate.volume_arn = zip_file.urn
             self.delegate.doValidateContainer()
 
     def validateContainerMultiPart(self, urn_a, urn_b):
@@ -129,11 +129,12 @@ class Validator(object):
                 else:
                     raise ValueError
 
+                self.delegate.volume_arn = zip_filea.urn
                 self.delegate.doValidateContainer()
 
     def validateBlockMapHash(self, mapStreamURI, imageStreamURI):
         storedHash = next(self.resolver.QuerySubjectPredicate(
-            mapStreamURI, self.lexicon.blockMapHash))
+            self.volume_arn, mapStreamURI, self.lexicon.blockMapHash))
         calculalatedHash = self.calculateBlockMapHash(mapStreamURI, imageStreamURI, storedHash.datatype)
 
         if storedHash != calculalatedHash:
@@ -162,13 +163,13 @@ class Validator(object):
             bytes = hash.digest()
             calculatedHash.update(bytes)
 
-        for hash in  self.resolver.QuerySubjectPredicate(mapStreamURI, self.lexicon.mapPointHash):
+        for hash in  self.resolver.QuerySubjectPredicate(self.volume_arn, mapStreamURI, self.lexicon.mapPointHash):
             calculatedHash.update(hash.digest())
 
-        for hash in  self.resolver.QuerySubjectPredicate(mapStreamURI, self.lexicon.mapIdxHash):
+        for hash in  self.resolver.QuerySubjectPredicate(self.volume_arn, mapStreamURI, self.lexicon.mapIdxHash):
             calculatedHash.update(hash.digest())
 
-        for hash in self.resolver.QuerySubjectPredicate(mapStreamURI, self.lexicon.mapPathHash):
+        for hash in self.resolver.QuerySubjectPredicate(self.volume_arn, mapStreamURI, self.lexicon.mapPathHash):
             calculatedHash.update(hash.digest())
 
         return hashes.newImmutableHash(calculatedHash.hexdigest(), storedHashDataType)
@@ -223,7 +224,7 @@ class Validator(object):
 
     def getStoredBlockHashes(self, imageStreamURI):
         hashes = []
-        for hash in self.resolver.QuerySubjectPredicate(imageStreamURI, self.lexicon.blockHashesHash):
+        for hash in self.resolver.QuerySubjectPredicate(self.volume_arn, imageStreamURI, self.lexicon.blockHashesHash):
             blockHashAlgo = hash.datatype
             digest = hash.value
             digestDataType = hash.datatype
@@ -244,7 +245,7 @@ class Validator(object):
 
     def validateMapIdxHash(self, map_uri):
         for stored_hash in self.resolver.QuerySubjectPredicate(
-                map_uri, self.lexicon.mapIdxHash):
+                self.volume_arn, map_uri, self.lexicon.mapIdxHash):
             return self.validateSegmentHash(
                 map_uri, "mapIdxHash", self.calculateMapIdxHash(
                     map_uri, stored_hash.datatype))
@@ -254,7 +255,7 @@ class Validator(object):
 
     def validateMapPointHash(self, map_uri):
         for stored_hash in self.resolver.QuerySubjectPredicate(
-                map_uri, self.lexicon.mapPointHash):
+                self.volume_arn, map_uri, self.lexicon.mapPointHash):
             return self.validateSegmentHash(
                 map_uri, "mapPointHash", self.calculateMapPointHash(
                     map_uri, stored_hash.datatype))
@@ -264,7 +265,7 @@ class Validator(object):
 
     def validateMapPathHash(self, map_uri):
         for stored_hash in self.resolver.QuerySubjectPredicate(
-                map_uri, self.lexicon.mapPathHash):
+                self.volume_arn, map_uri, self.lexicon.mapPathHash):
             return self.validateSegmentHash(
                 map_uri, "mapPathHash", self.calculateMapPathHash(
                     map_uri, stored_hash.datatype))
@@ -274,7 +275,7 @@ class Validator(object):
 
     def validateMapHash(self, map_uri):
         for stored_hash in self.resolver.QuerySubjectPredicate(
-                map_uri, self.lexicon.mapHash):
+                self.volume_arn, map_uri, self.lexicon.mapHash):
             return self.validateSegmentHash(
                 map_uri, "mapHash", self.calculateMapHash(
                     map_uri, stored_hash.datatype))
@@ -293,7 +294,7 @@ class Validator(object):
         return hashes.newImmutableHash(calculatedHash.hexdigest(), storedHashDataType)
 
     def validateSegmentHash(self, mapURI, hashType, calculatedHash):
-        storedHash = next(self.resolver.QuerySubjectPredicate(mapURI, self.lexicon.base + hashType))
+        storedHash = next(self.resolver.QuerySubjectPredicate(self.volume_arn, mapURI, self.lexicon.base + hashType))
 
         if storedHash != calculatedHash:
             self.listener.onInvalidHash(hashType, storedHash, calculatedHash, mapURI)
@@ -334,6 +335,7 @@ class PreStdValidator(Validator):
 
     def validateContainer(self, urn):
         with zip.ZipFile.NewZipFile(self.resolver, urn) as zip_file:
+            self.volume_arn = zip_file.urn
             self.doValidateContainer()
 
     # pre AFF4 standard Evimetry uses the contains relationship to locate the local
@@ -344,7 +346,7 @@ class PreStdValidator(Validator):
         return imageStreamURI
 
     def doValidateContainer(self):
-        types = list(self.resolver.QueryPredicateObject(
+        types = list(self.resolver.QueryPredicateObject(self.volume_arn,
             lexicon.AFF4_TYPE, self.lexicon.Image))
 
         if not types:
@@ -369,7 +371,7 @@ class PreStdValidator(Validator):
     #  name blockHashesHash
     def validateBlockMapHash(self, mapStreamURI, imageStreamURI):
 
-        storedHash = next(self.resolver.QuerySubjectPredicate(mapStreamURI,
+        storedHash = next(self.resolver.QuerySubjectPredicate(self.volume_arn, mapStreamURI,
                                                              self.lexicon.blockHashesHash))
         calculalatedHash = self.calculateBlockMapHash(mapStreamURI, imageStreamURI, storedHash.datatype)
 
@@ -379,7 +381,7 @@ class PreStdValidator(Validator):
             self.listener.onValidHash("BlockMapHash", storedHash, mapStreamURI)
 
     def isMap(self, stream):
-        types = self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE)
+        types = self.resolver.QuerySubjectPredicate(self.volume_arn, stream, lexicon.AFF4_TYPE)
         if self.lexicon.map in types:
             return True
         return False
@@ -393,13 +395,14 @@ class InterimStdValidator(Validator):
 
     def validateContainer(self, urn):
         with zip.ZipFile.NewZipFile(self.resolver, urn) as zip_file:
+            self.delegate.volume_arn = zip_file.urn
             self.doValidateContainer()
 
     def getParentMap(self, imageStreamURI):
-        imageStreamVolume = next(self.resolver.QuerySubjectPredicate(imageStreamURI, self.lexicon.stored))
+        imageStreamVolume = next(self.resolver.QuerySubjectPredicate(self.volume_arn, imageStreamURI, self.lexicon.stored))
 
-        for map in self.resolver.QuerySubjectPredicate(imageStreamURI, self.lexicon.target):
-            mapVolume = next(self.resolver.QuerySubjectPredicate(map, self.lexicon.stored))
+        for map in self.resolver.QuerySubjectPredicate(self.volume_arn, imageStreamURI, self.lexicon.target):
+            mapVolume = next(self.resolver.QuerySubjectPredicate(self.volume_arn, map, self.lexicon.stored))
             if mapVolume == imageStreamVolume:
                 return map
 
@@ -410,10 +413,10 @@ class InterimStdValidator(Validator):
         # the same data store may be used for multiple containers with
         # many images.
         for image in self.resolver.QueryPredicateObject(
-                lexicon.AFF4_TYPE, self.lexicon.Image):
+                self.volume_arn, lexicon.AFF4_TYPE, self.lexicon.Image):
 
             datastreams = list(self.resolver.QuerySubjectPredicate(
-                image, self.lexicon.dataStream))
+                self.volume_arn, image, self.lexicon.dataStream))
 
             calculated_hashes = collections.OrderedDict()
             hash_datatype = None
@@ -421,7 +424,7 @@ class InterimStdValidator(Validator):
             for stream in datastreams:
                 if self.isMap(stream):
                     for image_stream_uri in self.resolver.QuerySubjectPredicate(
-                            stream, self.lexicon.dependentStream):
+                            self.volume_arn, stream, self.lexicon.dependentStream):
                         parent_map = self.getParentMap(image_stream_uri)
                         if parent_map == stream:
                             # only validate the map and stream pair in the same container
@@ -444,7 +447,7 @@ class InterimStdValidator(Validator):
                                 hash_datatype = calculated_hash.datatype
 
             for stored_hash in self.resolver.QuerySubjectPredicate(
-                    image, self.lexicon.hash):
+                    self.volume_arn, image, self.lexicon.hash):
                 hasha = ""
                 hashb = ""
                 parent_map = None
@@ -495,8 +498,8 @@ class InterimStdValidator(Validator):
     def getStoredBlockHashes(self, image_stream_uri):
         res = []
 
-        for block_hash_uri in self.resolver.SelectSubjectsByPrefix(str(image_stream_uri) + "/blockhash."):
-            for hash in self.resolver.QuerySubjectPredicate(block_hash_uri, self.lexicon.hash):
+        for block_hash_uri in self.resolver.SelectSubjectsByPrefix(self.volume_arn, str(image_stream_uri) + "/blockhash."):
+            for hash in self.resolver.QuerySubjectPredicate(self.volume_arn, block_hash_uri, self.lexicon.hash):
                 extension = block_hash_uri.Parse().path.split(".")[-1]
                 block_hash_algo_type = hashes.fromShortName(extension)
                 hash = BlockHashesHash(block_hash_algo_type, hash.value, hash.datatype)
@@ -505,7 +508,7 @@ class InterimStdValidator(Validator):
         return res
 
     def isMap(self, stream):
-        types = self.resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE)
+        types = self.resolver.QuerySubjectPredicate(self.volume_arn, stream, lexicon.AFF4_TYPE)
         if self.lexicon.map in types:
             return True
         return False

@@ -19,6 +19,7 @@ from __future__ import unicode_literals
 
 from builtins import object
 import rdflib
+from aff4 import rdfvalue
 
 AFF4_VERSION = "0.2"
 
@@ -248,3 +249,7 @@ def AutoResolveAttribute(resolver, urn, attribute):
         result = resolver.Get(urn, getattr(lexicon, attribute))
         if result is not None:
             return result
+
+transient_graph = rdfvalue.URN("http://aff4.org/Schema#transient")
+
+any = rdfvalue.URN("http://aff4.org/Schema#any")

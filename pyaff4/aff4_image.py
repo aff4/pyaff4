@@ -94,31 +94,31 @@ class AFF4Image(aff4.AFF4Stream):
             # it.
             volume.children.add(image_urn)
 
-            resolver.Add(image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
+            resolver.Add(volume_urn, image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
                 lexicon.AFF4_IMAGE_TYPE))
 
-            resolver.Set(image_urn, lexicon.AFF4_STORED,
+            resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
                          rdfvalue.URN(volume_urn))
 
             return resolver.AFF4FactoryOpen(image_urn)
 
     def LoadFromURN(self):
-        #volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         #if not volume_urn:
         #    raise IOError("Unable to find storage for urn %s" % self.urn)
 
         self.lexicon = self.resolver.lexicon
 
-        self.chunk_size = int(self.resolver.Get(
+        self.chunk_size = int(self.resolver.Get(volume_urn,
             self.urn, self.lexicon.chunkSize) or 32 * 1024)
 
-        self.chunks_per_segment = int(self.resolver.Get(
+        self.chunks_per_segment = int(self.resolver.Get(volume_urn,
             self.urn, self.lexicon.chunksPerSegment) or 1024)
 
-        sz = self.resolver.Get(self.urn, self.lexicon.streamSize) or 0
+        sz = self.resolver.Get(volume_urn, self.urn, self.lexicon.streamSize) or 0
         self.size = int(sz)
 
-        self.compression = (self.resolver.Get(
+        self.compression = (self.resolver.Get(volume_urn,
             self.urn, self.lexicon.compressionMethod) or
             lexicon.AFF4_IMAGE_COMPRESSION_ZLIB)
 
@@ -161,7 +161,7 @@ class AFF4Image(aff4.AFF4Stream):
             else:
                 progress = aff4.EMPTY_PROGRESS
 
-        volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        volume_urn = self.resolver.Get(None, self.urn, lexicon.AFF4_STORED)
         if not volume_urn:
             raise IOError("Unable to find storage for urn %s" %
                           self.urn)
@@ -231,7 +231,7 @@ class AFF4Image(aff4.AFF4Stream):
             self._FlushBevy()
 
     def _FlushBevy(self):
-        volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         if not volume_urn:
             raise IOError("Unable to find storage for urn %s" % self.urn)
 
@@ -258,19 +258,20 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_length = 0
 
     def _write_metadata(self):
-        self.resolver.Add(self.urn, lexicon.AFF4_TYPE,
+        volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        self.resolver.Add(volume_urn, self.urn, lexicon.AFF4_TYPE,
                           rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
 
-        self.resolver.Set(self.urn, lexicon.AFF4_IMAGE_CHUNK_SIZE,
+        self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_IMAGE_CHUNK_SIZE,
                           rdfvalue.XSDInteger(self.chunk_size))
 
-        self.resolver.Set(self.urn, lexicon.AFF4_IMAGE_CHUNKS_PER_SEGMENT,
+        self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_IMAGE_CHUNKS_PER_SEGMENT,
                           rdfvalue.XSDInteger(self.chunks_per_segment))
 
-        self.resolver.Set(self.urn, lexicon.AFF4_STREAM_SIZE,
+        self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_STREAM_SIZE,
                           rdfvalue.XSDInteger(self.Size()))
 
-        self.resolver.Set(
+        self.resolver.Set(volume_urn,
             self.urn, lexicon.AFF4_IMAGE_COMPRESSION,
             rdfvalue.URN(self.compression))
 

@@ -44,8 +44,8 @@ class ReferenceTest(unittest.TestCase):
 
             with zip.ZipFile.NewZipFile(resolver, version.aff4v10, rdfvalue.URN.FromFileName(self.stdLinear)) as image_container:
                 # there is generally only one Image in a container. Get the underlying Map
-                imageURN = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, self.lexicon.Image))
-                datastreams = list(resolver.QuerySubjectPredicate(imageURN, self.lexicon.dataStream))
+                imageURN = next(resolver.QueryPredicateObject(image_container.urn, lexicon.AFF4_TYPE, self.lexicon.Image))
+                datastreams = list(resolver.QuerySubjectPredicate(image_container.urn, imageURN, self.lexicon.dataStream))
                 imageMapURN = datastreams[0]
 
                 # get a reference to the actual bytestream that is the forensic image
@@ -59,7 +59,7 @@ class ReferenceTest(unittest.TestCase):
 
                         # create our new container
                         destFileURN = rdfvalue.URN.FromFileName(self.fileName)
-                        resolver2.Set(destFileURN, lexicon.AFF4_STREAM_WRITE_MODE,
+                        resolver2.Set(lexicon.transient_graph, destFileURN, lexicon.AFF4_STREAM_WRITE_MODE,
                                      rdfvalue.XSDString(u"truncate"))
                         with zip.ZipFile.NewZipFile(resolver2, version.aff4v10, destFileURN) as image_container:
                             self.volume_urn = image_container.urn

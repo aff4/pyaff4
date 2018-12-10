@@ -413,7 +413,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
     compression_method = ZIP_STORED
 
     def LoadFromURN(self):
-        owner_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        owner_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(owner_urn, version=self.version) as owner:
             self.LoadFromZipFile(owner)
 
@@ -456,6 +456,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
             backing_store.Seek(file_header.extra_field_len, aff4.SEEK_CUR)
 
             buffer_size = zip_info.file_size
+            self.length = zip_info.file_size
             if file_header.compression_method == ZIP_DEFLATE:
                 # We write the entire file in a memory buffer if we need to
                 # deflate it.
@@ -478,7 +479,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
                 raise NotImplementedError()
 
     def WriteStream(self, stream, progress=None):
-        owner_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        owner_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
             owner.StreamAddMember(
                 self.urn, stream, compression_method=self.compression_method,
@@ -486,7 +487,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
     def Flush(self):
         if self.IsDirty():
-            owner_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+            owner_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
             with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
                 self.Seek(0)
 
@@ -498,6 +499,9 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
     def Close(self):
         pass
+
+    def Length(self):
+        return self.length
 
 
 class BasicZipFile(aff4.AFF4Volume):
@@ -559,11 +563,11 @@ class BasicZipFile(aff4.AFF4Volume):
                 self.urn.Set(utils.SmartUnicode(urn_string))
 
                 # Set these triples so we know how to open the zip file again.
-                self.resolver.Set(self.urn, lexicon.AFF4_TYPE, rdfvalue.URN(
+                self.resolver.Set(self.urn, self.urn, lexicon.AFF4_TYPE, rdfvalue.URN(
                     lexicon.AFF4_ZIP_TYPE))
-                self.resolver.Set(self.urn, lexicon.AFF4_STORED, rdfvalue.URN(
+                self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED, rdfvalue.URN(
                     backing_store_urn))
-                self.resolver.Set(backing_store_urn, lexicon.AFF4_CONTAINS,
+                self.resolver.Set(lexicon.transient_graph, backing_store_urn, lexicon.AFF4_CONTAINS,
                                   self.urn)
 
             directory_offset = end_cd.offset_of_cd
@@ -685,12 +689,12 @@ class BasicZipFile(aff4.AFF4Volume):
                 member_urn = escaping.urn_from_member_name(
                     zip_info.filename, self.urn, self.version)
 
-                self.resolver.Set(
+                self.resolver.Set(lexicon.transient_graph,
                     member_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
                         lexicon.AFF4_ZIP_SEGMENT_TYPE))
 
-                self.resolver.Set(member_urn, lexicon.AFF4_STORED, self.urn)
-                self.resolver.Set(member_urn, lexicon.AFF4_STREAM_SIZE,
+                self.resolver.Set(lexicon.transient_graph, member_urn, lexicon.AFF4_STORED, self.urn)
+                self.resolver.Set(lexicon.transient_graph, member_urn, lexicon.AFF4_STREAM_SIZE,
                                   rdfvalue.XSDInteger(zip_info.file_size))
                 self.members[member_urn] = zip_info
 
@@ -707,10 +711,10 @@ class BasicZipFile(aff4.AFF4Volume):
             vers = Version(0,1,"pyaff4")
         result = ZipFile(resolver, urn=None, version=vers)
 
-        resolver.Set(result.urn, lexicon.AFF4_TYPE,
+        resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_TYPE,
                      rdfvalue.URN(lexicon.AFF4_ZIP_TYPE))
 
-        resolver.Set(result.urn, lexicon.AFF4_STORED,
+        resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED,
                      rdfvalue.URN(backing_store_urn))
 
         return resolver.AFF4FactoryOpen(result.urn,  version=vers)
@@ -737,13 +741,14 @@ class BasicZipFile(aff4.AFF4Volume):
         # Is it in the cache?
         res = self.resolver.CacheGet(segment_urn)
         if res:
+            res.readptr = 0
             return res
 
-        self.resolver.Set(
+        self.resolver.Set(lexicon.transient_graph,
             segment_urn, lexicon.AFF4_TYPE,
             rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_TYPE))
 
-        self.resolver.Set(segment_urn, lexicon.AFF4_STORED, self.urn)
+        self.resolver.Set(lexicon.transient_graph, segment_urn, lexicon.AFF4_STORED, self.urn)
 
         #  Keep track of all the segments we issue.
         self.children.add(segment_urn)
@@ -783,7 +788,7 @@ class BasicZipFile(aff4.AFF4Volume):
         return self.resolver.CachePut(result)
 
     def LoadFromURN(self):
-        self.backing_store_urn = self.resolver.Get(
+        self.backing_store_urn = self.resolver.Get(lexicon.transient_graph,
             self.urn, lexicon.AFF4_STORED)
 
         if not self.backing_store_urn:
@@ -813,7 +818,7 @@ class BasicZipFile(aff4.AFF4Volume):
         if progress is None:
             progress = aff4.EMPTY_PROGRESS
 
-        backing_store_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        backing_store_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
             LOGGER.info("Writing member %s", member_urn)
 
@@ -897,7 +902,7 @@ class BasicZipFile(aff4.AFF4Volume):
         super(BasicZipFile, self).Flush()
 
     def write_zip64_CD(self):
-        backing_store_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        backing_store_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
             # We write to a memory stream first, and then copy it into the
             # backing_store at once. This really helps when we have lots of

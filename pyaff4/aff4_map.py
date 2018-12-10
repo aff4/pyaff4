@@ -193,10 +193,10 @@ class AFF4Map(aff4.AFF4Stream):
             # it.
             volume.children.add(image_urn)
 
-            resolver.Set(image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
+            resolver.Set(volume_urn, image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
                 lexicon.AFF4_MAP_TYPE))
 
-            resolver.Set(image_urn, lexicon.AFF4_STORED,
+            resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
                          rdfvalue.URN(volume_urn))
 
             return resolver.AFF4FactoryOpen(image_urn)
@@ -341,7 +341,7 @@ class AFF4Map(aff4.AFF4Stream):
     def Flush(self):
         if self.IsDirty():
             # Get the volume we are stored on.
-            volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+            volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
             with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
                 with volume.CreateMember(self.urn.Append("map")) as map_stream:
                     for interval in self.tree:
@@ -399,8 +399,8 @@ class AFF4Map(aff4.AFF4Stream):
 
         except IOError:
             # If the backing stream does not already exist, we make one.
-            volume_urn = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
-            compression_urn = self.resolver.Get(
+            volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            compression_urn = self.resolver.Get(volume_urn,
                 target, lexicon.AFF4_IMAGE_COMPRESSION)
 
             LOGGER.info("Stream will be compressed with %s", compression_urn)
@@ -507,6 +507,7 @@ class AFF4Map2(AFF4Map):
                     self.tree.addi(range.map_offset, range.map_end, range)
 
         except IOError:
+            # we get IOErrors here on creation from scratch. This is safe and expected.
             pass
 
 class ByteRangeARN(aff4.AFF4Stream):

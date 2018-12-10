@@ -38,7 +38,7 @@ class AFF4Directory(aff4.AFF4Volume):
         result.version = version
         result.root_path = root_urn.ToFilename()
 
-        mode = resolver.Get(root_urn, lexicon.AFF4_STREAM_WRITE_MODE)
+        mode = resolver.Get(lexicon.transient_graph, root_urn, lexicon.AFF4_STREAM_WRITE_MODE)
         if mode == "truncate":
             aff4_utils.RemoveDirectory(result.root_path)
 
@@ -49,9 +49,9 @@ class AFF4Directory(aff4.AFF4Volume):
             else:
                 raise RuntimeError("Unknown mode")
 
-        resolver.Set(result.urn, lexicon.AFF4_TYPE,
+        resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_TYPE,
                      rdfvalue.URN(lexicon.AFF4_DIRECTORY_TYPE))
-        resolver.Set(result.urn, lexicon.AFF4_STORED,
+        resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED,
                      rdfvalue.URN(root_urn))
 
         result.LoadFromURN()

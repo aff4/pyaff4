@@ -119,7 +119,7 @@ class Container(object):
     def createURN(resolver, container_urn):
         """Public method to create a new writable locical AFF4 container."""
 
-        resolver.Set(container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
+        resolver.Set(lexicon.transient_graph, container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
 
         version = Version(1, 1, "pyaff4")
         with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
@@ -159,22 +159,22 @@ class Container(object):
             resolver = ds(lex)
 
             if mode != None and mode == "+":
-                resolver.Set(urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                resolver.Set(lexicon.transient_graph, urn, lexicon.AFF4_STREAM_WRITE_MODE,
                              rdfvalue.XSDString("append"))
 
             with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
                 volumeURN = zip_file.urn
                 if lex == lexicon.standard:
-                    images = list(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.Image))
+                    images = list(resolver.QueryPredicateObject(volumeURN, lexicon.AFF4_TYPE, lex.Image))
                     imageURN = images[0]
 
-                    datastreams = list(resolver.QuerySubjectPredicate(imageURN, lex.dataStream))
+                    datastreams = list(resolver.QuerySubjectPredicate(volumeURN, imageURN, lex.dataStream))
 
                     if len(datastreams) > 0:
                         # it is a disk image or a memory image
 
                         for stream in datastreams:
-                            if lex.map in resolver.QuerySubjectPredicate(stream, lexicon.AFF4_TYPE):
+                            if lex.map in resolver.QuerySubjectPredicate(volumeURN, stream, lexicon.AFF4_TYPE):
                                 dataStream = resolver.AFF4FactoryOpen(stream)
                                 image = aff4.Image(resolver, urn=imageURN)
                                 dataStream.parent = image
@@ -198,8 +198,8 @@ class Container(object):
 
 
                 elif lex == lexicon.scudette:
-                    m = next(resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lex.map))
-                    cat = next(resolver.QuerySubjectPredicate(m, lex.category))
+                    m = next(resolver.QueryPredicateObject(volumeURN, lexicon.AFF4_TYPE, lex.map))
+                    cat = next(resolver.QuerySubjectPredicate(volumeURN, m, lex.category))
                     if cat == lex.memoryPhysical:
                         dataStream = resolver.AFF4FactoryOpen(m)
 
@@ -242,13 +242,13 @@ class LogicalImageContainer(Container):
         super(LogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
 
     def images(self):
-        _images = self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
+        _images = self.resolver.QueryPredicateObject(self.urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
         for image in _images:
-            pathName = next(self.resolver.QuerySubjectPredicate(image, lexicon.standard11.pathName))
+            pathName = next(self.resolver.QuerySubjectPredicate(self.urn, image, lexicon.standard11.pathName))
             yield aff4.LogicalImage(self, self.resolver, self.urn, image, pathName)
 
     def open(self, urn):
-        pathName = next(self.resolver.QuerySubjectPredicate(urn, lexicon.standard11.pathName))
+        pathName = next(self.resolver.QuerySubjectPredicate(self.urn, urn, lexicon.standard11.pathName))
         return aff4.LogicalImage(self.resolver, self.urn, urn, pathName)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -261,13 +261,13 @@ class PreStdLogicalImageContainer(LogicalImageContainer):
         super(PreStdLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
 
     def images(self):
-        _images = self.resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard.Image)
+        _images = self.resolver.QueryPredicateObject(self.urn, lexicon.AFF4_TYPE, lexicon.standard.Image)
         for image in _images:
-            pathName = next(self.resolver.QuerySubjectPredicate(image, self.lexicon.pathName))
+            pathName = next(self.resolver.QuerySubjectPredicate(self.urn, image, self.lexicon.pathName))
             yield aff4.LogicalImage(self.resolver, self.urn, image, pathName)
 
     def open(self, urn):
-        pathName = next(self.resolver.QuerySubjectPredicate(urn, self.lexicon.pathName))
+        pathName = next(self.resolver.QuerySubjectPredicate(self.urn, urn, self.lexicon.pathName))
         return aff4.LogicalImage(self.resolver, self.urn, urn, pathName)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -344,9 +344,9 @@ class WritableLogicalImageContainer(Container):
         else:
             writer = self.newZipStream(image_urn, filename)
 
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
         return writer
 
     def writeLogicalStream(self, filename, readstream, length):
@@ -362,9 +362,9 @@ class WritableLogicalImageContainer(Container):
             self.writeZipStream(image_urn, filename, readstream)
             #self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
 
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
         return image_urn
 
     def writeLogical(self, filename, readstream, length):
@@ -380,9 +380,9 @@ class WritableLogicalImageContainer(Container):
             self.writeZipStream(image_urn, filename, readstream)
             #self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
 
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
-        self.resolver.Add(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
         return image_urn
 
     def isAFF4Collision(self, filename):
@@ -422,23 +422,23 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                 hashid = rdfvalue.URN("aff4:sha512:" + h.hexdigest())
 
                 # check if this hash is in the container already
-                existing_bytestream_reference_id =  self.resolver.Get(hashid, rdfvalue.URN(lexicon.standard.dataStream))
+                existing_bytestream_reference_id =  self.resolver.Get(self.urn, hashid, rdfvalue.URN(lexicon.standard.dataStream))
                 if existing_bytestream_reference_id == None:
                     block_stream_address = self.block_store_stream.Tell()
                     self.block_store_stream.Write(chunk)
 
                     chunk_reference_id = self.block_store_stream.urn.SerializeToString() + "[0x%x:0x%x]" % (block_stream_address, toread)
                     chunk_reference_id = rdfvalue.URN(chunk_reference_id)
-                    self.resolver.Add(hashid, rdfvalue.URN(lexicon.standard.dataStream), chunk_reference_id)
+                    self.resolver.Add(self.urn, hashid, rdfvalue.URN(lexicon.standard.dataStream), chunk_reference_id)
 
                 logical_file_map.AddRange(file_offset, 0, toread, hashid)
 
                 file_offset += toread
 
 
-        self.resolver.Add(logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
-        self.resolver.Add(logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
-        self.resolver.Add(logical_file_id, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
+        self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
+        self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+        self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
         return logical_file_id
 
     def __exit__(self, exc_type, exc_value, traceback):

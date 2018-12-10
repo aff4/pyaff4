@@ -180,8 +180,8 @@ def ingestZipfile(container_name, zipfile, append):
             # the following coaxes our ZIP implementation to treat this file
             # as a regular old zip
             result = zip.BasicZipFile(resolver, urn=None, version=version.aff4v10)
-            resolver.Set(result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
-            resolver.Set(result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
+            resolver.Set(volume.urn, result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
+            resolver.Set(volume.urn, result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
 
             with resolver.AFF4FactoryOpen(result.urn, version=version.aff4v10) as zip_file:
                 for member in zip_file.members:
@@ -197,7 +197,7 @@ def ingestZipfile(container_name, zipfile, append):
                         #fsmeta.store(resolver)
                         for h in hasher.hashes:
                             hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
-                            resolver.Add(urn, rdfvalue.URN(lexicon.standard.hash), hh)
+                            resolver.Add(container_urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
 
         return urn
 
@@ -230,9 +230,9 @@ def addPathNames(container_name, pathnames, recursive, append, hashbased):
 
                     fsmeta.urn = image_urn
                     fsmeta.store(resolver)
-                    resolver.Set(image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(pathname))
-                    resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FolderImage))
-                    resolver.Add(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+                    resolver.Set(volume.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(pathname))
+                    resolver.Add(volume.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FolderImage))
+                    resolver.Add(volume.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
                     if recursive:
                         for child in os.listdir(pathname):
                             pathnames.append(os.path.join(pathname, child))
@@ -257,10 +257,10 @@ def extractAll(container_name, destFolder):
     with container.Container.openURNtoContainer(container_urn) as volume:
         printVolumeInfo(file, volume)
         resolver = volume.resolver
-        for imageUrn in resolver.QueryPredicateObject(lexicon.AFF4_TYPE, lexicon.standard11.FileImage):
+        for imageUrn in resolver.QueryPredicateObject(volume.urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage):
             imageUrn = utils.SmartUnicode(imageUrn)
 
-            pathName = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.pathName)).value
+            pathName = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.pathName)).value
             if pathName.startswith("/"):
                 pathName = "." + pathName
             with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
@@ -276,10 +276,10 @@ def extractAll(container_name, destFolder):
                         shutil.copyfileobj(srcStream, destStream)
                         print ("\tExtracted %s to %s" % (pathName, destFile))
 
-                    lastWritten = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.lastWritten))
-                    lastAccessed = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.lastAccessed))
-                    recordChanged = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.recordChanged))
-                    birthTime = next(resolver.QuerySubjectPredicate(imageUrn, lexicon.standard11.birthTime))
+                    lastWritten = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastWritten))
+                    lastAccessed = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastAccessed))
+                    recordChanged = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.recordChanged))
+                    birthTime = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.birthTime))
                     logical.resetTimestamps(destFile, lastWritten, lastAccessed, recordChanged, birthTime)
 
                 else:
@@ -296,7 +296,7 @@ def extract(container_name, imageURNs, destFolder):
             for imageUrn in imageURNs:
                 imageUrn = utils.SmartUnicode(imageUrn)
 
-                pathName = next(resolver.QuerySubjectPredicate(imageUrn, volume.lexicon.pathName))
+                pathName = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, volume.lexicon.pathName))
 
                 with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
                     if destFolder != "-":

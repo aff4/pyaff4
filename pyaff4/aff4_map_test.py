@@ -38,7 +38,7 @@ class AFF4MapTest(unittest.TestCase):
     def setUp(self):
         version = container.Version(1, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
-            resolver.Set(self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+            resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))
 
             with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
