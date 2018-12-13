@@ -140,7 +140,7 @@ def resetTimestampsPosix(destFile, lastWritten, lastAccessed, recordChanged, bir
         lw = parse(lastWritten.value)
         la = parse(lastWritten.value)
         os.utime(destFile, ((la - epoch).total_seconds(), (lw - epoch).total_seconds()))
-    except Exception, err:
+    except Exception:
         traceback.print_exc()
 
 # default implementation does nothing at present on non posix environments

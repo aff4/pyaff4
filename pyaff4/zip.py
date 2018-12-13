@@ -844,7 +844,7 @@ class BasicZipFile(aff4.AFF4Volume):
                         data = stream.read(BUFF_SIZE)
                         if not data:
                             break
-                    except IOError, e:
+                    except IOError:
                         break
 
                     c_data = compressor.compress(data)

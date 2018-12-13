@@ -13,16 +13,15 @@ from __future__ import unicode_literals
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from pyaff4 import lexicon
 from pyaff4.rdfvalue import *
+from pyaff4 import lexicon
 import hashlib
 import pyblake2
 
 def new(datatype):
-    return map[datatype]()
+    return hashNameToFunctionMap[datatype]()
 
 def newImmutableHash(value, datatype):
-
     if datatype == lexicon.HASH_SHA1:
         h = SHA1Hash()
     elif datatype == lexicon.HASH_MD5:
@@ -40,28 +39,26 @@ def newImmutableHash(value, datatype):
     h.Set(value)
     return h
 
+
 def toShortAlgoName(datatype):
-    return map[datatype]().name
+    return hashNameToFunctionMap[datatype]().name
+
 
 def fromShortName(name):
     return nameMap[name]
 
-def length(datatype):
-    return map[datatype]().digest_size
 
-map = {
+def length(datatype):
+    return hashNameToFunctionMap[datatype]().digest_size
+
+
+hashNameToFunctionMap = {
+    lexicon.HASH_MD5: hashlib.md5,
     lexicon.HASH_SHA1: hashlib.sha1,
     lexicon.HASH_SHA256: hashlib.sha256,
     lexicon.HASH_SHA512: hashlib.sha512,
-    lexicon.HASH_MD5: hashlib.md5,
     lexicon.HASH_BLAKE2B: pyblake2.blake2b
 }
 
-nameMap = {
-    "md5" : lexicon.HASH_MD5,
-    "sha1" : lexicon.HASH_SHA1,
-    "sha256" : lexicon.HASH_SHA256,
-    "sha512" : lexicon.HASH_SHA512,
-    "blake2b" : lexicon.HASH_BLAKE2B,
-    "blockMapHashSHA512" : lexicon.HASH_BLOCKMAPHASH_SHA512
-}
+nameMap = dict(md5=lexicon.HASH_MD5, sha1=lexicon.HASH_SHA1, sha256=lexicon.HASH_SHA256, sha512=lexicon.HASH_SHA512,
+               blake2b=lexicon.HASH_BLAKE2B, blockMapHashSHA512=lexicon.HASH_BLOCKMAPHASH_SHA512)

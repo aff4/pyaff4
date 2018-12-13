@@ -19,7 +19,7 @@ from __future__ import unicode_literals
 
 from builtins import object
 import rdflib
-from aff4 import rdfvalue
+from pyaff4 import rdfvalue
 
 AFF4_VERSION = "0.2"
 
@@ -151,8 +151,6 @@ HASH_SHA1 = rdflib.URIRef("http://aff4.org/Schema#SHA1")
 HASH_MD5 = rdflib.URIRef("http://aff4.org/Schema#MD5")
 HASH_BLAKE2B = rdflib.URIRef("http://aff4.org/Schema#Blake2b")
 
-
-
 HASH_BLOCKMAPHASH_SHA512 = rdflib.URIRef("http://aff4.org/Schema#blockMapHashSHA512")
 
 class Lexicon(object):
@@ -251,5 +249,4 @@ def AutoResolveAttribute(resolver, urn, attribute):
             return result
 
 transient_graph = rdfvalue.URN("http://aff4.org/Schema#transient")
-
 any = rdfvalue.URN("http://aff4.org/Schema#any")

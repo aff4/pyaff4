@@ -508,7 +508,7 @@ class MemoryDataStore(object):
 
             # TODO: this could be cleaner. RDF properties have multiple values
 
-            if type(uri_types) == types.ListType or type(uri_types) == types.GeneratorType:
+            if isinstance(uri_types, list) or isinstance(uri_types, types.GeneratorType):
                 for typ in uri_types:
                     handler = registry.AFF4_TYPE_MAP.get(typ)
                     if handler is not None:
