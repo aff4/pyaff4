@@ -15,8 +15,6 @@
 import os
 import platform
 from pyaff4 import lexicon, rdfvalue
-from pyaff4 import statx
-import time
 import tzlocal
 import pytz
 from datetime import datetime

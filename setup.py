@@ -64,6 +64,7 @@ setup(
         "pyyaml",
         "tzlocal",
         "html5lib",
+        "python-dateutil"
     ],
     extras_require=dict(
         cloud="google-api-python-client"

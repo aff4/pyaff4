@@ -348,8 +348,8 @@ class MemoryDataStore(object):
 
                         if zipcontainer.ContainsMember(current_turtle_chunk_arn):
                             with zipcontainer.OpenMember(current_turtle_chunk_arn) as turtle_chunk_segment:
-                                turtle_chunk_txt = streams.ReadAll(turtle_chunk_segment)
-                                turtle_segment.write(utils.SmartStr(turtle_chunk_txt + "\r\n"))
+                                turtle_chunk_txt = utils.SmartUnicode(streams.ReadAll(turtle_chunk_segment))
+                                turtle_segment.write(utils.SmartStr(turtle_chunk_txt + u"\r\n"))
                             turtleContainerIndex += 1
 
                         else:
@@ -371,8 +371,8 @@ class MemoryDataStore(object):
                 (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicodeself._DumpToTurtle(zipcontainer.urn))
                 directives_difference = turtle.difference(directives_txt, current_directives_txt)
 
-                if not directives_difference == "":
-                    directives_txt = directives_txt + "\r\n" + directives_difference
+                if not directives_difference == u"":
+                    directives_txt = directives_txt + u"\r\n" + directives_difference
                     with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
                         directives_segment.compression_method = ZIP_DEFLATE
                         directives_segment.write(utils.SmartStr(directives_txt))
@@ -387,7 +387,7 @@ class MemoryDataStore(object):
 
                 with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
                     turtle_segment.compression_method = ZIP_DEFLATE
-                    turtle_segment.write(utils.SmartStr(directives_txt + "\r\n\r\n"))
+                    turtle_segment.write(utils.SmartStr(directives_txt + u"\r\n\r\n"))
 
                     turtleContainerIndex = 0
                     while True:
@@ -397,7 +397,7 @@ class MemoryDataStore(object):
                             with zipcontainer.OpenZipSegment(
                                 u"information.turtle/%08d" % turtleContainerIndex) as turtle_chunk_segment:
                                 turtle_chunk_txt = streams.ReadAll(turtle_chunk_segment)
-                                turtle_segment.write(utils.SmartStr(turtle_chunk_txt + "\r\n"))
+                                turtle_segment.write(utils.SmartStr(turtle_chunk_txt + u"\r\n"))
                             turtleContainerIndex += 1
                         else:
                             break

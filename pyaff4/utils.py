@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 __author__ = "Michael Cohen <scudette@gmail.com>"
 
 import six
-from types import ListType
 from future import types
 
 def SmartStr(string, encoding="utf8"):
@@ -77,10 +76,10 @@ def asList(a, b):
     elif b == None:
         return a
     else:
-        if type(a) == ListType:
+        if isinstance(a, list):
             a.append(b)
             return a
-        elif type(b) == ListType:
+        elif isinstance(b, list):
             b.append(a)
             return b
         else:

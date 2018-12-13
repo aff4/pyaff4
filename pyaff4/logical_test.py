@@ -25,6 +25,7 @@ import io
 import tempfile
 import random
 import math
+import platform
 
 
 
@@ -190,6 +191,7 @@ class LogicalTest(unittest.TestCase):
     def onInvalidHash(self, typ, hasha, hashb, streamURI):
         self.fail()
 
+    @unittest.skipIf(platform.system() == "Windows")
     def testFuzz(self):
         chunksize=512
         for length in [chunksize-1, chunksize, chunksize+1, chunksize*2-1, chunksize*2, chunksize*2+1, chunksize*1000, 0]:
