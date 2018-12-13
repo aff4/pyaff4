@@ -23,6 +23,9 @@ from datetime import datetime
 from dateutil.parser import parse
 import traceback
 
+if platform.system() == "Linux":
+    from pyaff4 import statx
+
 class FSMetadata(object):
     def __init__(self, urn, name, length):
         self.name = name
@@ -86,41 +89,36 @@ class FSMetadata(object):
             birthTime = datetime.fromtimestamp(sx.get_btime(), local_tz)
             return LinuxFSMetadata(filename, filename, size, lastWritten, accessed, recordChanged, birthTime)
 
-class UnixMetadata(FSMetadata):
+class ClassicUnixMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
         super(UnixMetadata, self).__init__(urn, name, size)
         self.lastWritten = lastWritten
         self.lastAccessed = lastAccessed
         self.recordChanged = recordChanged
-        self.birthTime = birthTime
+
 
     def store(self, resolver):
         resolver.Set(self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
-class LinuxFSMetadata(UnixMetadata):
-    def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
-        super(LinuxFSMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged)
-
-
-class MacOSFSMetadata(FSMetadata):
+class ModernUnixMetadata(ClassicUnixMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
-        super(MacOSFSMetadata, self).__init__(urn, name, size)
-        self.lastWritten = lastWritten
-        self.lastAccessed = lastAccessed
-        self.recordChanged = recordChanged
-        self.birthTime = birthTime
+        super(ModernUnixMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
 
     def store(self, resolver):
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
+        super(ModernUnixMetadata, self).store(resolver)
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
+class LinuxFSMetadata(ModernUnixMetadata):
+    def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
+        super(LinuxFSMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
+
+
+class MacOSFSMetadata(ModernUnixMetadata):
+    def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
+        super(MacOSFSMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
 
 class WindowsFSMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, birthTime):

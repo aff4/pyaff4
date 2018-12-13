@@ -14,11 +14,11 @@ def toDirectivesAndTripes(text):
         else:
             triples.append(line)
 
-    return ("\r\n".join(directives), "\r\n".join(triples))
+    return (u"\r\n".join(directives), u"\r\n".join(triples))
 
 
 
 def difference(a, b):
-    aset = set(a.split("\r\n"))
-    bset = set(b.split("\r\n"))
+    aset = set(a.split(u"\r\n"))
+    bset = set(b.split(u"\r\n"))
     return aset.difference(bset)

@@ -497,6 +497,9 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
         super(ZipFileSegment, self).Flush()
 
+    def Reset(self):
+        self.readptr = 0
+
     def Close(self):
         pass
 

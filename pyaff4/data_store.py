@@ -51,7 +51,7 @@ try:
 except:
     pass
 
-#HAS_HDT = False
+HAS_HDT = False
 def CHECK(condition, error):
     if not condition:
         raise RuntimeError(error)
@@ -324,7 +324,7 @@ class MemoryDataStore(object):
                 (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicode(self._DumpToTurtle(zipcontainer.urn)))
                 directives_difference = turtle.difference(directives_txt, current_directives_txt)
                 if not len(directives_difference) == 0:
-                    directives_txt = directives_txt + "\r\n" + directives_difference
+                    directives_txt = directives_txt + u"\r\n" + directives_difference
                     with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
                         directives_segment.compression_method = ZIP_DEFLATE
                         directives_segment.write(utils.SmartStr(directives_txt))
@@ -607,12 +607,8 @@ class MemoryDataStore(object):
         if graph == lexicon.any or graph == None:
             resa = self.transient_store.get(subject, {}).get(attribute)
             resb = self.store.get(subject, {}).get(attribute)
-            if resa == None:
-                return resb
-            elif resb == None:
-                return resa
-            else:
-                return resa.append(resb)
+            return utils.asList(resa, resb)
+
         elif graph == transient_graph:
             return self.transient_store.get(subject, {}).get(attribute)
         else:
