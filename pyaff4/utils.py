@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 __author__ = "Michael Cohen <scudette@gmail.com>"
 
 import six
+from types import ListType
 from future import types
 
 def SmartStr(string, encoding="utf8"):
@@ -67,3 +68,20 @@ def AssertUnicode(string):
     elif six.PY2:
         if type(string) not in (unicode, types.newstr):
             raise RuntimeError("String must be unicode.")
+
+# TODO. This is so ugly. Need to go through and fix all calls to Get to make
+# sure they are expecting an array or generator in response
+def asList(a, b):
+    if a == None:
+        return b
+    elif b == None:
+        return a
+    else:
+        if type(a) == ListType:
+            a.append(b)
+            return a
+        elif type(b) == ListType:
+            b.append(a)
+            return b
+        else:
+            return [a,b]

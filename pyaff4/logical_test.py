@@ -23,6 +23,11 @@ import traceback
 import os
 import io
 import tempfile
+import random
+import math
+
+
+
 
 """
 Tests logical file creation
@@ -148,6 +153,7 @@ class LogicalTest(unittest.TestCase):
         containerName = tempfile.gettempdir() + "/test-windowsdrive.aff4"
         self.createAndReadSinglePathImage(containerName, u"c:\\犬\\ネコ.txt", u"/c:/犬/ネコ.txt")
 
+
     def testAFF4ReservedSegmentCollision(self):
         containerName = tempfile.gettempdir() + "/test.aff4"
         try:
@@ -177,6 +183,62 @@ class LogicalTest(unittest.TestCase):
 
         finally:
             os.unlink(containerName)
+
+    def onValidHash(self, typ, hash, imageStreamURI):
+        self.assertEqual(True,True)
+
+    def onInvalidHash(self, typ, hasha, hashb, streamURI):
+        self.fail()
+
+    def testFuzz(self):
+        chunksize=512
+        for length in [chunksize-1, chunksize, chunksize+1, chunksize*2-1, chunksize*2, chunksize*2+1, chunksize*1000, 0]:
+            for maxSegmentResidentSize in [0, 1, chunksize-1, chunksize, chunksize+1]:
+                try:
+                    containerName = tempfile.gettempdir() + "/testfuzz-%d-%d.aff4" % (length, maxSegmentResidentSize)
+                    print(containerName)
+                    hasher = linear_hasher.PushHasher([lexicon.HASH_SHA1, lexicon.HASH_MD5])
+
+                    container_urn = rdfvalue.URN.FromFileName(containerName)
+                    with data_store.MemoryDataStore() as resolver:
+                        with container.Container.createURN(resolver, container_urn) as volume:
+                            volume.maxSegmentResidentSize = maxSegmentResidentSize
+                            with volume.newLogicalStream("/foo", 20) as writer:
+                                with open("/dev/random", "r") as randomStream:
+                                    writer.chunk_size = chunksize
+                                    writer_arn = writer.urn
+
+                                    pos = 0
+                                    while pos < length:
+                                        toread = int(min(math.ceil(1024 * random.random()), length - pos))
+                                        data = randomStream.read(toread)
+                                        writer.Write(data)
+                                        hasher.update(data)
+                                        pos += toread
+
+                                    # write in the hashes before auto-close
+                                    for h in hasher.hashes:
+                                        hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
+                                        volume.resolver.Add(volume.urn, writer_arn, rdfvalue.URN(lexicon.standard.hash), hh)
+
+                    with container.Container.openURNtoContainer(container_urn) as volume:
+                        images = list(volume.images())
+                        self.assertEqual(1, len(images), "Only one logical image")
+                        self.assertEqual("/foo", images[0].name(), "unicode filename should be preserved")
+
+                        fragment = escaping.member_name_for_urn(images[0].urn.value, volume.version,
+                                                                base_urn=volume.urn, use_unicode=True)
+
+                        hasher = linear_hasher.LinearHasher2(resolver, self)
+                        for image in volume.images():
+                            hasher.hash(image)
+
+                    os.unlink(containerName)
+                except Exception:
+                    traceback.print_exc()
+                    self.fail()
+                    continue
+
 
 
 
