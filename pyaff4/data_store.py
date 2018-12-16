@@ -1,6 +1,5 @@
-from __future__ import print_function
-from __future__ import unicode_literals
 # Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2018 Schatz Forensic Pty. Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -14,6 +13,9 @@ from __future__ import unicode_literals
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from builtins import str
 from builtins import object
 from os.path import expanduser
@@ -24,6 +26,7 @@ import re
 import six
 import os
 import tempfile
+import traceback
 import subprocess
 import sys
 import types
@@ -46,12 +49,13 @@ from pyaff4.lexicon import transient_graph
 LOGGER = logging.getLogger("pyaff4")
 HAS_HDT = False
 try:
+    import hdt
     from hdt import HDTDocument
     HAS_HDT = True
 except:
     pass
 
-HAS_HDT = False
+#HAS_HDT = False
 def CHECK(condition, error):
     if not condition:
         raise RuntimeError(error)
@@ -736,33 +740,75 @@ class HDTAssistedDataStore(MemoryDataStore):
             if os.path.exists(f):
                 os.unlink(f)
 
+    def createHDTviaShell(self, zip, cached_turtle):
+        try:
+
+            rdf2hdt = "/usr/local/bin/rdf2hdt"
+            temp = tempfile.NamedTemporaryFile(delete=False)
+
+            try:
+                with zip.OpenZipSegment("information.turtle") as fd:
+                    print(dir(temp))
+                    streams.WriteAll(fd, temp)
+                temp.close()
+            except Exception as e:
+                # no turtle yet
+                return
+
+            try:
+                cmd = rdf2hdt + " -f turtle " + temp.name + " " + cached_turtle
+                retcode = subprocess.call(cmd, shell=True)
+                if retcode < 0:
+                    print("rdf2hdt failed", -retcode, file=sys.stderr)
+                else:
+                    pass
+            except OSError as e:
+                print("Execution failed:", e, file=sys.stderr)
+            os.unlink(temp.name)
+        except:
+            raise Exception("rdf2dht failed. Please make data_store.HAS_HDT=False until this is fixed. ")
+
+    def createHDTviaLib(self, zip, cached_turtle):
+        try:
+            temp = tempfile.NamedTemporaryFile(delete=False)
+
+            try:
+                with zip.OpenZipSegment("information.turtle") as fd:
+                    print(dir(temp))
+                    streams.WriteAll(fd, temp)
+                temp.close()
+            except Exception as e:
+                # no turtle yet
+                return
+
+            doc = hdt.generate_hdt(temp.name, "aff4://foo")
+            retcode = doc.save_to_hdt(cached_turtle)
+
+            if retcode != 0:
+                print("rdf2hdt failed", -retcode, file=sys.stderr)
+            else:
+                pass
+
+        except:
+            traceback.print_exc()
+            raise Exception("rdf2dht failed. Please make data_store.HAS_HDT=False until this is fixed. ")
+
+        finally:
+            os.unlink(temp.name)
+
+
     def loadMetadata(self, zip):
         # Load the turtle metadata.
         aff4cache = os.path.join(expanduser("~"), ".aff4")
         cached_turtle = os.path.join(aff4cache, "%s.hdt" % str(zip.urn)[7:])
         if not os.path.exists(cached_turtle):
-            try:
-                rdf2hdt = "/usr/local/bin/rdf2hdt"
-                temp = tempfile.NamedTemporaryFile(delete=False)
-                with zip.OpenZipSegment("information.turtle") as fd:
-                    print(dir(temp))
-                    streams.WriteAll(fd, temp)
-                temp.close()
-                try:
-                    cmd = rdf2hdt + " -f turtle " + temp.name + " " + cached_turtle
-                    retcode = subprocess.call(cmd, shell=True)
-                    if retcode < 0:
-                        print("rdf2hdt failed", -retcode, file=sys.stderr)
-                    else:
-                        pass
-                except OSError as e:
-                    print("Execution failed:", e, file=sys.stderr)
-                os.unlink(temp.name)
-            except:
-                raise Exception("rdf2dht failed. Please make data_store.HAS_HDT=False until this is fixed. ")
+            self.createHDTviaLib(zip, cached_turtle)
 
-        # assume we have a HDT cache of turtle at this point
-        self.hdt = HDTDocument(cached_turtle)
+        if os.path.exists(cached_turtle):
+            # assume we have a HDT cache of turtle at this point
+            self.hdt = HDTDocument(cached_turtle)
+
+
     # this implementation currently not tested
     # and it is super ugly. We are materializing all triples just to
     # list all the subjects.
