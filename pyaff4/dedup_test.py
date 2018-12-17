@@ -48,6 +48,10 @@ class DedupeTest(unittest.TestCase):
         try:
 
             containerName = "/tmp/test-append-dedup.aff4"
+            try:
+                os.unlink(containerName)
+            except:
+                pass
 
             container_urn = rdfvalue.URN.FromFileName(containerName)
             resolver = data_store.MemoryDataStore()
@@ -85,7 +89,7 @@ class DedupeTest(unittest.TestCase):
                 self.assertTrue(fragmentA.endswith("paper-hash_based_disk_imaging_using_aff4.pdf.frag.1"))
                 self.assertTrue(fragmentB.endswith("paper-hash_based_disk_imaging_using_aff4.pdf.frag.2"))
 
-                hasher = linear_hasher.LinearHasher2(resolver, self)
+                hasher = linear_hasher.LinearHasher2(volume.resolver, self)
                 for image in volume.images():
                     print("\t%s <%s>" % (image.name(), image.urn))
                     hasher.hash(image)
@@ -95,7 +99,8 @@ class DedupeTest(unittest.TestCase):
             self.fail()
 
         finally:
-            os.unlink(containerName)
+            #os.unlink(containerName)
+            pass
 
 
 
