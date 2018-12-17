@@ -172,8 +172,10 @@ def ingestZipfile(container_name, zipfile, append):
             volume = container.Container.createURN(resolver, container_urn)
             print("Creating AFF4Container: file://%s <%s>" % (container_name, volume.urn))
         else:
-            volume = container.Container.openURNtoContainer(container_urn, mode="+", resolver=resolver)
+            volume = container.Container.openURNtoContainer(container_urn, mode="+")
             print("Appending to AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+
+        resolver = volume.resolver
 
         with volume as volume:
             filename_arn = rdfvalue.URN.FromFileName(zipfile)
@@ -247,7 +249,7 @@ def addPathNames(container_name, pathnames, recursive, append, hashbased):
                         fsmeta.store(resolver)
                         for h in hasher.hashes:
                             hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
-                            resolver.Add(urn, rdfvalue.URN(lexicon.standard.hash), hh)
+                            resolver.Add(urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
         return urn
 
 def extractAll(container_name, destFolder):
@@ -300,7 +302,10 @@ def extract(container_name, imageURNs, destFolder):
 
                 with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
                     if destFolder != "-":
-                        destFile = os.path.join(destFolder, escaping.arnPathFragment_from_path(pathName.value))
+                        pathName = escaping.arnPathFragment_from_path(pathName.value)
+                        while pathName.startswith("/"):
+                            pathName = pathName[1:]
+                        destFile = os.path.join(destFolder, pathName)
                         if not os.path.exists(os.path.dirname(destFile)):
                             try:
                                 os.makedirs(os.path.dirname(destFile))
@@ -308,8 +313,8 @@ def extract(container_name, imageURNs, destFolder):
                                 if exc.errno != errno.EEXIST:
                                     raise
                         with open(destFile, "w") as destStream:
-                            shutil.copyfileobj(srcStream, destStream)
-                            print ("\tExtracted %s to %s" % (pathName.value, destFile))
+                            shutil.copyfileobj(srcStream, destStream, length=32*2014)
+                            print ("\tExtracted %s to %s" % (pathName, destFile))
                     else:
                         shutil.copyfileobj(srcStream, sys.stdout)
 

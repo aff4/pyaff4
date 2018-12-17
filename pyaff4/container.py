@@ -76,13 +76,14 @@ class Container(object):
 
 
     @staticmethod
-    def identifyURN(urn):
-        if data_store.HAS_HDT:
-            ds = data_store.HDTAssistedDataStore
-        else:
-            ds = data_store.MemoryDataStore
+    def identifyURN(urn, resolver=None):
+        if resolver == None:
+            if data_store.HAS_HDT:
+                resolver = data_store.HDTAssistedDataStore(lexicon.standard)
+            else:
+                resolver = data_store.MemoryDataStore(lexicon.standard)
 
-        with ds(lexicon.standard) as resolver:
+        with resolver as resolver:
             with zip.ZipFile.NewZipFile(resolver, Version(0,1,"pyaff4"), urn) as zip_file:
                 if len(list(zip_file.members.keys())) == 0:
                     # it's a new zipfile
@@ -95,7 +96,10 @@ class Container(object):
                         #resolver.Close(version)
                         version = parseProperties(versionTxt.decode("utf-8"))
                         version = Version.create(version)
-                        return (version, lexicon.standard)
+                        if version.is11():
+                            return (version, lexicon.standard11)
+                        else:
+                            return (version, lexicon.standard)
                 except:
                     if str(resolver.aff4NS) == lexicon.AFF4_NAMESPACE:
                         # Rekall defined the new AFF4 namespace post the Wirespeed paper
@@ -151,20 +155,21 @@ class Container(object):
 
     @staticmethod
     def openURNtoContainer(urn, mode=None):
-            (version, lex) = Container.identifyURN(urn)
             if data_store.HAS_HDT:
-                ds = data_store.HDTAssistedDataStore
+                resolver = data_store.HDTAssistedDataStore(lexicon.standard)
             else:
-                ds = data_store.MemoryDataStore
-            resolver = ds(lex)
+                resolver = data_store.MemoryDataStore(lexicon.standard)
 
+            (version, lex) = Container.identifyURN(urn, resolver=resolver)
+
+            resolver.lexicon = lex
             if mode != None and mode == "+":
                 resolver.Set(lexicon.transient_graph, urn, lexicon.AFF4_STREAM_WRITE_MODE,
                              rdfvalue.XSDString("append"))
 
             with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
                 volumeURN = zip_file.urn
-                if lex == lexicon.standard:
+                if lex == lexicon.standard or lex == lexicon.standard11:
                     images = list(resolver.QueryPredicateObject(volumeURN, lexicon.AFF4_TYPE, lex.Image))
                     imageURN = images[0]
 
@@ -414,8 +419,9 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                 chunk = readstream.read(toread)
 
                 # pad the chunk to chunksize if it is small
-                if len(chunk) < chunk_size:
-                    chunk = chunk + b"\x00" * (chunk_size - len(chunk))
+                read_chunk_size = len(chunk)
+                if read_chunk_size < chunk_size:
+                    chunk = chunk + b"\x00" * (chunk_size - read_chunk_size)
 
                 h = hashes.new(lexicon.HASH_SHA512)
                 h.update(chunk)
@@ -423,18 +429,24 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
 
                 # check if this hash is in the container already
                 existing_bytestream_reference_id =  self.resolver.Get(self.urn, hashid, rdfvalue.URN(lexicon.standard.dataStream))
+
                 if existing_bytestream_reference_id == None:
                     block_stream_address = self.block_store_stream.Tell()
                     self.block_store_stream.Write(chunk)
 
-                    chunk_reference_id = self.block_store_stream.urn.SerializeToString() + "[0x%x:0x%x]" % (block_stream_address, toread)
+                    chunk_reference_id = self.block_store_stream.urn.SerializeToString() + "[0x%x:0x%x]" % (block_stream_address, chunk_size)
                     chunk_reference_id = rdfvalue.URN(chunk_reference_id)
                     self.resolver.Add(self.urn, hashid, rdfvalue.URN(lexicon.standard.dataStream), chunk_reference_id)
 
-                logical_file_map.AddRange(file_offset, 0, toread, hashid)
+                    logical_file_map.AddRange(file_offset, 0, toread, hashid)
+                    #print("[%x, %x] -> %s -> %s" % (file_offset, toread, hashid, chunk_reference_id))
+                else:
+                    logical_file_map.AddRange(file_offset, 0, toread, hashid)
+                    #print("[%x, %x] -> %s -> %s" % (file_offset, toread, hashid, existing_bytestream_reference_id))
 
                 file_offset += toread
 
+        logical_file_map.Close()
 
         self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
         self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
