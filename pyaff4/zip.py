@@ -54,6 +54,10 @@ ZIP_DEBUG = True
 #   incompatible with MacOS shell compressor and doesnt display will with unzip (infozip)
 USE_UNICODE = True
 
+class UnknownZipEntity(Exception):
+    pass
+
+
 class EndCentralDirectory(struct_parser.CreateStruct(
         "EndCentralDirectory_t",
         definition="""
@@ -190,7 +194,7 @@ class Zip64FileHeaderExtensibleField(object):
         result = cls()
         result.header_id = struct.unpack("H", buffer[0:2])[0]
         if result.header_id != 1:
-            raise IOError("Invalid Zip64 Extended Information Extra Field")
+            raise UnknownZipEntity("Invalid Zip64 Extended Information Extra Field")
 
         result.data_size = struct.unpack("H", buffer[2:4])[0]
 
@@ -538,11 +542,11 @@ class BasicZipFile(aff4.AFF4Volume):
             # Fetch the volume comment.
             if end_cd.comment_len > 0:
                 backing_store.Seek(ecd_real_offset + end_cd.sizeof())
-                urn_string = backing_store.Read(end_cd.comment_len)
+                urn_string = utils.SmartUnicode(backing_store.Read(end_cd.comment_len))
 
                 # trim trailing null if there
-                if urn_string[end_cd.comment_len-1] == chr(0):
-                    urn_string = urn_string[0:end_cd.comment_len-1]
+                if urn_string[len(urn_string)-1] == chr(0):
+                    urn_string = urn_string[0:len(urn_string)-1]
                 LOGGER.info("Loaded AFF4 volume URN %s from zip file.",
                             urn_string)
 
@@ -665,13 +669,13 @@ class BasicZipFile(aff4.AFF4Volume):
                 if entry.extra_field_len > 0:
                     extrabuf = backing_store.Read(entry.extra_field_len)
 
-                    extra, readbytes = Zip64FileHeaderExtensibleField.FromBuffer(
-                        entry, extrabuf)
-                    extrabuf = extrabuf[readbytes:]
-
                     # AFF4 requres Zip64, but we still want to be able to read 3rd party
                     # zip files, so just try/catch around reads of the extensible field
                     try:
+                        extra, readbytes = Zip64FileHeaderExtensibleField.FromBuffer(
+                            entry, extrabuf)
+                        extrabuf = extrabuf[readbytes:]
+
                         if extra.header_id == 1:
                             if extra.Get("relative_offset_local_header") is not None:
                                 zip_info.local_header_offset = (
@@ -774,7 +778,7 @@ class BasicZipFile(aff4.AFF4Volume):
     def OpenMember(self, segment_urn):
         # Is it already in the cache?
         if segment_urn not in self.members:
-            raise IOError("Segment %s does not exist yet" % filename)
+            raise IOError("Segment %s does not exist yet" % segment_urn)
 
         res = self.resolver.CacheGet(segment_urn)
 
@@ -799,12 +803,13 @@ class BasicZipFile(aff4.AFF4Volume):
 
         try:
             self.parse_cd(self.backing_store_urn)
+            self.resolver.loadMetadata(self)
         except IOError:
             # If we can not parse a CD from the zip file, this is fine, we just
             # append an AFF4 volume to it, or make a new file.
             return
 
-        self.resolver.loadMetadata(self)
+
 
     def StreamAddMember(self, member_urn, stream,
                         compression_method=ZIP_STORED,

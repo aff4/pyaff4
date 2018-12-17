@@ -55,7 +55,7 @@ try:
 except:
     pass
 
-#HAS_HDT = False
+HAS_HDT = False
 def CHECK(condition, error):
     if not condition:
         raise RuntimeError(error)
@@ -499,7 +499,7 @@ class MemoryDataStore(object):
         if self.streamFactory.isSymbolicStream(urn):
             obj = self.streamFactory.createSymbolic(urn)
         elif urn.SerializeToString().startswith("aff4:sha512"):
-            bytestream_reference_id = self.Get(urn, rdfvalue.URN(lexicon.standard.dataStream))
+            bytestream_reference_id = self.Get(urn, urn, rdfvalue.URN(lexicon.standard.dataStream))
             cached_obj = self.ObjectCache.Get(bytestream_reference_id)
             if cached_obj:
                 cached_obj.Prepare()

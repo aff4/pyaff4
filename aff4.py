@@ -179,11 +179,11 @@ def ingestZipfile(container_name, zipfile, append):
             filename_arn = rdfvalue.URN.FromFileName(zipfile)
             # the following coaxes our ZIP implementation to treat this file
             # as a regular old zip
-            result = zip.BasicZipFile(resolver, urn=None, version=version.aff4v10)
-            resolver.Set(volume.urn, result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
-            resolver.Set(volume.urn, result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
+            result = zip.BasicZipFile(resolver, urn=None, version=version.basic_zip)
+            resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
+            resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
 
-            with resolver.AFF4FactoryOpen(result.urn, version=version.aff4v10) as zip_file:
+            with resolver.AFF4FactoryOpen(result.urn, version=version.basic_zip) as zip_file:
                 for member in zip_file.members:
                     info = zip_file.members[member]
                     pathname = basefilename +  member.SerializeToString()[len(result.urn.SerializeToString()):]

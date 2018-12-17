@@ -28,6 +28,9 @@ import os, io
 """
 Tests logical file creation
 """
+
+
+
 class DedupeTest(unittest.TestCase):
     testImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images", u"AFF4-L")
 
@@ -35,11 +38,16 @@ class DedupeTest(unittest.TestCase):
     def setUp(self):
         pass
 
+    def onValidHash(self, typ, hash, imageStreamURI):
+        self.assertTrue(True)
+
+    def onInvalidHash(self, typ, hasha, hashb, streamURI):
+        self.fail()
 
     def testCreateAndAppendSinglePathImage(self):
         try:
 
-            containerName = "/tmp/test-append.aff4"
+            containerName = "/tmp/test-append-dedup.aff4"
 
             container_urn = rdfvalue.URN.FromFileName(containerName)
             resolver = data_store.MemoryDataStore()
@@ -49,21 +57,38 @@ class DedupeTest(unittest.TestCase):
 
             with container.Container.createURN(resolver, container_urn) as volume:
                 with open(frag1path, "rb") as src:
-                    stream = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
-                    urn = volume.writeLogicalStreamHashBased(frag1path, stream, 4*1024)
+                    stream = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1])
+                    urn = volume.writeLogicalStreamHashBased(frag1path, stream, 32768)
                     for h in stream.hashes:
                         hh = hashes.newImmutableHash(h.hexdigest(), stream.hashToType[h])
+                        self.assertEqual("deb3fa3b60c6107aceb97f684899387c78587eae", hh.value)
                         resolver.Add(volume.urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
 
             frag2path = os.path.join(self.testImagesPath, "paper-hash_based_disk_imaging_using_aff4.pdf.frag.2")
 
             with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
                 with open(frag2path, "rb") as src:
-                    stream = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
-                    urn = volume.writeLogicalStreamHashBased(frag2path, stream, 2*4*1024)
+                    stream = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5 ])
+                    urn = volume.writeLogicalStreamHashBased(frag2path, stream, 2*32768)
                     for h in stream.hashes:
                         hh = hashes.newImmutableHash(h.hexdigest(), stream.hashToType[h])
                         resolver.Add(volume.urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                images = sorted(images, key=lambda x: utils.SmartUnicode(x.pathName), reverse=False)
+                self.assertEqual(2, len(images), "Only two logical images")
+
+                fragmentA = escaping.member_name_for_urn(images[0].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+                fragmentB = escaping.member_name_for_urn(images[1].urn.value, volume.version, base_urn=volume.urn, use_unicode=True)
+
+                self.assertTrue(fragmentA.endswith("paper-hash_based_disk_imaging_using_aff4.pdf.frag.1"))
+                self.assertTrue(fragmentB.endswith("paper-hash_based_disk_imaging_using_aff4.pdf.frag.2"))
+
+                hasher = linear_hasher.LinearHasher2(resolver, self)
+                for image in volume.images():
+                    print("\t%s <%s>" % (image.name(), image.urn))
+                    hasher.hash(image)
 
         except:
             traceback.print_exc()

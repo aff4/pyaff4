@@ -24,9 +24,10 @@ import re
 import shutil
 import string
 import urllib.parse
-
+import pyaff4
 from pyaff4 import rdfvalue
 from pyaff4 import utils
+
 
 PRINTABLES = set(string.printable)
 for i in "!$\\:*%?\"<>|]":
@@ -134,13 +135,14 @@ def urn_from_member_name(member, base_urn, version):
     """Returns a URN object from a zip file's member name."""
     member = utils.SmartUnicode(member)
 
-    if version.isLessThanOrEqual(1, 0):
-        # Remove %xx escapes.
-        member = re.sub(
-            "%(..)", lambda x: chr(int("0x" + x.group(1), 0)),
-            member)
-    elif version.equals(1,1):
-        member = member.replace(" ", "%20")
+    if version != pyaff4.version.basic_zip:
+        if version.isLessThanOrEqual(1, 0):
+            # Remove %xx escapes.
+            member = re.sub(
+                "%(..)", lambda x: chr(int("0x" + x.group(1), 0)),
+                member)
+        elif version.equals(1,1):
+            member = member.replace(" ", "%20")
 
     # This is an absolute URN.
     if urllib.parse.urlparse(member).scheme == "aff4":
