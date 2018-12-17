@@ -253,15 +253,19 @@ class AFF4Map(aff4.AFF4Stream):
                         range.target_offset_at_map_offset(self.readptr))
 
                     buffer = target_stream.Read(length_to_read_in_target)
-                    assert len(buffer) == length_to_read_in_target
-                    result += buffer
+                    if buffer == None:
+                        bytes_read = 0
+                    else:
+                        bytes_read = len(buffer)
+                        result += buffer
+
             except IOError:
                 LOGGER.debug("*** Stream %s not found. Substituting zeros. ***",
                              target_stream)
                 result += b"\x00" * length_to_read_in_target
             finally:
-                length -= length_to_read_in_target
-                self.readptr += length_to_read_in_target
+                length -= bytes_read
+                self.readptr += bytes_read
 
         return result
 
@@ -526,11 +530,12 @@ class ByteRangeARN(aff4.AFF4Stream):
 
     def Read(self, length):
         result = b""
-        assert self.readptr == 0
+        if self.readptr >= self.length:
+            return None
         length_to_read_in_target = min(length, self.length)
         try:
             with self.resolver.AFF4FactoryOpen(self.target, version=self.version) as target_stream:
-                target_stream.Seek(self.offset)
+                target_stream.Seek(self.offset + self.readptr)
                 buffer = target_stream.Read(length_to_read_in_target)
                 assert len(buffer) == length_to_read_in_target
                 result += buffer

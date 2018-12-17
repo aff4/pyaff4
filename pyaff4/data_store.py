@@ -110,6 +110,8 @@ class AFF4ObjectCache(object):
             older_item.aff4_obj.Flush()
 
     def Put(self, aff4_obj, in_use_state=False):
+        if type(aff4_obj) == aff4_map.ByteRangeARN:
+            return
         key = aff4_obj.urn.SerializeToString()
         CHECK(key not in self.in_use,
               u"Object %s Put in cache while already in use." % utils.SmartUnicode(key))
@@ -149,6 +151,8 @@ class AFF4ObjectCache(object):
         return entry.aff4_obj
 
     def Return(self, aff4_obj):
+        if type(aff4_obj) == aff4_map.ByteRangeARN:
+            return
         key = aff4_obj.urn.SerializeToString()
         entry = self.in_use.get(key)
         CHECK(entry is not None,
@@ -499,12 +503,15 @@ class MemoryDataStore(object):
         if self.streamFactory.isSymbolicStream(urn):
             obj = self.streamFactory.createSymbolic(urn)
         elif urn.SerializeToString().startswith("aff4:sha512"):
+            # Don't use the cache for these as they are low cost
+            # and they will push aside heavier weight things
+            #bytestream_reference_id = self.Get(urn, urn, rdfvalue.URN(lexicon.standard.dataStream))
+            #cached_obj = self.ObjectCache.Get(bytestream_reference_id)
+            #if cached_obj:
+            #    cached_obj.Prepare()
+            #    return cached_obj
             bytestream_reference_id = self.Get(urn, urn, rdfvalue.URN(lexicon.standard.dataStream))
-            cached_obj = self.ObjectCache.Get(bytestream_reference_id)
-            if cached_obj:
-                cached_obj.Prepare()
-                return cached_obj
-            obj = aff4_map.ByteRangeARN(version, resolver=self, urn=bytestream_reference_id)
+            return aff4_map.ByteRangeARN(version, resolver=self, urn=bytestream_reference_id)
         else:
             uri_types = self.Get(lexicon.any, urn, lexicon.AFF4_TYPE)
 
@@ -526,6 +533,8 @@ class MemoryDataStore(object):
                 handler = registry.AFF4_TYPE_MAP.get(components.scheme)
 
             if handler is None:
+                if str(urn).endswith("paper-hash_based_disk_imaging_using_aff4.pdf.frag.2"):
+                    print()
                 raise IOError("Unable to create object %s" % urn)
 
             obj = handler(resolver=self, urn=urn, version=version)
