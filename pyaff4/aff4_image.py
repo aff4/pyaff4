@@ -222,9 +222,20 @@ class AFF4Image(aff4.AFF4Stream):
         elif self.compression == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
             compressed_chunk = chunk
 
-        self.bevy_index.append((bevy_offset, len(compressed_chunk)))
-        self.bevy.append(compressed_chunk)
-        self.bevy_length += len(compressed_chunk)
+        compressedLen = len(compressed_chunk)
+
+        if compressedLen < self.chunk_size - 16:
+            self.bevy_index.append((bevy_offset, compressedLen))
+            self.bevy.append(compressed_chunk)
+            self.bevy_length += compressedLen
+        else:
+            self.bevy_index.append((bevy_offset, self.chunk_size))
+            self.bevy.append(chunk)
+            self.bevy_length += self.chunk_size
+
+        #self.bevy_index.append((bevy_offset, len(compressed_chunk)))
+        #self.bevy.append(compressed_chunk)
+        #self.bevy_length += len(compressed_chunk)
         self.chunk_count_in_bevy += 1
 
         if self.chunk_count_in_bevy >= self.chunks_per_segment:
