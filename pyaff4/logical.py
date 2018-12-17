@@ -89,25 +89,26 @@ class FSMetadata(object):
 
 class ClassicUnixMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
-        super(UnixMetadata, self).__init__(urn, name, size)
+        super(ClassicUnixMetadata, self).__init__(urn, name, size)
         self.lastWritten = lastWritten
         self.lastAccessed = lastAccessed
         self.recordChanged = recordChanged
 
 
     def store(self, resolver):
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
 
 class ModernUnixMetadata(ClassicUnixMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
-        super(ModernUnixMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
+        super(ModernUnixMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged)
+        self.birthTime = birthTime
 
     def store(self, resolver):
         super(ModernUnixMetadata, self).store(resolver)
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
 class LinuxFSMetadata(ModernUnixMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
