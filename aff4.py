@@ -32,7 +32,7 @@ from pyaff4 import rdfvalue, hashes, utils
 from pyaff4 import block_hasher, data_store, linear_hasher, zip
 from pyaff4 import aff4_map
 
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
 VERBOSE = False
 TERSE = False
