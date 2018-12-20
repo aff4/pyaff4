@@ -102,7 +102,7 @@ class AFF4ImageTest(unittest.TestCase):
         # Now test snappy decompression.
         with resolver.AFF4FactoryOpen(self.image_urn_2) as image_2:
             self.assertEquals(
-                resolver.Get(zip_file.urn, image_2.urn, lexicon.AFF4_IMAGE_COMPRESSION),
+                resolver.GetUnique(zip_file.urn, image_2.urn, lexicon.AFF4_IMAGE_COMPRESSION),
                 lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY)
 
             data = image_2.Read(100)

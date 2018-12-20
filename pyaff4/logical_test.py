@@ -191,13 +191,13 @@ class LogicalTest(unittest.TestCase):
     def onInvalidHash(self, typ, hasha, hashb, streamURI):
         self.fail()
 
-    @unittest.skipIf(platform.system() == "Windows")
+    @unittest.skipIf(platform.system() == "Windows", "Only works on unix")
     def testFuzz(self):
         chunksize=512
         for length in [chunksize-1, chunksize, chunksize+1, chunksize*2-1, chunksize*2, chunksize*2+1, chunksize*1000, 0]:
             for maxSegmentResidentSize in [0, 1, chunksize-1, chunksize, chunksize+1]:
                 try:
-                    containerName = tempfile.gettempdir() + "/testfuzz-%d-%d.aff4" % (length, maxSegmentResidentSize)
+                    containerName = tempfile.gettempdir() + "/testfuzz-length-%d-maxresident%d.aff4" % (length, maxSegmentResidentSize)
                     print(containerName)
                     hasher = linear_hasher.PushHasher([lexicon.HASH_SHA1, lexicon.HASH_MD5])
 
@@ -205,7 +205,7 @@ class LogicalTest(unittest.TestCase):
                     with data_store.MemoryDataStore() as resolver:
                         with container.Container.createURN(resolver, container_urn) as volume:
                             volume.maxSegmentResidentSize = maxSegmentResidentSize
-                            with volume.newLogicalStream("/foo", 20) as writer:
+                            with volume.newLogicalStream("/foo", length) as writer:
                                 with open("/dev/random", "r") as randomStream:
                                     writer.chunk_size = chunksize
                                     writer_arn = writer.urn

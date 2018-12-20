@@ -38,7 +38,7 @@ class AFF4Directory(aff4.AFF4Volume):
         result.version = version
         result.root_path = root_urn.ToFilename()
 
-        mode = resolver.Get(lexicon.transient_graph, root_urn, lexicon.AFF4_STREAM_WRITE_MODE)
+        mode = resolver.GetUnique(lexicon.transient_graph, root_urn, lexicon.AFF4_STREAM_WRITE_MODE)
         if mode == "truncate":
             aff4_utils.RemoveDirectory(result.root_path)
 

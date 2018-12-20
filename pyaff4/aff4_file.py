@@ -40,7 +40,7 @@ class FileBackedObject(aff4.AFF4Stream):
         super(FileBackedObject, self).__init__( *args, **kwargs)
 
     def _GetFilename(self):
-        filename = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_FILE_NAME)
+        filename = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_FILE_NAME)
         if filename:
             return filename
 
@@ -86,7 +86,7 @@ class FileBackedObject(aff4.AFF4Stream):
         directory_components = os.sep.split(filename)
         directory_components.pop(-1)
 
-        mode = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE)
+        mode = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE)
         if mode == "truncate":
             flags = "w+b"
             self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE,

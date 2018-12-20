@@ -428,7 +428,7 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                 hashid = rdfvalue.URN("aff4:sha512:" + h.hexdigest())
 
                 # check if this hash is in the container already
-                existing_bytestream_reference_id =  self.resolver.Get(self.urn, hashid, rdfvalue.URN(lexicon.standard.dataStream))
+                existing_bytestream_reference_id =  self.resolver.GetUnique(lexicon.any, hashid, rdfvalue.URN(lexicon.standard.dataStream))
 
                 if existing_bytestream_reference_id == None:
                     block_stream_address = self.block_store_stream.Tell()

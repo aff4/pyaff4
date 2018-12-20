@@ -44,7 +44,7 @@ from pyaff4 import aff4_map
 from pyaff4 import escaping
 from pyaff4 import turtle
 from pyaff4.zip import ZIP_DEFLATE
-from pyaff4.lexicon import transient_graph
+from pyaff4.lexicon import transient_graph, any
 
 LOGGER = logging.getLogger("pyaff4")
 HAS_HDT = False
@@ -55,7 +55,7 @@ try:
 except:
     pass
 
-HAS_HDT = False
+#HAS_HDT = False
 def CHECK(condition, error):
     if not condition:
         raise RuntimeError(error)
@@ -510,10 +510,10 @@ class MemoryDataStore(object):
             #if cached_obj:
             #    cached_obj.Prepare()
             #    return cached_obj
-            bytestream_reference_id = self.Get(urn, urn, rdfvalue.URN(lexicon.standard.dataStream))
+            bytestream_reference_id = self.GetUnique(lexicon.any, urn, rdfvalue.URN(lexicon.standard.dataStream))
             return aff4_map.ByteRangeARN(version, resolver=self, urn=bytestream_reference_id)
         else:
-            uri_types = self.Get(lexicon.any, urn, lexicon.AFF4_TYPE)
+            uri_types = self.Get(lexicon.any, urn, rdfvalue.URN(lexicon.AFF4_TYPE))
 
             handler = None
 
@@ -613,6 +613,7 @@ class MemoryDataStore(object):
 
         store.setdefault(subject, {})[attribute] = value
 
+    # return a list of results
     def Get(self, graph, subject, attribute):
         subject = rdfvalue.URN(subject).SerializeToString()
         attribute = rdfvalue.URN(attribute).SerializeToString()
@@ -623,12 +624,29 @@ class MemoryDataStore(object):
             return utils.asList(resa, resb)
 
         elif graph == transient_graph:
-            return self.transient_store.get(subject, {}).get(attribute)
+            res = self.transient_store.get(subject, {}).get(attribute)
+            if isinstance(res, list):
+                return res
+            else:
+                return [res]
         else:
-            return self.store.get(subject, {}).get(attribute)
+            res = self.store.get(subject, {}).get(attribute)
+            if isinstance(res, list):
+                return res
+            else:
+                return [res]
 
-        #vals = store.get(subject, {})
-        #return vals.get(attribute)
+    # return a single result or None
+    def GetUnique(self, graph, subject, attribute):
+        res = self.Get(graph, subject, attribute)
+        if isinstance (res, list):
+            if len(res) == 1:
+                return res[0]
+            return None
+        elif isinstance(res, types.GeneratorType):
+            return list(res)
+        else:
+            return res
 
     def QuerySubject(self, graph, subject_regex=None):
         subject_regex = re.compile(utils.SmartStr(subject_regex))
@@ -686,8 +704,15 @@ class MemoryDataStore(object):
                         yield rdfvalue.URN(subject)
 
     def QuerySubjectPredicate(self, graph, subject, predicate):
-        subject = utils.SmartUnicode(subject)
-        predicate = utils.SmartUnicode(predicate)
+        if isinstance(subject, rdfvalue.URN):
+            subject = subject.SerializeToString()
+        else:
+            subject = utils.SmartUnicode(subject)
+
+        if isinstance(predicate, rdfvalue.URN):
+            predicate = predicate.SerializeToString()
+        else:
+            predicate = utils.SmartUnicode(predicate)
 
         if graph == lexicon.any or graph == None:
             storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
@@ -757,7 +782,6 @@ class HDTAssistedDataStore(MemoryDataStore):
 
             try:
                 with zip.OpenZipSegment("information.turtle") as fd:
-                    print(dir(temp))
                     streams.WriteAll(fd, temp)
                 temp.close()
             except Exception as e:
@@ -783,7 +807,6 @@ class HDTAssistedDataStore(MemoryDataStore):
 
             try:
                 with zip.OpenZipSegment("information.turtle") as fd:
-                    print(dir(temp))
                     streams.WriteAll(fd, temp)
                 temp.close()
             except Exception as e:
@@ -865,7 +888,7 @@ class HDTAssistedDataStore(MemoryDataStore):
             # the persisted graph and the transient graph. The set lets us remove duplicates
             res = set(self.QuerySubjectPredicate(graph, subject, attribute))
             if len(res) == 1:
-                return list(res)[0]
+                return list(res)
             return list(res)
 
     def QuerySubjectPredicate(self, graph, subject, predicate):
@@ -875,8 +898,19 @@ class HDTAssistedDataStore(MemoryDataStore):
         if self.hdt == None:
             return
 
-        subject = utils.SmartUnicode(subject)
-        predicate = utils.SmartUnicode(predicate)
+        if graph == transient_graph:
+            return
+
+        if isinstance(subject, rdfvalue.URN):
+            subject = subject.SerializeToString()
+        else:
+            subject = utils.SmartUnicode(subject)
+
+        if isinstance(predicate, rdfvalue.URN):
+            predicate = predicate.SerializeToString()
+        else:
+            predicate = utils.SmartUnicode(predicate)
+
         (triples, cardinality) = self.hdt.search_triples(subject, predicate, "")
 
         for (s,p,o) in triples:

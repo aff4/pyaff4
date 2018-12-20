@@ -39,7 +39,7 @@ class DataStoreTest(unittest.TestCase):
             rdfvalue.XSDString("bar"))
 
     def testDataStore(self):
-        result = self.store.Get(None,self.hello_urn, rdfvalue.URN(
+        result = self.store.GetUnique(None,self.hello_urn, rdfvalue.URN(
             lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY))
         self.assertEquals(type(result), rdfvalue.XSDString)
 
@@ -52,7 +52,7 @@ class DataStoreTest(unittest.TestCase):
         # In the current implementation a second Set() overwrites the previous
         # value.
         self.assertEquals(
-            self.store.Get(None,self.hello_urn, rdfvalue.URN(
+            self.store.GetUnique(None,self.hello_urn, rdfvalue.URN(
                 lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY)),
             rdfvalue.XSDString("bar"))
 
@@ -61,7 +61,7 @@ class DataStoreTest(unittest.TestCase):
         new_store = data_store.MemoryDataStore()
         stream = io.BytesIO(data.encode('utf-8'))
         new_store.LoadFromTurtle(stream, None)
-        res = new_store.Get(None,self.hello_urn, rdfvalue.URN(
+        res = new_store.GetUnique(None,self.hello_urn, rdfvalue.URN(
             lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY))
         self.assertEquals(res, b"foo")
 

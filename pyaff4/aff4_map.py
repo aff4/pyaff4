@@ -247,6 +247,7 @@ class AFF4Map(aff4.AFF4Stream):
             target = self.targets[range.target_id]
             length_to_read_in_target = min(length, range.map_end - self.readptr)
 
+            bytes_read = 0
             try:
                 with self.resolver.AFF4FactoryOpen(target, version=self.version) as target_stream:
                     target_stream.Seek(
@@ -345,7 +346,7 @@ class AFF4Map(aff4.AFF4Stream):
     def Flush(self):
         if self.IsDirty():
             # Get the volume we are stored on.
-            volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
             with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
                 with volume.CreateMember(self.urn.Append("map")) as map_stream:
                     for interval in self.tree:
@@ -403,8 +404,8 @@ class AFF4Map(aff4.AFF4Stream):
 
         except IOError:
             # If the backing stream does not already exist, we make one.
-            volume_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-            compression_urn = self.resolver.Get(volume_urn,
+            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            compression_urn = self.resolver.GetUnique(volume_urn,
                 target, lexicon.AFF4_IMAGE_COMPRESSION)
 
             LOGGER.info("Stream will be compressed with %s", compression_urn)

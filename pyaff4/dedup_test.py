@@ -14,7 +14,9 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from pyaff4 import data_store, container, logical
+from pyaff4 import data_store
+from pyaff4 import container
+from pyaff4 import logical
 from pyaff4 import escaping
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue

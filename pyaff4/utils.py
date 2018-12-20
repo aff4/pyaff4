@@ -71,16 +71,28 @@ def AssertUnicode(string):
 # TODO. This is so ugly. Need to go through and fix all calls to Get to make
 # sure they are expecting an array or generator in response
 def asList(a, b):
+    a_islist = isinstance(a, list)
+    b_islist = isinstance(b, list)
+
     if a == None:
-        return b
+        if b_islist:
+            return b
+        else:
+            return [b]
     elif b == None:
-        return a
-    else:
-        if isinstance(a, list):
-            a.append(b)
+        if a_islist:
             return a
-        elif isinstance(b, list):
+        else:
+            return [a]
+    else:
+        if a_islist and b_islist:
+            a.extend(b)
+            return a
+        elif b_islist:
             b.append(a)
             return b
+        elif a_islist:
+            a.append(b)
+            return a
         else:
             return [a,b]

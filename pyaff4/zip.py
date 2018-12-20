@@ -417,7 +417,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
     compression_method = ZIP_STORED
 
     def LoadFromURN(self):
-        owner_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(owner_urn, version=self.version) as owner:
             self.LoadFromZipFile(owner)
 
@@ -483,7 +483,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
                 raise NotImplementedError()
 
     def WriteStream(self, stream, progress=None):
-        owner_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
             owner.StreamAddMember(
                 self.urn, stream, compression_method=self.compression_method,
@@ -491,7 +491,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
     def Flush(self):
         if self.IsDirty():
-            owner_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
             with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
                 self.Seek(0)
 
@@ -795,7 +795,7 @@ class BasicZipFile(aff4.AFF4Volume):
         return self.resolver.CachePut(result)
 
     def LoadFromURN(self):
-        self.backing_store_urn = self.resolver.Get(lexicon.transient_graph,
+        self.backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph,
             self.urn, lexicon.AFF4_STORED)
 
         if not self.backing_store_urn:
@@ -826,7 +826,7 @@ class BasicZipFile(aff4.AFF4Volume):
         if progress is None:
             progress = aff4.EMPTY_PROGRESS
 
-        backing_store_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
             LOGGER.info("Writing member %s", member_urn)
 
@@ -910,7 +910,7 @@ class BasicZipFile(aff4.AFF4Volume):
         super(BasicZipFile, self).Flush()
 
     def write_zip64_CD(self):
-        backing_store_urn = self.resolver.Get(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
             # We write to a memory stream first, and then copy it into the
             # backing_store at once. This really helps when we have lots of
