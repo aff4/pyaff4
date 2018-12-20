@@ -33,7 +33,7 @@ from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import struct_parser
 from pyaff4 import utils, escaping
-from pyaff4.version import Version
+from pyaff4.version import Version, basic_zip
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -565,7 +565,7 @@ class BasicZipFile(aff4.AFF4Volume):
             # URN and then create a new ZipFile volume. After parsing the
             # central directory we discover our URN and therefore we can delete
             # the old, randomly selected URN.
-            if urn_string and self.urn != urn_string:
+            if urn_string and self.urn != urn_string and self.version != basic_zip :
                 self.resolver.DeleteSubject(self.urn)
                 self.urn.Set(utils.SmartUnicode(urn_string))
 
