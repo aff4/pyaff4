@@ -804,7 +804,8 @@ class HDTAssistedDataStore(MemoryDataStore):
     def createHDTviaLib(self, zip, cached_turtle):
         try:
             temp = tempfile.NamedTemporaryFile(delete=False)
-
+            LOGGER.debug("Creating HDT index %s" % cached_turtle)
+            LOGGER.debug("Creating temp turtle file for import %s" % temp.name)
             try:
                 with zip.OpenZipSegment("information.turtle") as fd:
                     streams.WriteAll(fd, temp)
