@@ -772,34 +772,8 @@ class HDTAssistedDataStore(MemoryDataStore):
         cached_turtle_index = cached_turtle + ".index.v1-1"
         for f in [cached_turtle, cached_turtle_index]:
             if os.path.exists(f):
+                LOGGER.debug("Invalidating HDT index %s" % f)
                 os.unlink(f)
-
-    def createHDTviaShell(self, zip, cached_turtle):
-        try:
-
-            rdf2hdt = "/usr/local/bin/rdf2hdt"
-            temp = tempfile.NamedTemporaryFile(delete=False)
-
-            try:
-                with zip.OpenZipSegment("information.turtle") as fd:
-                    streams.WriteAll(fd, temp)
-                temp.close()
-            except Exception as e:
-                # no turtle yet
-                return
-
-            try:
-                cmd = rdf2hdt + " -f turtle " + temp.name + " " + cached_turtle
-                retcode = subprocess.call(cmd, shell=True)
-                if retcode < 0:
-                    print("rdf2hdt failed", -retcode, file=sys.stderr)
-                else:
-                    pass
-            except OSError as e:
-                print("Execution failed:", e, file=sys.stderr)
-            os.unlink(temp.name)
-        except:
-            raise Exception("rdf2dht failed. Please make data_store.HAS_HDT=False until this is fixed. ")
 
     def createHDTviaLib(self, zip, cached_turtle):
         try:
@@ -833,6 +807,12 @@ class HDTAssistedDataStore(MemoryDataStore):
     def loadMetadata(self, zip):
         # Load the turtle metadata.
         aff4cache = os.path.join(expanduser("~"), ".aff4")
+        if not os.path.exists(aff4cache):
+            try:
+                os.makedirs(aff4cache)
+            except OSError as exc:  # Guard against race condition
+                if exc.errno != errno.EEXIST:
+                    raise
         cached_turtle = os.path.join(aff4cache, "%s.hdt" % str(zip.urn)[7:])
         if not os.path.exists(cached_turtle):
             self.createHDTviaLib(zip, cached_turtle)
