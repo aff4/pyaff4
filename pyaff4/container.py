@@ -225,6 +225,13 @@ class Container(object):
 
                         return PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
 
+    def containsLogicalImage(self, pathfragment):
+        arn = self.urn.Append(escaping.arnPathFragment_from_path(pathfragment), quote=False)
+        types = self.resolver.Get(lexicon.any, arn, lexicon.AFF4_TYPE)
+        if lexicon.standard11.FileImage in types:
+            return True
+        else:
+            return False
 
     def __enter__(self):
         return self

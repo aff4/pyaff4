@@ -195,6 +195,7 @@ def ingestZipfile(container_name, zipfile, append):
 
         with volume as volume:
             filename_arn = rdfvalue.URN.FromFileName(zipfile)
+
             # the following coaxes our ZIP implementation to treat this file
             # as a regular old zip
             result = zip.BasicZipFile(resolver, urn=None, version=version.basic_zip)
@@ -210,6 +211,10 @@ def ingestZipfile(container_name, zipfile, append):
                     with resolver.AFF4FactoryOpen(member, version=version.aff4v10) as src:
 
                         hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
+                        if volume.containsLogicalImage(pathname):
+                            print("\tCollision: this ARN is already present in this volume.")
+                            continue
+
                         urn = volume.writeLogicalStreamHashBased(pathname, hasher, info.file_size)
                         #fsmeta.urn = urn
                         #fsmeta.store(resolver)
