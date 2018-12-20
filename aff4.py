@@ -23,11 +23,13 @@ from builtins import object
 
 import argparse
 import sys, os, errno, shutil, uuid
+import time
 
 from pyaff4 import container, version
 from pyaff4 import lexicon, logical, escaping
 from pyaff4 import rdfvalue, hashes, utils
 from pyaff4 import block_hasher, data_store, linear_hasher, zip
+from pyaff4 import aff4_map
 
 
 VERBOSE = False
@@ -45,14 +47,27 @@ def meta(file):
     except:
         pass
 
+    for image in volume.images():
+        print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
+        with resolver.AFF4FactoryOpen(image.urn) as srcStream:
+            if type(srcStream) == aff4_map.AFF4Map2:
+                source_ranges = sorted(srcStream.tree)
+                for n in source_ranges:
+                    d = n.data
+                    print("\t\t[%x,%x] -> %s[%x,%x]" % (d.map_offset, d.length, srcStream.targets[d.target_id], d.target_offset, d.length))
+
 
 def list(file):
+    start = time.time()
     volume = container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file))
 
+    print("Finished in %d (s)" % int(time.time() - start))
     if issubclass(volume.__class__, container.PhysicalImageContainer):
         printDiskImageInfo(file, volume)
     elif issubclass(volume.__class__, container.LogicalImageContainer):
         printLogicalImageInfo(file, volume)
+
+
 
 def printLogicalImageInfo(file, volume):
     printVolumeInfo(file, volume)
@@ -160,6 +175,7 @@ def verify(file):
 
 def ingestZipfile(container_name, zipfile, append):
     # TODO: check path in exists
+    start = time.time()
     with data_store.MemoryDataStore() as resolver:
         basefilename = os.path.basename(zipfile)
         if basefilename.endswith(".bag.zip"):
@@ -201,6 +217,7 @@ def ingestZipfile(container_name, zipfile, append):
                             hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
                             resolver.Add(container_urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
 
+        print ("Finished in %d (s)" % int(time.time() - start))
         return urn
 
 def addPathNames(container_name, pathnames, recursive, append, hashbased):
