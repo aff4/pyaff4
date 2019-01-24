@@ -22,6 +22,7 @@ import intervaltree
 import logging
 import struct
 import sys
+import traceback
 
 from pyaff4 import aff4
 from pyaff4 import aff4_image
@@ -159,7 +160,7 @@ class _MapStreamHelper(object):
             # Read and copy the data.
             source_urn = self.source.targets[current_range.target_id]
             with self.resolver.AFF4FactoryOpen(source_urn) as source:
-                source.Seek(current_range.target_offset + self.range_offset)
+                source.SeekRead(current_range.target_offset + self.range_offset)
 
                 data = source.Read(to_read)
                 if not data:
@@ -227,6 +228,7 @@ class AFF4Map(aff4.AFF4Stream):
 
 
         except IOError:
+            traceback.print_exc()
             pass
 
     def Read(self, length):
@@ -250,7 +252,7 @@ class AFF4Map(aff4.AFF4Stream):
             bytes_read = 0
             try:
                 with self.resolver.AFF4FactoryOpen(target, version=self.version) as target_stream:
-                    target_stream.Seek(
+                    target_stream.SeekRead(
                         range.target_offset_at_map_offset(self.readptr))
 
                     buffer = target_stream.Read(length_to_read_in_target)
@@ -261,6 +263,7 @@ class AFF4Map(aff4.AFF4Stream):
                         result += buffer
 
             except IOError:
+                traceback.print_exc()
                 LOGGER.debug("*** Stream %s not found. Substituting zeros. ***",
                              target_stream)
                 result += b"\x00" * length_to_read_in_target
@@ -358,18 +361,22 @@ class AFF4Map(aff4.AFF4Stream):
                         [x.SerializeToString().encode("utf-8") for x in self.targets]))
 
                 self.resolver.Close(idx_stream)
-                for target in self.targets:
-                    # for cross containterne references, opening the target wont work
-                    # so we enclose this in a try/catch
-                    try:
-                        # dont do this for hash references
-                        if target.SerializeToString().startswith("aff4:sha512"):
-                            continue
-                        with self.resolver.AFF4FactoryOpen(target) as stream:
-                            pass
-                        self.resolver.Close(stream)
-                    except:
-                        pass
+                #for target in self.targets:
+                #    # for cross containterne references, opening the target wont work
+                #    # so we enclose this in a try/catch
+                #    try:
+                #        # dont do this for hash references
+                #        if target.SerializeToString().startswith("aff4:sha512"):
+                #            continue
+                #
+                #        # Looks like the following is API misuse - we should let the Close happen automatically
+                #        #with self.resolver.AFF4FactoryOpen(target) as stream:
+                #        #    traceback.print_exc()
+                #        #    pass
+                #        #self.resolver.Close(stream)
+                #    except:
+                #        traceback.print_exc()
+                #        pass
 
 
         return super(AFF4Map, self).Flush()
@@ -427,13 +434,13 @@ class AFF4Map(aff4.AFF4Stream):
 
         target = self.GetBackingStream()
         with self.resolver.AFF4FactoryOpen(target) as stream:
-            self.AddRange(self.readptr, stream.Size(), len(data), target)
+            self.AddRange(self.writeptr, stream.Size(), len(data), target)
 
             # Append the data on the end of the stream.
-            stream.Seek(stream.Size())
+            stream.SeekWrite(stream.Size())
             stream.Write(data)
 
-            self.readptr += len(data)
+            self.writeptr += len(data)
 
         return len(data)
 
@@ -515,6 +522,22 @@ class AFF4Map2(AFF4Map):
             # we get IOErrors here on creation from scratch. This is safe and expected.
             pass
 
+def isByteRangeARN(urn):
+    if not urn.startswith("aff4://"):
+        return False
+    if not urn.endswith("]"):
+        return False
+    try:
+        (target, rangepair) = urn.split("[")
+        rangepair = rangepair[0:len(rangepair) - 1]
+        (offset, length) = rangepair.split(":")
+
+        offset = int(offset, 16)
+        length = int(length, 16)
+        return True
+    except:
+        return False
+
 class ByteRangeARN(aff4.AFF4Stream):
 
     def __init__(self, version, resolver=None, urn=None):
@@ -536,7 +559,9 @@ class ByteRangeARN(aff4.AFF4Stream):
         length_to_read_in_target = min(length, self.length)
         try:
             with self.resolver.AFF4FactoryOpen(self.target, version=self.version) as target_stream:
-                target_stream.Seek(self.offset + self.readptr)
+                #if target_stream.IsDirty():
+                #    target_stream.FlushBuffers()
+                target_stream.SeekRead(self.offset + self.readptr)
                 buffer = target_stream.Read(length_to_read_in_target)
                 assert len(buffer) == length_to_read_in_target
                 result += buffer

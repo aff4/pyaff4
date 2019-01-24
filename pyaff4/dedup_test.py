@@ -64,7 +64,7 @@ class DedupeTest(unittest.TestCase):
             with container.Container.createURN(resolver, container_urn) as volume:
                 with open(frag1path, "rb") as src:
                     stream = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1])
-                    urn = volume.writeLogicalStreamHashBased(frag1path, stream, 32768)
+                    urn = volume.writeLogicalStreamHashBased(frag1path, stream, 32768, False)
                     for h in stream.hashes:
                         hh = hashes.newImmutableHash(h.hexdigest(), stream.hashToType[h])
                         self.assertEqual("deb3fa3b60c6107aceb97f684899387c78587eae", hh.value)
@@ -75,7 +75,7 @@ class DedupeTest(unittest.TestCase):
             with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
                 with open(frag2path, "rb") as src:
                     stream = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5 ])
-                    urn = volume.writeLogicalStreamHashBased(frag2path, stream, 2*32768)
+                    urn = volume.writeLogicalStreamHashBased(frag2path, stream, 2*32768, False)
                     for h in stream.hashes:
                         hh = hashes.newImmutableHash(h.hexdigest(), stream.hashToType[h])
                         resolver.Add(volume.urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)

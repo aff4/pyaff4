@@ -104,11 +104,11 @@ class ReferenceTest(unittest.TestCase):
                     self.assertEquals(629087, image.Size())
 
                     # read the header of the virtual file
-                    image.Seek(0, 0)
+                    image.SeekRead(0, 0)
                     self.assertEquals(b"%PDF", image.Read(4))
 
                     # read the whole virtual file and compare with a known hash of it
-                    image.Seek(0, 0)
+                    image.SeekRead(0, 0)
                     buf = image.Read(629087)
                     hash = hashes.new(lexicon.HASH_SHA1)
                     hash.update(buf)

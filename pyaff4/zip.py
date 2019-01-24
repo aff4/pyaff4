@@ -291,7 +291,7 @@ class ZipInfo(object):
 
     def WriteFileHeader(self, backing_store):
         if self.file_header_offset is None:
-            self.file_header_offset = backing_store.Tell()
+            self.file_header_offset = backing_store.TellWrite()
 
         encodedFilename = self.filename
         if USE_UNICODE:
@@ -323,7 +323,7 @@ class ZipInfo(object):
         if not extra_header_64.empty():
             header.extra_field_len = extra_header_64.sizeof()
 
-        backing_store.Seek(self.file_header_offset)
+        backing_store.SeekWrite(self.file_header_offset)
         backing_store.Write(header.Pack())
         backing_store.write(encodedFilename)
 
@@ -432,7 +432,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
         backing_store_urn = owner.backing_store_urn
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
-            backing_store.Seek(
+            backing_store.SeekRead(
                 zip_info.local_header_offset + owner.global_offset, 0)
             file_header = ZipFileHeader(
                 backing_store.Read(ZipFileHeader.sizeof()))
@@ -457,7 +457,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
                 LOGGER.error(msg)
                 raise IOError(msg)
 
-            backing_store.Seek(file_header.extra_field_len, aff4.SEEK_CUR)
+            backing_store.SeekRead(file_header.extra_field_len, aff4.SEEK_CUR)
 
             buffer_size = zip_info.file_size
             self.length = zip_info.file_size
@@ -476,7 +476,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
             elif file_header.compression_method == ZIP_STORED:
                 # Otherwise we map a slice into it.
                 self.fd = FileWrapper(self.resolver, backing_store_urn,
-                                      backing_store.Tell(), buffer_size)
+                                      backing_store.TellRead(), buffer_size)
 
             else:
                 LOGGER.info("Unsupported compression method.")
@@ -493,7 +493,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
         if self.IsDirty():
             owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
             with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
-                self.Seek(0)
+                self.SeekRead(0)
 
                 # Copy ourselves into the owner.
                 owner.StreamAddMember(
@@ -528,9 +528,9 @@ class BasicZipFile(aff4.AFF4Volume):
             # Find the End of Central Directory Record - We read about 4k of
             # data and scan for the header from the end, just in case there is
             # an archive comment appended to the end.
-            backing_store.Seek(-BUFF_SIZE, 2)
+            backing_store.SeekRead(-BUFF_SIZE, 2)
 
-            ecd_real_offset = backing_store.Tell()
+            ecd_real_offset = backing_store.TellRead()
             buffer = backing_store.Read(BUFF_SIZE)
 
             end_cd, buffer_offset = EndCentralDirectory.FromBuffer(buffer)
@@ -541,7 +541,7 @@ class BasicZipFile(aff4.AFF4Volume):
 
             # Fetch the volume comment.
             if end_cd.comment_len > 0:
-                backing_store.Seek(ecd_real_offset + end_cd.sizeof())
+                backing_store.SeekRead(ecd_real_offset + end_cd.sizeof())
                 urn_string = utils.SmartUnicode(backing_store.Read(end_cd.comment_len))
 
                 # trim trailing null if there
@@ -597,7 +597,7 @@ class BasicZipFile(aff4.AFF4Volume):
             # This is a 64 bit archive, find the Zip64EndCD.
             else:
                 locator_real_offset = ecd_real_offset - Zip64CDLocator.sizeof()
-                backing_store.Seek(locator_real_offset, 0)
+                backing_store.SeekRead(locator_real_offset, 0)
                 locator = Zip64CDLocator(
                     backing_store.Read(Zip64CDLocator.sizeof()))
 
@@ -610,7 +610,7 @@ class BasicZipFile(aff4.AFF4Volume):
                 # the offset_of_cd field will not be valid, as it still points
                 # to the old offset. In this case we also need to know the
                 # global shift.
-                backing_store.Seek(
+                backing_store.SeekRead(
                     locator_real_offset - Zip64EndCD.sizeof(), 0)
 
                 end_cd = Zip64EndCD(
@@ -638,7 +638,7 @@ class BasicZipFile(aff4.AFF4Volume):
             # Now iterate over the directory and read all the ZipInfo structs.
             entry_offset = directory_offset
             for _ in range(directory_number_of_entries):
-                backing_store.Seek(entry_offset + self.global_offset, 0)
+                backing_store.SeekRead(entry_offset + self.global_offset, 0)
                 entry = CDFileHeader(
                     backing_store.Read(CDFileHeader.sizeof()))
 
@@ -831,12 +831,12 @@ class BasicZipFile(aff4.AFF4Volume):
             LOGGER.info("Writing member %s", member_urn)
 
             # Append member at the end of the file.
-            backing_store.Seek(0, aff4.SEEK_END)
+            backing_store.SeekWrite(0, aff4.SEEK_END)
 
             # zip_info offsets are relative to the start of the zip file (take
             # global_offset into account).
             zip_info = ZipInfo(
-                local_header_offset=backing_store.Tell() - self.global_offset,
+                local_header_offset=backing_store.TellWrite() - self.global_offset,
                 filename=escaping.member_name_for_urn(member_urn, self.version, self.urn, use_unicode=USE_UNICODE),
                 file_size=0, crc32=0, compression_method=compression_method)
 
@@ -918,10 +918,10 @@ class BasicZipFile(aff4.AFF4Volume):
             cd_stream = io.BytesIO()
 
             # Append a new central directory to the end of the zip file.
-            backing_store.Seek(0, aff4.SEEK_END)
+            backing_store.SeekWrite(0, aff4.SEEK_END)
 
             # The real start of the ECD.
-            ecd_real_offset = backing_store.Tell()
+            ecd_real_offset = backing_store.TellWrite()
 
             total_entries = len(self.members)
             for urn, zip_info in list(self.members.items()):

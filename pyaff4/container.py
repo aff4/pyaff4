@@ -410,7 +410,7 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
         self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, block_store_stream_id, self.urn)
         self.block_store_stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
 
-    def writeLogicalStreamHashBased(self, filename, readstream, length):
+    def writeLogicalStreamHashBased(self, filename, readstream, length, check_bytes):
         logical_file_id = None
         if self.isAFF4Collision(filename):
             logical_file_id = rdfvalue.URN("aff4://%s" % uuid.uuid4())
@@ -438,7 +438,7 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                 existing_bytestream_reference_id =  self.resolver.GetUnique(lexicon.any, hashid, rdfvalue.URN(lexicon.standard.dataStream))
 
                 if existing_bytestream_reference_id == None:
-                    block_stream_address = self.block_store_stream.Tell()
+                    block_stream_address = self.block_store_stream.TellWrite()
                     self.block_store_stream.Write(chunk)
 
                     chunk_reference_id = self.block_store_stream.urn.SerializeToString() + "[0x%x:0x%x]" % (block_stream_address, chunk_size)
@@ -448,7 +448,30 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                     logical_file_map.AddRange(file_offset, 0, toread, hashid)
                     #print("[%x, %x] -> %s -> %s" % (file_offset, toread, hashid, chunk_reference_id))
                 else:
-                    logical_file_map.AddRange(file_offset, 0, toread, hashid)
+                    if check_bytes:
+                        with self.resolver.AFF4FactoryOpen(existing_bytestream_reference_id) as existing_chunk_stream:
+                            existing_chunk_length = existing_chunk_stream.length
+                            existing_chunk = existing_chunk_stream.Read(existing_chunk_length)
+
+                            if chunk != existing_chunk:
+                                # we hit the jackpot and found a hash collision
+                                # in this highly unlikely event, we store the new bytes using regular logical
+                                # imaging. To record the collision, we add the colliding stream as a property
+                                print("!!!Collision found for hash %s" % hashid)
+                                block_stream_address = self.block_store_stream.TellWrite()
+                                self.block_store_stream.Write(chunk)
+
+                                chunk_reference_id = self.block_store_stream.urn.SerializeToString() + "[0x%x:0x%x]" % (
+                                block_stream_address, chunk_size)
+                                chunk_reference_id = rdfvalue.URN(chunk_reference_id)
+                                logical_file_map.AddRange(file_offset, block_stream_address, chunk_size, self.block_store_stream.urn)
+
+                                self.resolver.Add(self.urn, hashid, rdfvalue.URN(lexicon.standard11.collidingDataStream),
+                                                  chunk_reference_id)
+                            else:
+                                logical_file_map.AddRange(file_offset, 0, toread, hashid)
+                    else:
+                        logical_file_map.AddRange(file_offset, 0, toread, hashid)
                     #print("[%x, %x] -> %s -> %s" % (file_offset, toread, hashid, existing_bytestream_reference_id))
 
                 file_offset += toread

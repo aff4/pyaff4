@@ -32,7 +32,7 @@ from pyaff4 import rdfvalue, hashes, utils
 from pyaff4 import block_hasher, data_store, linear_hasher, zip
 from pyaff4 import aff4_map
 
-#logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.DEBUG)
 
 VERBOSE = False
 TERSE = False
@@ -176,7 +176,7 @@ def verify(file):
             print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
             hasher.hash(image)
 
-def ingestZipfile(container_name, zipfile, append):
+def ingestZipfile(container_name, zipfile, append, check_bytes):
     # TODO: check path in exists
     start = time.time()
     with data_store.MemoryDataStore() as resolver:
@@ -218,7 +218,7 @@ def ingestZipfile(container_name, zipfile, append):
                             print("\tCollision: this ARN is already present in this volume.")
                             continue
 
-                        urn = volume.writeLogicalStreamHashBased(pathname, hasher, info.file_size)
+                        urn = volume.writeLogicalStreamHashBased(pathname, hasher, info.file_size, check_bytes)
                         #fsmeta.urn = urn
                         #fsmeta.store(resolver)
                         for h in hasher.hashes:
@@ -368,6 +368,8 @@ def main(argv):
                         help='extract ALL objects from the container')
     parser.add_argument('-H', "--hash", action="store_true",
                         help='use hash based imaging for storing content')
+    parser.add_argument('-p', "--paranoid", action="store_true",
+                        help='do a byte-for-byte comparison when matching hashes are found with hash based imaging')
     parser.add_argument('-a', "--append", action="store_true",
                         help='append to an existing image')
     parser.add_argument('-i', "--ingest", action="store_true",
@@ -402,7 +404,7 @@ def main(argv):
         extractAll(dest, args.srcFiles[0])
     elif args.ingest == True:
         dest = args.aff4container
-        ingestZipfile(dest, args.srcFiles[0], False)
+        ingestZipfile(dest, args.srcFiles[0], False, args.paranoid)
 
 
 if __name__ == "__main__":

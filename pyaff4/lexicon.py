@@ -195,6 +195,7 @@ class Std11Lexicon(StdLexicon):
     recordChanged = (AFF4_NAMESPACE + "recordChanged")
     birthTime = (AFF4_NAMESPACE + "birthTime")
     pathName = (AFF4_NAMESPACE + "originalFileName")
+    collidingDataStream = (AFF4_NAMESPACE + "collidingDataStream")
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE

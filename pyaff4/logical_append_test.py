@@ -72,7 +72,7 @@ class LogicalAppendTest(unittest.TestCase):
                     with volume.resolver.AFF4FactoryOpen(images[1].urn) as fd:
                         index = 0
                         while index < 110000:
-                            fd.Seek(index)
+                            fd.SeekRead(index)
                             bufa = fd.Read(1000)
                             largedata.seek(index)
                             bufb = largedata.read(1000)

@@ -184,7 +184,7 @@ class AFF4Image(aff4.AFF4Stream):
                 # Make another bevy.
                 self.bevy_number += 1
                 self.size += stream.size
-                self.readptr += stream.size
+                self.writeptr += stream.size
 
                 # Last iteration - the compressor stream quit before the bevy is
                 # full.
@@ -206,20 +206,17 @@ class AFF4Image(aff4.AFF4Stream):
         if idx > 0:
             self.buffer = self.buffer[idx:]
 
-        self.readptr += len(data)
-        if self.readptr > self.size:
-            self.size = self.readptr
+        self.writeptr += len(data)
+        if self.writeptr > self.size:
+            self.size = self.writeptr
 
         return len(data)
 
     def FlushChunk(self, chunk):
-        bevy_offset = self.bevy_length
+        if len(chunk) == 0:
+            return
 
-        # if the data is sub chunk sized, pad with zeros
-        # (this generally only happens for the last chunk in the image stream)
-        if len(chunk) != self.chunk_size:
-            topad = self.chunk_size - (self.size % self.chunk_size)
-            chunk += b"\x00" * topad
+        bevy_offset = self.bevy_length
 
         if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_ZLIB:
             compressed_chunk = zlib.compress(chunk)
@@ -245,6 +242,7 @@ class AFF4Image(aff4.AFF4Stream):
         #self.bevy_length += len(compressed_chunk)
         self.chunk_count_in_bevy += 1
 
+        #self.buffer = chunk[self.chunk_size:]
         if self.chunk_count_in_bevy >= self.chunks_per_segment:
             self._FlushBevy()
 
@@ -293,10 +291,40 @@ class AFF4Image(aff4.AFF4Stream):
             self.urn, lexicon.AFF4_IMAGE_COMPRESSION,
             rdfvalue.URN(self.compression))
 
+    def FlushBuffers(self):
+        if self.IsDirty():
+            # Flush the last chunk.
+            chunk = self.buffer
+            chunkSize = len(chunk)
+            if chunkSize <= self.chunk_size:
+                topad = 0
+                # if the data is sub chunk sized, pad with zeros
+                # (this generally only happens for the last chunk in the image stream)
+                if len(chunk) != self.chunk_size:
+                    topad = self.chunk_size - (self.size % self.chunk_size)
+                    chunk += b"\x00" * topad
+
+                self.FlushChunk(chunk)
+                self.buffer = b""
+                self.writeptr += topad
+
+            else:
+                raise Exception("Illegal state")
+
     def Flush(self):
         if self.IsDirty():
             # Flush the last chunk.
-            self.FlushChunk(self.buffer)
+            # If it is sub chunk-size it out to chunk_size
+            chunk = self.buffer
+            chunkSize = len(chunk)
+            if chunkSize <= self.chunk_size:
+                # if the data is sub chunk sized, pad with zeros
+                # (this generally only happens for the last chunk in the image stream)
+                topad = self.chunk_size - (self.size % self.chunk_size)
+                chunk += b"\x00" * topad
+
+            self.FlushChunk(chunk)
+
             self._FlushBevy()
 
             self._write_metadata()
@@ -398,6 +426,7 @@ class AFF4Image(aff4.AFF4Stream):
         result = b""
 
         while chunks_to_read > 0:
+
             r = self.cache.get(chunk_id)
             if r != None:
                 result += r
@@ -405,6 +434,26 @@ class AFF4Image(aff4.AFF4Stream):
                 chunk_id += 1
                 chunks_read += 1
                 continue
+
+            if self._dirty:
+                # try reading directly from the yet-to-be persisted bevvy
+                if chunk_id < self.chunk_count_in_bevy:
+                    r = self.bevy[chunk_id]
+                    result += self.doDecompress(r)
+                    chunks_to_read -= 1
+                    chunk_id += 1
+                    chunks_read += 1
+                    continue
+
+                # try reading from the write buffer
+                if chunk_id == self.chunk_count_in_bevy:
+                    if len(self.buffer) == self.chunk_size:
+                        r = self.buffer
+                        result += r
+                        chunks_to_read -= 1
+                        chunk_id += 1
+                        chunks_read += 1
+                        continue
 
 
             bevy_id = old_div(chunk_id, self.chunks_per_segment)
@@ -453,30 +502,39 @@ class AFF4Image(aff4.AFF4Stream):
 
         # The index is a list of (offset, compressed_length)
         chunk_offset, chunk_size = bevy_index[chunk_id_in_bevy]
-        bevy.Seek(chunk_offset, 0)
+        bevy.SeekRead(chunk_offset, 0)
         cbuffer = bevy.Read(chunk_size)
+
+        return self.doDecompress(cbuffer)
+
+    def doDecompress(self, cbuffer):
+
         if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_ZLIB :
             if len(cbuffer) == self.chunk_size:
                 return cbuffer
             return zlib.decompress(cbuffer)
 
-        # Backwards compatibility with Scudette's AFF4 implementation.
-        if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY_SCUDETTE:
+        elif self.compression == lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY_SCUDETTE:
+            # Backwards compatibility with Scudette's AFF4 implementation.
             # Chunks are always compressed.
             return snappy.decompress(cbuffer)
 
-        if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY:
-            # Buffer is not compressed.
+        elif self.compression == lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY:
+
             if len(cbuffer) == self.chunk_size:
+                # Buffer is not compressed.
                 return cbuffer
+            try:
+                return snappy.decompress(cbuffer)
+            except Exception as e:
+                raise e
 
-            return snappy.decompress(cbuffer)
-
-        if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
+        elif self.compression == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
             return cbuffer
 
-        raise RuntimeError(
-            "Unable to process compression %s" % self.compression)
+        else:
+            raise RuntimeError(
+                "Unable to process compression %s" % self.compression)
 
 
 # This class implements Evimetry's AFF4 pre standardisation effort
@@ -495,7 +553,7 @@ class AFF4PreSImage(AFF4Image):
                 bevy_blockHash_urn) as bevy_blockHashes:
             idx = chunk_id * blockLength
 
-            bevy_blockHashes.Seek(idx)
+            bevy_blockHashes.SeekRead(idx)
             hash_value = bevy_blockHashes.Read(blockLength)
 
             return hashes.newImmutableHash(

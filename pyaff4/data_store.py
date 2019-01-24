@@ -41,10 +41,12 @@ from pyaff4 import stream_factory
 from pyaff4 import utils
 from pyaff4 import streams
 from pyaff4 import aff4_map
+from pyaff4 import aff4_image
 from pyaff4 import escaping
 from pyaff4 import turtle
 from pyaff4.zip import ZIP_DEFLATE
 from pyaff4.lexicon import transient_graph, any
+from pyaff4.aff4_map import isByteRangeARN
 
 LOGGER = logging.getLogger("pyaff4")
 HAS_HDT = False
@@ -113,6 +115,7 @@ class AFF4ObjectCache(object):
         if type(aff4_obj) == aff4_map.ByteRangeARN:
             return
         key = aff4_obj.urn.SerializeToString()
+        #LOGGER.debug("Putting %s in cache" % key)
         CHECK(key not in self.in_use,
               u"Object %s Put in cache while already in use." % utils.SmartUnicode(key))
 
@@ -132,6 +135,7 @@ class AFF4ObjectCache(object):
 
     def Get(self, urn):
         key = rdfvalue.URN(urn).SerializeToString()
+        #LOGGER.debug("Getting %s from cache" % key)
         entry = self.in_use.get(key)
         if entry is not None:
             entry.use_count += 1
@@ -151,9 +155,12 @@ class AFF4ObjectCache(object):
         return entry.aff4_obj
 
     def Return(self, aff4_obj):
+        if type(aff4_obj) == aff4_image.AFF4SImage:
+            print
         if type(aff4_obj) == aff4_map.ByteRangeARN:
             return
         key = aff4_obj.urn.SerializeToString()
+        #LOGGER.debug("Returning %s in cache" % key)
         entry = self.in_use.get(key)
         CHECK(entry is not None,
               u"Object %s Returned to cache, but it is not in use!" % key)
@@ -169,7 +176,10 @@ class AFF4ObjectCache(object):
             self._Trim()
 
     def Remove(self, aff4_obj):
+        if type(aff4_obj) == aff4_image.AFF4SImage:
+            print
         key = aff4_obj.urn.SerializeToString()
+        #LOGGER.debug("Removing %s in cache" % key)
         entry = self.lru_map.pop(key, None)
         if entry is not None:
             entry.unlink()
@@ -512,6 +522,8 @@ class MemoryDataStore(object):
             #    return cached_obj
             bytestream_reference_id = self.GetUnique(lexicon.any, urn, rdfvalue.URN(lexicon.standard.dataStream))
             return aff4_map.ByteRangeARN(version, resolver=self, urn=bytestream_reference_id)
+        elif isByteRangeARN(urn.SerializeToString()):
+            return aff4_map.ByteRangeARN(version, resolver=self, urn=urn)
         else:
             uri_types = self.Get(lexicon.any, urn, rdfvalue.URN(lexicon.AFF4_TYPE))
 

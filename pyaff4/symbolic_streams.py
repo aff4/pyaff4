@@ -39,7 +39,7 @@ class RepeatedStream(aff4.AFF4Stream):
     def WriteStream(self, source):
         raise NotImplementedError()
 
-    def Tell(self):
+    def TellRead(self):
         return self.readptr
 
     def Size(self):
@@ -61,7 +61,7 @@ class RepeatedStream(aff4.AFF4Stream):
         self.Flush()
 
     def Prepare(self):
-        self.Seek(0)
+        self.SeekRead(0)
 
 
 class RepeatedStringStream(aff4.AFF4Stream):
@@ -113,4 +113,4 @@ class RepeatedStringStream(aff4.AFF4Stream):
         self.Flush()
 
     def Prepare(self):
-        self.Seek(0)
+        self.SeekRead(0)

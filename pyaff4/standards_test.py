@@ -84,7 +84,7 @@ class StandardsTest(unittest.TestCase):
             imageStream = resolver.AFF4FactoryOpen(
                 "aff4://c215ba20-5648-4209-a793-1f918c723610")
 
-            imageStream.Seek(0x163)
+            imageStream.SeekRead(0x163)
             res = imageStream.Read(17)
             self.assertEquals(res, b"Invalid partition")
 
@@ -96,7 +96,7 @@ class StandardsTest(unittest.TestCase):
             mapStream = resolver.AFF4FactoryOpen(
                 "aff4://c215ba20-5648-4209-a793-1f918c723610")
 
-            mapStream.Seek(0x163)
+            mapStream.SeekRead(0x163)
             res = mapStream.Read(17)
             self.assertEquals(res, b"Invalid partition")
 

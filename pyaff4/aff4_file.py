@@ -146,13 +146,13 @@ class FileBackedObject(aff4.AFF4Stream):
         # if self.fd.tell() != self.readptr:
         #    self.fd.seek(self.readptr)
         # TODO: make this platform aware
-        self.fd.seek(self.readptr)
+        self.fd.seek(self.writeptr)
 
         self.fd.write(utils.SmartStr(data))
         # self.fd.flush()
 
         self.size = len(data)
-        self.readptr += self.size
+        self.writeptr += self.size
 
     def Flush(self):
         if self.IsDirty():

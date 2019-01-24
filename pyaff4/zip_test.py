@@ -49,7 +49,7 @@ class ZipTest(unittest.TestCase):
                     segment.Write(self.data1)
 
                 with zip_file.CreateMember(segment_urn) as segment2:
-                    segment2.Seek(0, 2)
+                    segment2.SeekWrite(0, 2)
                     segment2.Write(self.data2)
 
                 streamed_urn = self.volume_urn.Append(self.streamed_segment)

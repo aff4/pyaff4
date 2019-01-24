@@ -241,6 +241,7 @@ SEEK_END = 2
 
 class AFF4Stream(AFF4Object):
     readptr = 0
+    writeptr = 0
     size = 0
 
     def __init__(self, *args, **kwargs):
@@ -260,7 +261,18 @@ class AFF4Stream(AFF4Object):
         """
         raise NotImplementedError()
 
-    def Seek(self, offset, whence=0):
+    def SeekWrite(self, offset, whence=0):
+        if whence == SEEK_SET:
+            self.writeptr = offset
+        elif whence == SEEK_CUR:
+            self.writeptr += offset
+        elif whence == SEEK_END:
+            self.writeptr = offset + self.Size()
+
+        if self.writeptr < 0:
+            self.writeptr = 0
+
+    def SeekRead(self, offset, whence=0):
         if whence == SEEK_SET:
             self.readptr = offset
         elif whence == SEEK_CUR:
@@ -271,8 +283,11 @@ class AFF4Stream(AFF4Object):
         if self.readptr < 0:
             self.readptr = 0
 
-    def Tell(self):
+    def TellRead(self):
         return self.readptr
+
+    def TellWrite(self):
+        return self.writeptr
 
     def Size(self):
         return self.size
@@ -281,7 +296,7 @@ class AFF4Stream(AFF4Object):
         return self.Read(length)
 
     def seek(self, offset, whence=0):
-        self.Seek(offset, whence=whence)
+        self.SeekRead(offset, whence=whence)
 
     def write(self, data):
         self.Write(data)
@@ -293,7 +308,8 @@ class AFF4Stream(AFF4Object):
         self.Flush()
 
     def Prepare(self):
-        self.Seek(0)
+        self.SeekRead(0)
+        #self.SeekWrite(0)
 
 
 class ProgressContext(object):

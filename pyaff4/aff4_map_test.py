@@ -49,14 +49,14 @@ class AFF4MapTest(unittest.TestCase):
                 with aff4_map.AFF4Map.NewAFF4Map(
                     resolver, self.image_urn, self.volume_urn) as image:
                     # Maps are written in random order.
-                    image.Seek(50)
+                    image.SeekWrite(50)
                     image.Write(b"XX - This is the position.")
 
-                    image.Seek(0)
+                    image.SeekWrite(0)
                     image.Write(b"00 - This is the position.")
 
                     # We can "overwrite" data by writing the same range again.
-                    image.Seek(50)
+                    image.SeekWrite(50)
                     image.Write(b"50")
 
                 # Test the Stream method.
@@ -200,10 +200,10 @@ class AFF4MapTest(unittest.TestCase):
 
     def CheckImageURN(self, resolver, image_urn):
         with resolver.AFF4FactoryOpen(image_urn) as map:
-            map.Seek(50)
+            map.SeekRead(50)
             self.assertEquals(map.Read(2), b"50")
 
-            map.Seek(0)
+            map.SeekRead(0)
             self.assertEquals(map.Read(2), b"00")
 
             ranges = map.GetRanges()
@@ -223,7 +223,7 @@ class AFF4MapTest(unittest.TestCase):
             self.assertEquals(ranges[2].target_offset, 2)
 
             # Test that reads outside the ranges null pad correctly.
-            map.Seek(48)
+            map.SeekRead(48)
             read_string = map.Read(4)
             self.assertEquals(read_string, b"\x00\x0050")
 
