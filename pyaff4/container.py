@@ -34,7 +34,7 @@ from pyaff4 import utils
 
 import yaml
 import uuid
-
+import base64
 
 class Image(object):
     def __init__(self, image, resolver, dataStream):
@@ -410,7 +410,7 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
         self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, block_store_stream_id, self.urn)
         self.block_store_stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
 
-    def writeLogicalStreamHashBased(self, filename, readstream, length, check_bytes):
+    def writeLogicalStreamHashBased(self, filename, readstream, length, check_bytes=False):
         logical_file_id = None
         if self.isAFF4Collision(filename):
             logical_file_id = rdfvalue.URN("aff4://%s" % uuid.uuid4())
@@ -432,7 +432,8 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
 
                 h = hashes.new(lexicon.HASH_SHA512)
                 h.update(chunk)
-                hashid = rdfvalue.URN("aff4:sha512:" + h.hexdigest())
+                # we use RFC rfc4648
+                hashid = rdfvalue.URN("aff4:sha512:" + base64.urlsafe_b64encode(h.digest()))
 
                 # check if this hash is in the container already
                 existing_bytestream_reference_id =  self.resolver.GetUnique(lexicon.any, hashid, rdfvalue.URN(lexicon.standard.dataStream))
