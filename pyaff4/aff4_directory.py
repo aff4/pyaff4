@@ -51,6 +51,7 @@ class AFF4Directory(aff4.AFF4Volume):
 
         resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_TYPE,
                      rdfvalue.URN(lexicon.AFF4_DIRECTORY_TYPE))
+
         resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED,
                      rdfvalue.URN(root_urn))
 
@@ -61,6 +62,12 @@ class AFF4Directory(aff4.AFF4Volume):
     def __init__(self, *args, **kwargs):
         super(AFF4Directory, self).__init__(*args, **kwargs)
         self.children = set()
+
+    def ContainsSegment(self, child_arn):
+        localpath = escaping.member_name_for_file_iri(child_arn.SerializeToString())
+        if os.path.exists(localpath):
+            return True
+        return False
 
     def CreateMember(self, child_urn):
         # Check that child is a relative path in our URN.
@@ -73,18 +80,18 @@ class AFF4Directory(aff4.AFF4Volume):
         # allow slashes in the filename. Otherwise we will fail to create
         # e.g. stream/0000000 and stream/0000000/index.
         filename = escaping.member_name_for_urn(
-            child_urn, self.version, base_urn=self.urn, slash_ok=False)
+            child_urn, self.version, self.urn)
 
         # We are allowed to create any files inside the directory volume.
-        self.resolver.Set(child_urn, lexicon.AFF4_TYPE,
+        self.resolver.Set(lexicon.transient_graph, child_urn, lexicon.AFF4_TYPE,
                           rdfvalue.URN(lexicon.AFF4_FILE_TYPE))
-        self.resolver.Set(child_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+        self.resolver.Set(lexicon.transient_graph, child_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                           rdfvalue.XSDString("truncate"))
-        self.resolver.Set(child_urn, lexicon.AFF4_DIRECTORY_CHILD_FILENAME,
+        self.resolver.Set(lexicon.transient_graph, child_urn, lexicon.AFF4_DIRECTORY_CHILD_FILENAME,
                           rdfvalue.XSDString(filename))
 
         # Store the member inside our storage location.
-        self.resolver.Set(
+        self.resolver.Set(lexicon.transient_graph,
             child_urn, lexicon.AFF4_FILE_NAME,
             rdfvalue.XSDString(self.root_path + os.sep + filename))
 
@@ -95,7 +102,7 @@ class AFF4Directory(aff4.AFF4Volume):
         return result
 
     def LoadFromURN(self):
-        self.storage = self.resolver.Get(self.urn, lexicon.AFF4_STORED)
+        self.storage = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         if not self.storage:
             LOGGER.error("Unable to find storage for AFF4Directory %s",
                          self.urn)
@@ -107,26 +114,27 @@ class AFF4Directory(aff4.AFF4Volume):
         try:
             # We need to get the URN of the container before we can process
             # anything.
-            with self.resolver.AFF4FactoryOpen(
-                    self.storage.Append(
-                        lexicon.AFF4_CONTAINER_DESCRIPTION)) as desc:
-                if desc:
-                    urn_string = utils.SmartUnicode(desc.Read(1000))
 
-                    if (urn_string and
-                            self.urn.SerializeToString() != urn_string):
-                        self.resolver.DeleteSubject(self.urn)
-                        self.urn.Set(urn_string)
+            containerDescriptionSegment = self.storage.Append(lexicon.AFF4_CONTAINER_DESCRIPTION)
+            if self.ContainsSegment(containerDescriptionSegment):
+                with self.resolver.AFF4FactoryOpen(containerDescriptionSegment) as desc:
+                    if desc:
+                        urn_string = utils.SmartUnicode(desc.Read(1000))
 
-                    # Set these triples with the new URN so we know how to open
-                    # it.
-                    self.resolver.Set(self.urn, lexicon.AFF4_TYPE,
-                                      rdfvalue.URN(lexicon.AFF4_DIRECTORY_TYPE))
+                        if (urn_string and
+                                self.urn.SerializeToString() != urn_string):
+                            self.resolver.DeleteSubject(self.urn)
+                            self.urn.Set(urn_string)
 
-                    self.resolver.Set(self.urn, lexicon.AFF4_STORED,
-                                      rdfvalue.URN(self.storage))
+                        # Set these triples with the new URN so we know how to open
+                        # it.
+                        self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_TYPE,
+                                          rdfvalue.URN(lexicon.AFF4_DIRECTORY_TYPE))
 
-                    LOGGER.info("AFF4Directory volume found: %s", self.urn)
+                        self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED,
+                                          rdfvalue.URN(self.storage))
+
+                        LOGGER.info("AFF4Directory volume found: %s", self.urn)
 
             # Try to load the RDF metadata file from the storage.
             with self.resolver.AFF4FactoryOpen(
@@ -142,7 +150,7 @@ class AFF4Directory(aff4.AFF4Volume):
                         child_filename = self.resolver.Get(
                             subject, lexicon.AFF4_DIRECTORY_CHILD_FILENAME)
                         if child_filename:
-                            self.resolver.Set(
+                            self.resolver.Set(lexicon.transient_graph,
                                 subject, lexicon.AFF4_FILE_NAME,
                                 rdfvalue.XSDString("%s%s%s" % (
                                     self.root_path, os.sep, child_filename)))

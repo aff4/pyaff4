@@ -238,7 +238,7 @@ class URN(RDFValue):
         Filename may be a unicode string, in which case it will be
         UTF8 encoded into the URN. URNs are always ASCII.
         """
-        result = cls("file:%s" % urllib.request.pathname2url(filename))
+        result = cls("file://%s" % urllib.request.pathname2url(filename))
         result.original_filename = filename
         return result
 
@@ -329,6 +329,11 @@ class URN(RDFValue):
 
             # we dont rely on the basic urllib as our IRI scheme is not a regular URL scheme
             return URN(u"%s://%s%s" % (components.scheme, components.hostname, components.path))
+        elif components.scheme == "file":
+            new_path = posixpath.normpath(posixpath.join(
+                    "/", components.path, component))
+            components = components._replace(path=new_path)
+            return URN(u"%s://%s" % (components.scheme, components.path))
         else:
             raise Exception("Not implemented")
 

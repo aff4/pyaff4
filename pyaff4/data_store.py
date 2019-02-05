@@ -715,6 +715,17 @@ class MemoryDataStore(object):
                     if object in value:
                         yield rdfvalue.URN(subject)
 
+    def QuerySubjectPredicateInternal(self, store, subject, predicate):
+        if subject in store:
+            predicateValues = store[subject]
+            if predicate in predicateValues:
+                storeValues = predicateValues[predicate]
+                if type(storeValues) != type([]):
+                    yield storeValues
+                else:
+                    for val in storeValues:
+                        yield val
+
     def QuerySubjectPredicate(self, graph, subject, predicate):
         if isinstance(subject, rdfvalue.URN):
             subject = subject.SerializeToString()
@@ -727,21 +738,17 @@ class MemoryDataStore(object):
             predicate = utils.SmartUnicode(predicate)
 
         if graph == lexicon.any or graph == None:
-            storeitems = chain(six.iteritems(self.store), six.iteritems(self.transient_store))
+            for val in self.QuerySubjectPredicateInternal(self.transient_store, subject, predicate):
+                yield val
+            for val in self.QuerySubjectPredicateInternal(self.store, subject, predicate):
+                yield val
         elif graph == transient_graph:
-            storeitems = six.iteritems(self.transient_store)
+            for val in self.QuerySubjectPredicateInternal(self.transient_store, subject, predicate):
+                yield val
         else:
-            storeitems = six.iteritems(self.store)
+            for val in self.QuerySubjectPredicateInternal(self.store, subject, predicate):
+                yield val
 
-        for s, data in storeitems:
-            if s == subject:
-                for pred, value in six.iteritems(data):
-                    if pred == predicate:
-                        if type(value) != type([]):
-                            value = [value]
-
-                        for o in value:
-                            yield o
 
     def SelectSubjectsByPrefix(self, graph, prefix):
         prefix = utils.SmartUnicode(prefix)

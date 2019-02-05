@@ -47,7 +47,7 @@ ZIP32_MAX_SIZE = 2**32 -1
 BUFF_SIZE = 64 * 1024
 
 # Flag for debugging zip (uses pre Zip64 so we can open using more Zip tools. Should be false for production.
-ZIP_DEBUG = True
+ZIP_DEBUG = False
 
 # Use unicode filenames per Appendix D of APPNOTE.TXT ( bit 11 EFS)
 # produces zips that are openable correctly with Windows Explorer, WinRAR, and 7-ZIP
@@ -936,7 +936,7 @@ class BasicZipFile(aff4.AFF4Volume):
             # the following is included for debugging the zip implementation.
             # for small zip files, enable output to non-zip64 containers
             # NOT TO BE USED IN PRODUCTION
-            if not ZIP_DEBUG or offset_of_cd > ZIP32_MAX_SIZE or size_of_cd > ZIP32_MAX_SIZE:
+            if not ZIP_DEBUG or offset_of_cd > ZIP32_MAX_SIZE or size_of_cd > ZIP32_MAX_SIZE or total_entries > 0xffff:
                 # only write zip64 headers if needed
                 locator = Zip64CDLocator(
                     offset_of_end_cd=(offset_of_end_cd))
@@ -944,7 +944,7 @@ class BasicZipFile(aff4.AFF4Volume):
                 end_cd = Zip64EndCD(
                     size_of_header=Zip64EndCD.sizeof()-12,
                     number_of_entries_in_volume=total_entries,
-                    number_of_entries_in_total=total_entries,
+                    total_entries_in_cd=total_entries,
                     size_of_cd=size_of_cd,
                     offset_of_cd=offset_of_cd)
 
@@ -954,8 +954,8 @@ class BasicZipFile(aff4.AFF4Volume):
                 cd_stream.write(locator.Pack())
 
             end = EndCentralDirectory(
-                total_entries_in_cd_on_disk=len(self.members),
-                total_entries_in_cd=len(self.members),
+                total_entries_in_cd_on_disk=total_entries,
+                total_entries_in_cd=total_entries,
                 comment_len=len(urn_string),
                 offset_of_cd = offset_of_cd,
                 size_of_cd = size_of_cd)
@@ -965,6 +965,10 @@ class BasicZipFile(aff4.AFF4Volume):
 
             if offset_of_end_cd > ZIP32_MAX_SIZE or not ZIP_DEBUG :
                 end.offset_of_cd = 0xffffffff
+
+            if total_entries > 0xffff:
+                end.total_entries_in_cd_on_disk = 0xffff
+                end.total_entries_in_cd = 0xffff
 
             LOGGER.info("Writing ECD at %#x",
                         cd_stream.tell() + ecd_real_offset)

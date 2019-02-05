@@ -277,6 +277,12 @@ def addPathNames(container_name, pathnames, recursive, append, hashbased):
                             resolver.Add(urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
         return urn
 
+def nextOrNone(iterable):
+    try:
+        return next(iterable)
+    except:
+        return None
+
 def extractAll(container_name, destFolder):
     container_urn = rdfvalue.URN.FromFileName(container_name)
     urn = None
@@ -303,10 +309,10 @@ def extractAll(container_name, destFolder):
                         shutil.copyfileobj(srcStream, destStream)
                         print ("\tExtracted %s to %s" % (pathName, destFile))
 
-                    lastWritten = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastWritten))
-                    lastAccessed = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastAccessed))
-                    recordChanged = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.recordChanged))
-                    birthTime = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.birthTime))
+                    lastWritten = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastWritten))
+                    lastAccessed = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastAccessed))
+                    recordChanged = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.recordChanged))
+                    birthTime = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.birthTime))
                     logical.resetTimestamps(destFile, lastWritten, lastAccessed, recordChanged, birthTime)
 
                 else:

@@ -85,7 +85,6 @@ def arnPathFragment_from_path(pathName):
         # relative path or windows drive path
         return "/" + "".join(escaped_path)
 
-
 def member_name_for_urn(member_urn, version, base_urn=None, slash_ok=True, use_unicode=False):
     filename = base_urn.RelativePath(member_urn)
     # The member is not related to the base URN, just concatenate them together.
@@ -129,7 +128,10 @@ def member_name_for_urn(member_urn, version, base_urn=None, slash_ok=True, use_u
     else:
         raise Exception("Illegal version")
 
-
+#def member_name_for_urn(arn, version, base_urn):
+#    a = utils.SmartUnicode(arn)
+#    b = utils.SmartUnicode(base_urn)
+#    return a[len(b):]
 
 def urn_from_member_name(member, base_urn, version):
     """Returns a URN object from a zip file's member name."""
@@ -152,3 +154,7 @@ def urn_from_member_name(member, base_urn, version):
         result = base_urn.Append(member, quote=False)
 
     return rdfvalue.URN(result)
+
+def member_name_for_file_iri(arn):
+    return arn[len("file://"):]
+

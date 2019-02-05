@@ -133,9 +133,11 @@ class WindowsFSMetadata(FSMetadata):
         resolver.Set(self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
 def resetTimestampsPosix(destFile, lastWritten, lastAccessed, recordChanged, birthTime):
+    if lastWritten == None or lastAccessed == None:
+        return
     try:
         lw = parse(lastWritten.value)
-        la = parse(lastWritten.value)
+        la = parse(lastAccessed.value)
         os.utime(destFile, ((la - epoch).total_seconds(), (lw - epoch).total_seconds()))
     except Exception:
         traceback.print_exc()
