@@ -433,7 +433,7 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                 h = hashes.new(lexicon.HASH_SHA512)
                 h.update(chunk)
                 # we use RFC rfc4648
-                hashid = rdfvalue.URN("aff4:sha512:" + base64.urlsafe_b64encode(h.digest()))
+                hashid = rdfvalue.URN("aff4:sha512:" + base64.urlsafe_b64encode(h.digest()).decode())
 
                 # check if this hash is in the container already
                 existing_bytestream_reference_id =  self.resolver.GetUnique(lexicon.any, hashid, rdfvalue.URN(lexicon.standard.dataStream))
