@@ -664,29 +664,32 @@ class BasicZipFile(aff4.AFF4Volume):
                     lastmodtime=entry.dostime)
 
                 # Zip64 local header - parse the Zip64 extended information extra field.
-                # This field isnt a struct, its a serialization
-                #if zip_info.local_header_offset < 0 or zip_info.local_header_offset == 0xffffffff:
+                # if zip_info.local_header_offset < 0 or zip_info.local_header_offset == 0xffffffff:
                 if entry.extra_field_len > 0:
                     extrabuf = backing_store.Read(entry.extra_field_len)
 
                     # AFF4 requres Zip64, but we still want to be able to read 3rd party
-                    # zip files, so just try/catch around reads of the extensible field
-                    try:
-                        extra, readbytes = Zip64FileHeaderExtensibleField.FromBuffer(
-                            entry, extrabuf)
-                        extrabuf = extrabuf[readbytes:]
+                    # zip files, so just skip unknown Extensible data fields and find the Zip64
 
-                        if extra.header_id == 1:
-                            if extra.Get("relative_offset_local_header") is not None:
-                                zip_info.local_header_offset = (
-                                    extra.Get("relative_offset_local_header"))
-                            if extra.Get("file_size") is not None:
-                                zip_info.file_size = extra.Get("file_size")
-                            if extra.Get("compress_size") is not None:
-                                zip_info.compress_size = extra.Get("compress_size")
-                                #break
-                    except:
-                        pass
+                    while len(extrabuf) > 0:
+                        (headerID, dataSize) = struct.unpack("<HH", extrabuf[0:4])
+                        if headerID == 1:
+                            # Zip64 extended information extra field
+                            extra, readbytes = Zip64FileHeaderExtensibleField.FromBuffer(
+                                entry, extrabuf)
+                            extrabuf = extrabuf[readbytes:]
+
+                            if extra.header_id == 1:
+                                if extra.Get("relative_offset_local_header") is not None:
+                                    zip_info.local_header_offset = (
+                                        extra.Get("relative_offset_local_header"))
+                                if extra.Get("file_size") is not None:
+                                    zip_info.file_size = extra.Get("file_size")
+                                if extra.Get("compress_size") is not None:
+                                    zip_info.compress_size = extra.Get("compress_size")
+                        else:
+                            extrabuf = extrabuf[dataSize + 4:]
+
 
                 LOGGER.info("Found file %s @ %#x", zip_info.filename,
                             zip_info.local_header_offset)
