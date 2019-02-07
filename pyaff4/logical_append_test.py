@@ -37,7 +37,7 @@ class LogicalAppendTest(unittest.TestCase):
 
     def testCreateAndAppendSinglePathImageLarge2(self):
         try:
-            containerName = "test-append-large2.aff4"
+            containerName = "/tmp/test-append-large2.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
             largedata = io.BytesIO(os.urandom(1100000))
@@ -93,7 +93,7 @@ class LogicalAppendTest(unittest.TestCase):
     def testCreateAndAppendSinglePathImageLarge(self):
         try:
             length = 10000
-            containerName = "test-append-large.aff4"
+            containerName = "/tmp/test-append-large.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
             largedata = io.BytesIO(os.urandom(1100000))

@@ -22,6 +22,7 @@ import functools
 import urllib.parse
 import urllib.request, urllib.parse, urllib.error
 
+import os
 import binascii
 import posixpath
 import rdflib
@@ -238,6 +239,16 @@ class URN(RDFValue):
         Filename may be a unicode string, in which case it will be
         UTF8 encoded into the URN. URNs are always ASCII.
         """
+        if filename[0] in ["/", "\\"]:
+            # absolute path reference
+            pass
+        elif filename[1] == ":" and filename[2] in ["/", "\\"]:
+            # windows path beginning with a drive letter
+            pass
+        else:
+            # some kind of relative path
+            filename = os.getcwd() + "/" + filename
+
         result = cls("file://%s" % urllib.request.pathname2url(filename))
         result.original_filename = filename
         return result
