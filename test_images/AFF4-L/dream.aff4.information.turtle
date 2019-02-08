@@ -1,0 +1,20 @@
+@prefix aff4: <http://aff4.org/Schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<aff4://5aea2dd0-32b4-4c61-a9db-677654be6f83//test_images/AFF4-L/dream.txt> a aff4:FileImage,
+        aff4:Image,
+        aff4:zip_segment ;
+    aff4:birthTime "2018-09-17T13:42:20+10:00"^^xsd:datetime ;
+    aff4:hash "75d83773f8d431a3ca91bfb8859e486d"^^aff4:MD5,
+        "9ae1b46bead70c322eef7ac8bc36a8ea2055595c"^^aff4:SHA1 ;
+    aff4:lastAccessed "2018-10-23T11:08:19+10:00"^^xsd:datetime ;
+    aff4:lastWritten "2018-09-17T13:42:20+10:00"^^xsd:datetime ;
+    aff4:originalFileName "./test_images/AFF4-L/dream.txt"^^xsd:string ;
+    aff4:recordChanged "2018-09-17T13:42:20+10:00"^^xsd:datetime ;
+    aff4:size 8688 ;
+    aff4:stored <aff4://5aea2dd0-32b4-4c61-a9db-677654be6f83> .
+
+
