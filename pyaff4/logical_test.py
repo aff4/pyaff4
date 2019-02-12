@@ -54,10 +54,11 @@ class LogicalTest(unittest.TestCase):
 
                         # add in some data using the Push API, hashing while we go
                         data = u"helloworld"
-                        writer.Write(data)
-                        hasher.update(data.encode("utf-8"))
-                        writer.Write(data)
-                        hasher.update(data.encode("utf-8"))
+                        data_bytes = data.encode("utf-8")
+                        writer.Write(data_bytes)
+                        hasher.update(data_bytes)
+                        writer.Write(data_bytes)
+                        hasher.update(data_bytes)
 
                         # write in the hashes before auto-close
                         for h in hasher.hashes:
@@ -206,7 +207,7 @@ class LogicalTest(unittest.TestCase):
                         with container.Container.createURN(resolver, container_urn) as volume:
                             volume.maxSegmentResidentSize = maxSegmentResidentSize
                             with volume.newLogicalStream("/foo", length) as writer:
-                                with open("/dev/random", "r") as randomStream:
+                                with open("/dev/random", "rb") as randomStream:
                                     writer.chunk_size = chunksize
                                     writer_arn = writer.urn
 

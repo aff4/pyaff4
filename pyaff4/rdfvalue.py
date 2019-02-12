@@ -174,6 +174,9 @@ class XSDInteger(RDFValue):
     def __str__(self):
         return str(self.value)
 
+    def __hash__(self):
+        return hash(self.SerializeToString())
+
 
 class RDFHash(XSDString):
     # value is the hex encoded digest.
