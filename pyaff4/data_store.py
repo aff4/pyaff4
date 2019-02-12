@@ -376,21 +376,22 @@ class MemoryDataStore(object):
                 turtle_segment.Close()
             else:
                 # more than one append as already occurred
-                turtleContainerIndex = 2
+                turtleContainerIndex = 0
                 while True:
                     turtleARN = escaping.urn_from_member_name(u"information.turtle/%08d" % turtleContainerIndex,
                                                                                 zipcontainer.urn, zipcontainer.version)
                     if not zipcontainer.ContainsMember(turtleARN):
                         break
+                    turtleContainerIndex = turtleContainerIndex + 1
 
                 with zipcontainer.OpenZipSegment(u"information.turtle/directives") as directives_segment:
-                    directives_txt = streams.ReadAll(directives_segment)
+                    directives_txt = utils.SmartUnicode(streams.ReadAll(directives_segment))
 
-                (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicodeself._DumpToTurtle(zipcontainer.urn))
+                (current_directives_txt, current_triples_txt) = turtle.toDirectivesAndTripes(utils.SmartUnicode(self._DumpToTurtle(zipcontainer.urn)))
                 directives_difference = turtle.difference(directives_txt, current_directives_txt)
 
-                if not directives_difference == u"":
-                    directives_txt = directives_txt + u"\r\n" + directives_difference
+                if len(directives_difference) > 0:
+                    directives_txt = directives_txt + u"\r\n" + u"\r\n".join(directives_difference)
                     with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
                         directives_segment.compression_method = ZIP_DEFLATE
                         directives_segment.write(utils.SmartStr(directives_txt))
@@ -414,7 +415,7 @@ class MemoryDataStore(object):
                         if zipcontainer.ContainsMember(turtleARN):
                             with zipcontainer.OpenZipSegment(
                                 u"information.turtle/%08d" % turtleContainerIndex) as turtle_chunk_segment:
-                                turtle_chunk_txt = streams.ReadAll(turtle_chunk_segment)
+                                turtle_chunk_txt = utils.SmartUnicode(streams.ReadAll(turtle_chunk_segment))
                                 turtle_segment.write(utils.SmartStr(turtle_chunk_txt + u"\r\n"))
                             turtleContainerIndex += 1
                         else:
