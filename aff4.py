@@ -176,13 +176,11 @@ def verify(file):
             print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
             hasher.hash(image)
 
-def ingestZipfile(container_name, zipfile, append, check_bytes):
+def ingestZipfile(container_name, zipfiles, append, check_bytes):
     # TODO: check path in exists
     start = time.time()
     with data_store.MemoryDataStore() as resolver:
-        basefilename = os.path.basename(zipfile)
-        if basefilename.endswith(".bag.zip"):
-            basefilename = basefilename[0:len(basefilename) - len(".bag.zip")]
+
 
         container_urn = rdfvalue.URN.FromFileName(container_name)
         urn = None
@@ -197,33 +195,39 @@ def ingestZipfile(container_name, zipfile, append, check_bytes):
         resolver = volume.resolver
 
         with volume as volume:
-            filename_arn = rdfvalue.URN.FromFileName(zipfile)
+            for zipfile in zipfiles:
+                basefilename = os.path.basename(zipfile)
+                if basefilename.endswith(".bag.zip"):
+                    basefilename = basefilename[0:len(basefilename) - len(".bag.zip")]
 
-            # the following coaxes our ZIP implementation to treat this file
-            # as a regular old zip
-            result = zip.BasicZipFile(resolver, urn=None, version=version.basic_zip)
-            resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
-            resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
 
-            with resolver.AFF4FactoryOpen(result.urn, version=version.basic_zip) as zip_file:
-                for member in zip_file.members:
-                    info = zip_file.members[member]
-                    pathname = basefilename +  member.SerializeToString()[len(result.urn.SerializeToString()):]
-                    print(pathname)
+                filename_arn = rdfvalue.URN.FromFileName(zipfile)
 
-                    with resolver.AFF4FactoryOpen(member, version=version.aff4v10) as src:
+                # the following coaxes our ZIP implementation to treat this file
+                # as a regular old zip
+                result = zip.BasicZipFile(resolver, urn=None, version=version.basic_zip)
+                resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_TYPE, rdfvalue.URN("StandardZip"))
+                resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED, rdfvalue.URN(filename_arn))
 
-                        hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
-                        if volume.containsLogicalImage(pathname):
-                            print("\tCollision: this ARN is already present in this volume.")
-                            continue
+                with resolver.AFF4FactoryOpen(result.urn, version=version.basic_zip) as zip_file:
+                    for member in zip_file.members:
+                        info = zip_file.members[member]
+                        pathname = basefilename +  member.SerializeToString()[len(result.urn.SerializeToString()):]
+                        print(pathname)
 
-                        urn = volume.writeLogicalStreamHashBased(pathname, hasher, info.file_size, check_bytes)
-                        #fsmeta.urn = urn
-                        #fsmeta.store(resolver)
-                        for h in hasher.hashes:
-                            hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
-                            resolver.Add(container_urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
+                        with resolver.AFF4FactoryOpen(member, version=version.aff4v10) as src:
+
+                            hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
+                            if volume.containsLogicalImage(pathname):
+                                print("\tCollision: this ARN is already present in this volume.")
+                                continue
+
+                            urn = volume.writeLogicalStreamRabinHashBased(pathname, hasher, info.file_size, check_bytes)
+                            #fsmeta.urn = urn
+                            #fsmeta.store(resolver)
+                            for h in hasher.hashes:
+                                hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
+                                resolver.Add(container_urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
 
         print ("Finished in %d (s)" % int(time.time() - start))
         return urn
@@ -269,7 +273,7 @@ def addPathNames(container_name, pathnames, recursive, append, hashbased):
                         if hashbased == False:
                             urn = volume.writeLogicalStream(pathname, hasher, fsmeta.length)
                         else:
-                            urn = volume.writeLogicalStreamHashBased(pathname, hasher, fsmeta.length)
+                            urn = volume.writeLogicalStreamRabinHashBased(pathname, hasher, fsmeta.length)
                         fsmeta.urn = urn
                         fsmeta.store(resolver)
                         for h in hasher.hashes:
@@ -410,7 +414,7 @@ def main(argv):
         extractAll(dest, args.srcFiles[0])
     elif args.ingest == True:
         dest = args.aff4container
-        ingestZipfile(dest, args.srcFiles[0], False, args.paranoid)
+        ingestZipfile(dest, args.srcFiles, False, args.paranoid)
 
 
 if __name__ == "__main__":

@@ -64,7 +64,8 @@ setup(
         "pyyaml",
         "tzlocal",
         "html5lib",
-        "python-dateutil"
+        "python-dateutil",
+        "fastchunking"
 
     ],
     extras_require=dict(

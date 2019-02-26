@@ -279,7 +279,6 @@ class AFF4Map(aff4.AFF4Stream):
     def AddRange(self, map_offset, target_offset, length, target):
         """Add a new mapping range."""
         rdfvalue.AssertURN(target)
-
         self.last_target = target
 
         target_id = self.target_idx_map.get(target)
