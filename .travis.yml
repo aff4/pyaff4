@@ -1,8 +1,13 @@
 language: python
 python:
-  - "2.7"
+- '2.7'
 cache: pip
 install:
-  - pip install -r requirements.txt
+- pip install -r requirements.txt
 script:
-  - python setup.py test
+- python setup.py test
+deploy:
+  provider: pypi
+  user: blschatz
+  password:
+    secure: YRp+RZXF6Qkdjyt/5tEp/Bagj+SxlUUHokyY35AKLPqLYZktA1sJ8t1LRtJQ8vMv8pYWkpHbSF0tmmPOfhRCFs5CxAOACPXFnSRJRbe32E9u8g/Ffko+0V1WS4EFbQwNqgdpMKZ7LymGN01cYWPsZgN4wVUvXiJGK9yh4lTSiEhvaiIG8LuEofOuD9VCofBdMowkCAxw81v6lKGAhljZ2KuGbAmzczLDKl7CamdjpvZaFk2Yt9M0ZdNiDvZMumwnxaYuy4MGvTe+v0ccZ4WxwD6FcbVTdcPiZChW1M5fUqweKW0cXIDHDl15UhniGKZbuLAdapr7aaeXo71fkQ1nuJqGVtGT0yD7tK4EdGWAOG452kRiHmvuLkUf4c5VSwNU0P7h5VvARGWbSgj91YTR81+0qjD6W/J0bSd6SutRmzwzUo3wxtpUdl9YHToXaTYF3fq8/sxIzjvC1Y/appM4vnRg1VUR9qkzqatnBYdPCNmyu97uWV7LtmolegdZsVz8Teb3ksBMvd5wZVNs8+A7mBiDyMLNSm/8jYm1C6lbUyyO3Gvp5kEhmJ/fNum+bfrGuK2sjt7AlPNSW8LawkDdX0D/QqDYe/TS1KJXCJ/WZgzJam1SVnI3Ti7Z36cyZFNxgAC5tbyxvxYIp+O5VB9LppYfdHSTl48sR53yhI8BvyI=
