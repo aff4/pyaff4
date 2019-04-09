@@ -20,8 +20,8 @@ project at https://github.com/aff4/ReferenceImages
 2. Reading & writing AFF4 ImageStreams using the deflate or snappy compressor.
 3. Reading RDF metadata using Turtle (and to some degree YAML).
 4. Verification of linear and block hashed images.
-5. *new* Reading & writing logical images. 
-6. *new* Reading & writing deduplicated logical images. 
+5. Reading & writing logical images (*new*) . 
+6. Reading & writing deduplicated logical images (*new*). 
 
 
  ## What is not yet supported:
@@ -33,7 +33,7 @@ the AFF4 that have not yet been implemented in this codebase include:
 2. Persistent data store.
 3. HTTP backed streams.
 4. Support for signed statements or Bill of Materials.
-
+5. Directory based volumes.
 ## Notice
 
 This is not an official Google product (experimental or otherwise), it is just

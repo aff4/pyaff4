@@ -48,7 +48,7 @@ setup(
     long_description=long_description,
     version=VERSION["pep440"],
     cmdclass=commands,
-    description='Python Advanced Forensic Format Version 4 library.',
+    description='Python Advanced Forensic Format Version 4 (AFF4) python library.',
     author='Michael Cohen, Bradley Schatz',
     author_email='scudette@gmail.com, bradley@evimetry.com',
     url='https://www.aff4.org/',
