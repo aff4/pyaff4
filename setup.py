@@ -18,10 +18,11 @@ from setuptools import setup
 from setuptools.command.test import test as TestCommand
 
 try:
-    with open('../README.md') as file:
+    with open('README.md') as file:
         long_description = file.read()
 except IOError:
-    long_description = ""
+    long_description = (
+        'Advanced Forensic Format Version 4 (AFF4) Python module.')
 
 ENV = {"__file__": __file__}
 exec(open("pyaff4/_version.py").read(), ENV)
@@ -48,7 +49,7 @@ setup(
     long_description=long_description,
     version=VERSION["pep440"],
     cmdclass=commands,
-    description='Python Advanced Forensic Format Version 4 (AFF4) python library.',
+    description='Advanced Forensic Format Version 4 (AFF4) Python module.',
     author='Michael Cohen, Bradley Schatz',
     author_email='scudette@gmail.com, bradley@evimetry.com',
     url='https://www.aff4.org/',
@@ -66,7 +67,6 @@ setup(
         "html5lib",
         "python-dateutil",
         "fastchunking"
-
     ],
     extras_require=dict(
         cloud="google-api-python-client"
