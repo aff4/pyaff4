@@ -94,7 +94,7 @@ AFF4_STREAM_ORIGINAL_FILENAME = (AFF4_NAMESPACE + "original_filename")
 AFF4_ZIP_SEGMENT_TYPE = (AFF4_NAMESPACE + "zip_segment")
 
 # ZipStoredLogicalStream
-AFF4_ZIP_SEGMENT_IMAGE_TYPE = (AFF4_NAMESPACE + "ZipSegmentImage")
+AFF4_ZIP_SEGMENT_IMAGE_TYPE = (AFF4_NAMESPACE + "ZipSegment")
 AFF4_FILEIMAGE = (AFF4_NAMESPACE + "FileImage")
 
 # AFF4 Image Stream - stores a stream using Bevies.
@@ -189,13 +189,16 @@ class StdLexicon(Lexicon):
 class Std11Lexicon(StdLexicon):
     base = AFF4_NAMESPACE
     FileImage = base + "FileImage"
-    FolderImage = base + "FolderImage"
-    lastWritten = (AFF4_NAMESPACE + "lastWritten")
-    lastAccessed = (AFF4_NAMESPACE + "lastAccessed")
-    recordChanged = (AFF4_NAMESPACE + "recordChanged")
-    birthTime = (AFF4_NAMESPACE + "birthTime")
-    pathName = (AFF4_NAMESPACE + "originalFileName")
-    collidingDataStream = (AFF4_NAMESPACE + "collidingDataStream")
+    FolderImage = base + "Folder"
+    lastWritten = base+ "lastWritten"
+    lastAccessed = base + "lastAccessed"
+    recordChanged = base + "recordChanged"
+    birthTime = base + "birthTime"
+    pathName = base + "originalFilename"
+    collidingDataStream = base + "collidingDataStream"
+    child = base + "child"
+    LogicalAcquisitionTask = base + "LogicalAcquisitionTask"
+    filesystemRoot   = base + "filesystemRoot"
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE
