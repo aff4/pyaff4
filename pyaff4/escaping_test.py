@@ -48,6 +48,10 @@ class EscapingTest(unittest.TestCase):
         # microsoft device paths
         self.assertEqual(u"./Windows/foo.txt", arnPathFragment_from_path(u"\\\\.\\Windows\\foo.txt"))
 
+        # MacOS seen
+        self.assertEqual(u"/", u"/")
+        #self.assertEqual(u"/private/var/tmp/bootstrap/share/man/man1/%5b.1", arnPathFragment_from_path(u"/private/var/tmp/bootstrap/share/man/man1/[.1"))
+
     def testARNtoZipSegment(self):
         version = container.Version(1, 1, "pyaff4")
         self.assertEqual(u"/c:/foo", member_name_for_urn(u"aff4://e6bae91b-0be3-4770-8a36-14d231833e18//c:/foo",
