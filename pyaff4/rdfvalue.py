@@ -124,13 +124,13 @@ class XSDString(RDFValue):
 
 class XSDDateTime(RDFValue):
     """A unicode string."""
-    datatype = rdflib.XSD.datetime
+    datatype = rdflib.XSD.dateTime
 
     def SerializeToString(self):
         return utils.SmartStr(self.value)
 
     def UnSerializeFromString(self, string):
-        self.Set(rdflib.Literal(self.value, datatype=rdflib.XSD.datetime))
+        self.Set(rdflib.Literal(self.value, datatype=rdflib.XSD.dateTime))
 
     def Set(self, data):
         self.value = rdflib.Literal(data)
