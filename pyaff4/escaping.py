@@ -70,7 +70,7 @@ def arnPathFragment_from_path(pathName):
             escaped_path.append(c)
 
     if escaped_path[0] == u"/":
-        if escaped_path[1] == u"/":
+        if len(escaped_path) > 1 and escaped_path[1] == u"/":
             # unc path
             escaped_path = escaped_path[2:]
             return "".join(escaped_path)
