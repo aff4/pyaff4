@@ -296,6 +296,7 @@ class WritableLogicalImageContainer(Container):
     # logical images geater than this size are stored in ImageStreams
     # smaller ones in Zip Segments
     maxSegmentResidentSize = 1 * 1024 * 1024
+    #maxSegmentResidentSize = 1
 
     def __init__(self, version, volumeURN, resolver, lex):
         super(WritableLogicalImageContainer, self).__init__(version, volumeURN, resolver, lex)
@@ -371,9 +372,11 @@ class WritableLogicalImageContainer(Container):
 
         if length > self.maxSegmentResidentSize:
             self.writeCompressedBlockStream(image_urn, filename, readstream)
+            self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE),
+                              rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
         else:
             self.writeZipStream(image_urn, filename, readstream)
-            #self.resolver.Set(image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
+            self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
 
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
