@@ -262,7 +262,7 @@ class LogicalImageContainer(Container):
 
     def open(self, urn):
         pathName = next(self.resolver.QuerySubjectPredicate(self.urn, urn, lexicon.standard11.pathName))
-        return aff4.LogicalImage(self.resolver, self.urn, urn, pathName)
+        return aff4.LogicalImage(self, self.resolver, self.urn, urn, pathName)
 
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
@@ -277,11 +277,11 @@ class PreStdLogicalImageContainer(LogicalImageContainer):
         _images = self.resolver.QueryPredicateObject(self.urn, lexicon.AFF4_TYPE, lexicon.standard.Image)
         for image in _images:
             pathName = next(self.resolver.QuerySubjectPredicate(self.urn, image, self.lexicon.pathName))
-            yield aff4.LogicalImage(self.resolver, self.urn, image, pathName)
+            yield aff4.LogicalImage(self, self.resolver, self.urn, image, pathName)
 
     def open(self, urn):
         pathName = next(self.resolver.QuerySubjectPredicate(self.urn, urn, self.lexicon.pathName))
-        return aff4.LogicalImage(self.resolver, self.urn, urn, pathName)
+        return aff4.LogicalImage(self, self.resolver, self.urn, urn, pathName)
 
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
