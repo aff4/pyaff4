@@ -194,7 +194,7 @@ class Std11Lexicon(StdLexicon):
     lastAccessed = base + "lastAccessed"
     recordChanged = base + "recordChanged"
     birthTime = base + "birthTime"
-    pathName = base + "originalFilename"
+    pathName = base + "originalFileName"
     collidingDataStream = base + "collidingDataStream"
     child = base + "child"
     LogicalAcquisitionTask = base + "LogicalAcquisitionTask"

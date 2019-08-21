@@ -245,6 +245,7 @@ class MemoryDataStore(object):
 
     def __init__(self, lex=lexicon.standard):
         self.lexicon = lex
+        self.loadedVolumes = []
         self.store = collections.OrderedDict()
         self.transient_store = collections.OrderedDict()
         self.ObjectCache = AFF4ObjectCache(10)
@@ -469,11 +470,14 @@ class MemoryDataStore(object):
 
     def loadMetadata(self, zip):
         # Load the turtle metadata.
+        #if zip.urn not in self.loadedVolumes:
         with zip.OpenZipSegment("information.turtle") as fd:
             self.LoadFromTurtle(fd, zip.urn)
+            self.loadedVolumes.append(zip.urn)
 
     def LoadFromTurtle(self, stream, volume_arn):
         data = streams.ReadAll(stream)
+        print(data)
         g = rdflib.Graph()
         g.parse(data=data, format="turtle")
 
@@ -546,8 +550,6 @@ class MemoryDataStore(object):
                 handler = registry.AFF4_TYPE_MAP.get(components.scheme)
 
             if handler is None:
-                if str(urn).endswith("paper-hash_based_disk_imaging_using_aff4.pdf.frag.2"):
-                    print()
                 raise IOError("Unable to create object %s" % urn)
 
             obj = handler(resolver=self, urn=urn, version=version)
@@ -726,6 +728,7 @@ class MemoryDataStore(object):
                 else:
                     for val in storeValues:
                         yield val
+
 
     def QuerySubjectPredicate(self, graph, subject, predicate):
         if isinstance(subject, rdfvalue.URN):
