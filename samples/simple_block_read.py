@@ -12,14 +12,14 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-    from pyaff4 import container
-    import binascii
-    import os
-    import hexdump
+from pyaff4 import container
+import binascii
+import os
+import hexdump
 
-    referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images")
-    stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
+referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images")
+stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
 
-    with container.Container.open(stdLinear) as mapStream:
-        buf = mapStream.Read(4096)
-        print(hexdump.hexdump(buf))
+with container.Container.open(stdLinear) as mapStream:
+    buf = mapStream.Read(4096)
+    print(hexdump.hexdump(buf))
