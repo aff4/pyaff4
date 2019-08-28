@@ -292,7 +292,7 @@ def extractAll(container_name, destFolder):
     urn = None
 
     with container.Container.openURNtoContainer(container_urn) as volume:
-        printVolumeInfo(file, volume)
+        printVolumeInfo(container_urn.original_filename, volume)
         resolver = volume.resolver
         for imageUrn in resolver.QueryPredicateObject(volume.urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage):
             imageUrn = utils.SmartUnicode(imageUrn)
