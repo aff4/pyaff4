@@ -411,7 +411,7 @@ def main(argv):
         extract(dest, args.srcFiles, args.folder)
     elif args.extract_all == True:
         dest = args.aff4container
-        extractAll(dest, args.srcFiles[0])
+        extractAll(dest, args.folder)
     elif args.ingest == True:
         dest = args.aff4container
         ingestZipfile(dest, args.srcFiles, False, args.paranoid)
