@@ -309,7 +309,7 @@ def extractAll(container_name, destFolder):
                         except OSError as exc:  # Guard against race condition
                             if exc.errno != errno.EEXIST:
                                 raise
-                    with open(destFile, "w") as destStream:
+                    with open(destFile, "wb") as destStream:
                         shutil.copyfileobj(srcStream, destStream)
                         print ("\tExtracted %s to %s" % (pathName, destFile))
 
