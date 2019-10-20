@@ -241,7 +241,7 @@ def addPathNames(container_name, pathnames, recursive, append, hashbased):
             volume = container.Container.createURN(resolver, container_urn)
             print("Creating AFF4Container: file://%s <%s>" % (container_name, volume.urn))
         else:
-            volume = container.Container.openURNtoContainer(container_urn, mode="+", resolver=resolver)
+            volume = container.Container.openURNtoContainer(container_urn, mode="+")
             print("Appending to AFF4Container: file://%s <%s>" % (container_name, volume.urn))
 
         with volume as volume:

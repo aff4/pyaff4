@@ -144,6 +144,9 @@ class NoneObject(object):
 # debugging memory leaks.
 AFF4_OBJECT_REFS = {}
 
+def newARN():
+    arn = "aff4://%s" % uuid.uuid4()
+    return rdfvalue.URN(arn)
 
 class AFF4StreamProperties(object):
     seekable = True
@@ -175,6 +178,10 @@ class AFF4Object(object):
     def __exit__(self, exc_type, exc_value, traceback):
         # Return ourselves to the resolver cache.
         self.resolver.Return(self)
+
+        # Ensure exceptions aren't silently swallowed (are propagated)
+        if exc_value != None:
+            return False
 
     def LoadFromURN(self):
         raise NotImplementedError

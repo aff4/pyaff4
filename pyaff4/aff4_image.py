@@ -22,16 +22,18 @@ from builtins import object
 import binascii
 import logging
 import struct
-import zlib
+
 from expiringdict import ExpiringDict
 
+from CryptoPlus.Cipher import python_AES
 import snappy
+import zlib
 
 from pyaff4 import aff4
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
-from pyaff4 import hashes
+from pyaff4 import hashes, hexdump
 
 
 LOGGER = logging.getLogger("pyaff4")
@@ -88,14 +90,14 @@ class _CompressorStream(object):
 class AFF4Image(aff4.AFF4Stream):
 
     @staticmethod
-    def NewAFF4Image(resolver, image_urn, volume_urn):
+    def NewAFF4Image(resolver, image_urn, volume_urn, type=lexicon.AFF4_IMAGE_TYPE):
         with resolver.AFF4FactoryOpen(volume_urn) as volume:
             # Inform the volume that we have a new image stream contained within
             # it.
             volume.children.add(image_urn)
 
             resolver.Add(volume_urn, image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
-                lexicon.AFF4_IMAGE_TYPE))
+                type))
 
             resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
                          rdfvalue.URN(volume_urn))
@@ -137,6 +139,8 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_number = 0
 
         self.cache = ExpiringDict(max_len=1000, max_age_seconds=10)
+
+
 
     def _write_bevy_index(self, volume, bevy_urn, bevy_index, flush=False):
         """Write the index segment for the specified bevy_urn."""
@@ -194,6 +198,7 @@ class AFF4Image(aff4.AFF4Stream):
         self._write_metadata()
 
     def Write(self, data):
+        #hexdump(data)
         self.MarkDirty()
         self.buffer += data
         idx = 0
@@ -245,6 +250,7 @@ class AFF4Image(aff4.AFF4Stream):
         #self.buffer = chunk[self.chunk_size:]
         if self.chunk_count_in_bevy >= self.chunks_per_segment:
             self._FlushBevy()
+
 
     def _FlushBevy(self):
         volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
@@ -330,6 +336,28 @@ class AFF4Image(aff4.AFF4Stream):
             self._write_metadata()
 
         return super(AFF4Image, self).Flush()
+
+    def Abort(self):
+        if self.IsDirty():
+            # for standard image streams, the current bevy hasnt been flushed.
+            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+
+            with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
+                # make sure that the zip file is marked as dirty
+                volume._dirty = True
+
+                # create a set of the bevy related objects
+                bevvys_to_remove = []
+                for i in range(0, self.bevy_number+1):
+                    seg_arn = self.urn.Append("%08d" % i)
+                    idx_arn = self.urn.Append("%08d.index" % i)
+                    bevvys_to_remove.append(seg_arn)
+                    bevvys_to_remove.append(idx_arn)
+
+                volume.RemoveMembers(bevvys_to_remove)
+
+            self.resolver.DeleteSubject(self.urn)
+            self._dirty = False
 
     def Close(self):
         pass
@@ -439,7 +467,7 @@ class AFF4Image(aff4.AFF4Stream):
                 # try reading directly from the yet-to-be persisted bevvy
                 if chunk_id < self.chunk_count_in_bevy:
                     r = self.bevy[chunk_id]
-                    result += self.doDecompress(r)
+                    result += self.doDecompress(r, chunk_id)
                     chunks_to_read -= 1
                     chunk_id += 1
                     chunks_read += 1
@@ -505,9 +533,9 @@ class AFF4Image(aff4.AFF4Stream):
         bevy.SeekRead(chunk_offset, 0)
         cbuffer = bevy.Read(chunk_size)
 
-        return self.doDecompress(cbuffer)
+        return self.doDecompress(cbuffer, chunk_id)
 
-    def doDecompress(self, cbuffer):
+    def doDecompress(self, cbuffer, chunk_id):
 
         if self.compression == lexicon.AFF4_IMAGE_COMPRESSION_ZLIB :
             if len(cbuffer) == self.chunk_size:
@@ -586,6 +614,7 @@ class AFF4SImage(AFF4PreSImage):
             data = struct.unpack(format_string, bevy_index_data)
 
             return [(data[2*i], data[2*i+1]) for i in range(len(data)//2)]
+
 
 
 registry.AFF4_TYPE_MAP[lexicon.AFF4_SCUDETTE_IMAGE_TYPE] = AFF4Image

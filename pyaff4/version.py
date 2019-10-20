@@ -26,6 +26,14 @@ class Version(object):
                 return True
         return False
 
+    def isGreaterThanOrEqual(self, major, minor):
+        if self.major > major:
+            return True
+        if self.major == major:
+            if self.minor >= minor:
+                return True
+        return False
+
     def equals(self, major, minor):
         return self.major == major and self.minor == minor
 

@@ -264,7 +264,10 @@ class URN(RDFValue):
         # For file: urls we exactly reverse the conversion applied in
         # FromFileName.
         if self.value.startswith("file:"):
-            return urllib.request.url2pathname(self.value[5:])
+            res = urllib.request.url2pathname(self.value[5:])
+            if res.startswith("///"):
+                res = res[2:]
+            return res
 
         components = self.Parse()
         if components.scheme == "file":

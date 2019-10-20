@@ -32,7 +32,7 @@ from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import struct_parser
-from pyaff4 import utils, escaping
+from pyaff4 import utils, escaping, hexdump
 from pyaff4.version import Version, basic_zip
 
 LOGGER = logging.getLogger("pyaff4")
@@ -432,6 +432,7 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
         backing_store_urn = owner.backing_store_urn
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
+            backing_store.SeekRead(0,0)
             backing_store.SeekRead(
                 zip_info.local_header_offset + owner.global_offset, 0)
             file_header = ZipFileHeader(
@@ -500,6 +501,18 @@ class ZipFileSegment(aff4_file.FileBackedObject):
                     self.urn, self, self.compression_method)
 
         super(ZipFileSegment, self).Flush()
+
+    def Abort(self):
+        if self.IsDirty():
+            self._dirty = False
+            self.abortSignaled = False
+            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+
+            with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
+                # make sure that the zip file is marked as dirty
+                volume._dirty = True
+                volume.RemoveMembers([self.urn])
+            self.resolver.DeleteSubject(self.urn)
 
     def Reset(self):
         self.readptr = 0
@@ -735,12 +748,14 @@ class BasicZipFile(aff4.AFF4Volume):
                 return True
         return False
 
-        #member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
-
+    def ContainsSegment(self, segment_name):
+        segment_arn = escaping.urn_from_member_name(segment_name, self.urn, self.version)
+        return self.ContainsMember(segment_arn)
 
     def CreateMember(self, child_urn):
         member_filename = escaping.member_name_for_urn(child_urn, self.version, self.urn, use_unicode=USE_UNICODE)
         return self.CreateZipSegment(member_filename, arn=child_urn)
+
 
     def CreateZipSegment(self, filename, arn=None):
         self.MarkDirty()
@@ -750,7 +765,7 @@ class BasicZipFile(aff4.AFF4Volume):
 
         # Is it in the cache?
         res = self.resolver.CacheGet(segment_urn)
-        if res:
+        if res != None:
             res.readptr = 0
             return res
 
@@ -790,12 +805,16 @@ class BasicZipFile(aff4.AFF4Volume):
             res.Reset()
             return res
 
+        self.children.add(segment_urn)
+
         result = ZipFileSegment(resolver=self.resolver, urn=segment_urn)
         result.LoadFromZipFile(owner=self)
 
         LOGGER.info("Openning ZipFileSegment %s", result.urn)
 
         return self.resolver.CachePut(result)
+
+
 
     def LoadFromURN(self):
         self.backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph,
@@ -863,7 +882,8 @@ class BasicZipFile(aff4.AFF4Volume):
                     zip_info.file_size += len(data)
                     # Python 2 erronously returns a signed int here.
                     zip_info.crc32 = zlib.crc32(data, zip_info.crc32) & 0xffffffff
-                    backing_store.Write(c_data)
+                    if len(c_data) > 0:
+                        backing_store.Write(c_data)
                     progress.Report(zip_info.file_size)
 
                 # Finalize the compressor.
@@ -892,6 +912,48 @@ class BasicZipFile(aff4.AFF4Volume):
             zip_info.WriteFileHeader(backing_store)
             self.members[member_urn] = zip_info
 
+    def RemoveMember(self, child_urn):
+        highest_zip_info = sorted(list(self.members.values()), key=lambda k: k.file_header_offset, reverse=True)[0]
+        member_zip_info = self.members[child_urn]
+
+        obj = self.resolver.CacheGet(child_urn)
+        self.resolver.ObjectCache.Remove(obj)
+
+        self.children.remove(child_urn)
+        del self.members[child_urn]
+
+        # check if the item to be removed is the last in the zip file
+        # if yes, reclaim the space
+        if member_zip_info.filename == highest_zip_info.filename and member_zip_info.file_header_offset == highest_zip_info.file_header_offset:
+            backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
+                backing_store.Trim(highest_zip_info.file_header_offset)
+
+    def RemoveMembers(self, child_urns):
+        trimStorage = True
+        backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
+            for zip_info in sorted(list(self.members.values()), key=lambda k: k.file_header_offset, reverse=True):
+                arn = escaping.urn_from_member_name(zip_info.filename, self.urn, self.version)
+                if arn in child_urns:
+                    if self.resolver.CacheContains(arn):
+                        obj = self.resolver.CacheGet(arn)
+                        self.resolver.ObjectCache.Remove(obj)
+
+                    if arn in self.children:
+                        self.children.remove(arn)
+                    if self.members[arn] != None:
+                        del self.members[arn]
+
+                    if trimStorage:
+                        backing_store.Trim(zip_info.file_header_offset)
+                else:
+                    trimStorage = False
+
+    def RemoveSegment(self, segment_name):
+        segment_arn = escaping.urn_from_member_name(segment_name, self.urn, self.version)
+        self.RemoveMember(segment_arn)
+
     def Flush(self):
         # If the zip file was changed, re-write the central directory.
         if self.IsDirty():
@@ -899,10 +961,11 @@ class BasicZipFile(aff4.AFF4Volume):
             # cache.
             while len(self.children):
                 for child in list(self.children):
-                    with self.resolver.CacheGet(child) as obj:
-                        obj.Flush()
-
-                    self.children.remove(child)
+                    if (self.resolver.CacheContains(child)):
+                        with self.resolver.CacheGet(child) as obj:
+                            obj.Flush()
+                    if child in self.children:
+                        self.children.remove(child)
 
             # Add the turtle file to the volume.
             self.resolver.DumpToTurtle(self)

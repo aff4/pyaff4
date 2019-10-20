@@ -41,10 +41,10 @@ from pyaff4 import stream_factory
 from pyaff4 import utils
 from pyaff4 import streams
 from pyaff4 import aff4_map
-from pyaff4 import aff4_image
+from pyaff4 import aff4_image, encrypted_stream
 from pyaff4 import escaping
 from pyaff4 import turtle
-from pyaff4.zip import ZIP_DEFLATE
+from pyaff4.zip import ZIP_DEFLATE, ZIP_STORED
 from pyaff4.lexicon import transient_graph, any
 from pyaff4.aff4_map import isByteRangeARN
 
@@ -132,6 +132,17 @@ class AFF4ObjectCache(object):
         self.lru_map[key] = entry
 
         self._Trim()
+
+    def Contains(self, urn):
+        key = rdfvalue.URN(urn).SerializeToString()
+        entry = self.in_use.get(key)
+        if entry is not None:
+            return True
+
+        entry = self.lru_map.get(key)
+        if entry is not None:
+            return True
+        return False
 
     def Get(self, urn):
         key = rdfvalue.URN(urn).SerializeToString()
@@ -243,13 +254,14 @@ class AFF4ObjectCache(object):
 class MemoryDataStore(object):
     aff4NS = None
 
-    def __init__(self, lex=lexicon.standard):
+    def __init__(self, lex=lexicon.standard, parent=None):
         self.lexicon = lex
         self.loadedVolumes = []
         self.store = collections.OrderedDict()
         self.transient_store = collections.OrderedDict()
         self.ObjectCache = AFF4ObjectCache(10)
         self.flush_callbacks = {}
+        self.parent = parent
 
         if self.lexicon == lexicon.legacy:
             self.streamFactory = stream_factory.PreStdStreamFactory(
@@ -274,13 +286,19 @@ class MemoryDataStore(object):
     def DeleteSubject(self, subject):
         self.store.pop(rdfvalue.URN(subject), None)
 
+    def CacheContains(self, arn):
+        return self.ObjectCache.Contains(arn)
 
     def CacheGet(self, urn):
         result = self.ObjectCache.Get(urn)
-        if result is None:
-            result = aff4.NoneObject("Not present")
+        if result == None:
+            return result
+        else:
+            return result
+        #if result is None:
+        #    result = aff4.NoneObject("Not present")
 
-        return result
+        #return result
 
     def CachePut(self, obj):
         self.ObjectCache.Put(obj, True)
@@ -313,7 +331,7 @@ class MemoryDataStore(object):
         infoARN = escaping.urn_from_member_name(u"information.turtle", zipcontainer.urn, zipcontainer.version)
         if not zipcontainer.ContainsMember(infoARN):
             with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
-                turtle_segment.compression_method = ZIP_DEFLATE
+                turtle_segment.compression_method = ZIP_STORED
 
                 result = self._DumpToTurtle(zipcontainer.urn)
                 turtle_segment.write(utils.SmartStr(result))
@@ -477,7 +495,6 @@ class MemoryDataStore(object):
 
     def LoadFromTurtle(self, stream, volume_arn):
         data = streams.ReadAll(stream)
-        print(data)
         g = rdflib.Graph()
         g.parse(data=data, format="turtle")
 
@@ -549,6 +566,13 @@ class MemoryDataStore(object):
                 components = urn.Parse()
                 handler = registry.AFF4_TYPE_MAP.get(components.scheme)
 
+            if handler is None and self.parent != None:
+                # try the parent
+                o = self.parent.AFF4FactoryOpen(urn)
+                if o != None:
+                    return o
+
+
             if handler is None:
                 raise IOError("Unable to create object %s" % urn)
 
@@ -615,6 +639,7 @@ class MemoryDataStore(object):
             else:
                 if value not in oldvalue:
                     oldvalue.append(value)
+
 
     def Set(self, graph, subject, attribute, value):
         subject = rdfvalue.URN(subject).SerializeToString()

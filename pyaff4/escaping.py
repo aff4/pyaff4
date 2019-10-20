@@ -121,7 +121,7 @@ def member_name_for_urn(member_urn, version, base_urn=None, slash_ok=True, use_u
             else:
                 escaped_filename.append("%%%02x" % ord(c))
         return "".join(escaped_filename)
-    elif version.equals(1,1):
+    elif version.isGreaterThanOrEqual(1,1):
         #return toSegmentName(filename)
         filename = filename.replace("%20", " ")
         return filename

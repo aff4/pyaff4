@@ -111,12 +111,21 @@ AFF4_IMAGE_COMPRESSION_ZLIB = "https://www.ietf.org/rfc/rfc1950.txt"
 AFF4_IMAGE_COMPRESSION_SNAPPY = "http://code.google.com/p/snappy/"
 AFF4_IMAGE_COMPRESSION_SNAPPY_SCUDETTE = "https://github.com/google/snappy"
 AFF4_IMAGE_COMPRESSION_STORED = (AFF4_NAMESPACE + "compression/stored")
+AFF4_IMAGE_AES_XTS = "https://doi.org/10.1109/IEEESTD.2008.4493450"
 
 # AFF4Map - stores a mapping from one stream to another.
 AFF4_MAP_TYPE = (AFF4_NAMESPACE + "Map")
 AFF4_LEGACY_MAP_TYPE = (AFF4_LEGACY_NAMESPACE + "map")
 AFF4_SCUDETTE_MAP_TYPE = (AFF4_NAMESPACE + "map")
 
+# Encrypted Streams
+AFF4_ENCRYPTEDSTREAM_TYPE = (AFF4_NAMESPACE + "EncryptedStream")
+AFF4_RANDOMSTREAM_TYPE = (AFF4_NAMESPACE + "RandomAccessImageStream")
+AFF4_KEYBAG = (AFF4_NAMESPACE + "keyBag")
+AFF4_WRAPPEDKEY = (AFF4_NAMESPACE + "wrappedKey")
+AFF4_SALT = (AFF4_NAMESPACE + "salt")
+AFF4_ITERATIONS = (AFF4_NAMESPACE + "iterations")
+AFF4_KEYSIZEBYTES = (AFF4_NAMESPACE + "keySizeInBytes")
 
 # Categories describe the general type of an image.
 AFF4_CATEGORY = (AFF4_NAMESPACE + "category")
@@ -199,6 +208,13 @@ class Std11Lexicon(StdLexicon):
     child = base + "child"
     LogicalAcquisitionTask = base + "LogicalAcquisitionTask"
     filesystemRoot   = base + "filesystemRoot"
+    keyBag = AFF4_KEYBAG
+    salt = AFF4_SALT
+    iterations = AFF4_ITERATIONS
+    keySizeInBytes = AFF4_KEYSIZEBYTES
+    wrappedKey = AFF4_WRAPPEDKEY
+    EncryptedStream = AFF4_ENCRYPTEDSTREAM_TYPE
+
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE

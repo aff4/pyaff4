@@ -35,6 +35,7 @@ class LogicalAppendTest(unittest.TestCase):
     def setUp(self):
         pass
 
+    @unittest.skip
     def testCreateAndAppendSinglePathImageLarge2(self):
         try:
             containerName = "/tmp/test-append-large2.aff4"
@@ -90,6 +91,7 @@ class LogicalAppendTest(unittest.TestCase):
             pass
             # os.unlink(containerName)
 
+    @unittest.skip
     def testCreateAndAppendSinglePathImageLarge(self):
         try:
             length = 10000

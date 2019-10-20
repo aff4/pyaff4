@@ -165,6 +165,10 @@ class FileBackedObject(aff4.AFF4Stream):
     def Truncate(self):
         self.fd.truncate(0)
 
+    def Trim(self, offset):
+        self.fd.truncate(offset)
+        self.seek(0, offset)
+
     def Size(self):
         self.fd.seek(0, 2)
         return self.fd.tell()

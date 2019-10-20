@@ -28,7 +28,7 @@ from pyaff4 import rdfvalue
 from pyaff4 import aff4
 from pyaff4 import escaping
 from pyaff4.aff4_metadata import RDFObject
-from pyaff4 import zip
+from pyaff4 import zip, keybag
 from pyaff4.version import Version
 from pyaff4 import utils
 
@@ -121,15 +121,21 @@ class Container(object):
         return Container.openURN(rdfvalue.URN.FromFileName(filename))
 
     @staticmethod
-    def createURN(resolver, container_urn):
+    def createURN(resolver, container_urn, encryption=False):
         """Public method to create a new writable locical AFF4 container."""
 
         resolver.Set(lexicon.transient_graph, container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
 
-        version = Version(1, 1, "pyaff4")
-        with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
-            volume_urn = zip_file.urn
-            return WritableHashBasedImageContainer(version, volume_urn, resolver, lexicon.standard)
+        if encryption == False:
+            version = Version(1, 1, "pyaff4")
+            with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
+                volume_urn = zip_file.urn
+                return WritableHashBasedImageContainer(version, volume_urn, resolver, lexicon.standard)
+        else:
+            version = Version(1, 2, "pyaff4")
+            with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
+                volume_urn = zip_file.urn
+                return EncryptedImageContainer(version, volume_urn, resolver, lexicon.standard, mode="+")
 
     @staticmethod
     def openURN(urn):
@@ -171,36 +177,45 @@ class Container(object):
             with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
                 volumeURN = zip_file.urn
                 if lex == lexicon.standard or lex == lexicon.standard11:
+
                     images = list(resolver.QueryPredicateObject(volumeURN, lexicon.AFF4_TYPE, lex.Image))
-                    imageURN = images[0]
+                    if len(images) > 0:
+                        imageURN = images[0]
 
-                    datastreams = list(resolver.QuerySubjectPredicate(volumeURN, imageURN, lex.dataStream))
+                        datastreams = list(resolver.QuerySubjectPredicate(volumeURN, imageURN, lex.dataStream))
 
-                    if len(datastreams) > 0:
-                        # it is a disk image or a memory image
+                        if len(datastreams) > 0:
+                            # it is a disk image or a memory image
 
-                        for stream in datastreams:
-                            if lex.map in resolver.QuerySubjectPredicate(volumeURN, stream, lexicon.AFF4_TYPE):
-                                dataStream = resolver.AFF4FactoryOpen(stream)
-                                image = aff4.Image(resolver, urn=imageURN)
-                                dataStream.parent = image
+                            for stream in datastreams:
+                                if lex.map in resolver.QuerySubjectPredicate(volumeURN, stream, lexicon.AFF4_TYPE):
+                                    dataStream = resolver.AFF4FactoryOpen(stream)
+                                    image = aff4.Image(resolver, urn=imageURN)
+                                    dataStream.parent = image
 
-                                return PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
+                                    return PhysicalImageContainer(version, volumeURN, resolver, lex, image, dataStream)
+
+                        else:
+                            # it is a logical image
+                            if version.is11():
+                                # AFF4 logical images are defined at version 1.1
+                                if mode != None and mode == "+":
+                                    return WritableHashBasedImageContainer(version, volumeURN, resolver, lex)
+                                else:
+                                    return LogicalImageContainer(version, volumeURN, resolver, lex)
+                            else:
+                                # scudette's winpmem pre-std implementation is at 1.0
+                                lex = lexicon.pmemlogical
+                                return PreStdLogicalImageContainer(version, volumeURN, resolver, lex)
 
                     else:
-                        # it is a logical image
-                        if version.is11():
-                            # AFF4 logical images are defined at version 1.1
-                            if mode != None and mode == "+":
-                                return WritableHashBasedImageContainer(version, volumeURN, resolver, lex)
-                            else:
-                                return LogicalImageContainer(version, volumeURN, resolver, lex)
+                        # no images
+                        encryptedStreams = list(resolver.QueryPredicateObject(volumeURN, lexicon.AFF4_TYPE, lexicon.standard11.EncryptedStream))
+                        if len(encryptedStreams) == 1:
+                            encryptedBlockStreamARN = encryptedStreams[0]
+                            return EncryptedImageContainer(version, volumeURN, resolver, lexicon.standard11, encryptedBlockStreamARN, mode)
                         else:
-                            # scudette's winpmem pre-std implementation is at 1.0
-                            lex = lexicon.pmemlogical
-                            return PreStdLogicalImageContainer(version, volumeURN, resolver, lex)
-
-
+                            return LogicalImageContainer(version, volumeURN, resolver, lex)
 
 
                 elif lex == lexicon.scudette:
@@ -309,6 +324,7 @@ class WritableLogicalImageContainer(Container):
             if not volume.ContainsMember(container_description_urn):
                 with volume.CreateMember(container_description_urn) as container_description_file:
                     container_description_file.Write(SmartStr(volume.urn.value))
+                    container_description_file.Flush()
 
             # create the version segment if we aren't appending
             version_urn = self.urn.Append("version.txt")
@@ -316,6 +332,8 @@ class WritableLogicalImageContainer(Container):
                 with volume.CreateMember(version_urn) as versionFile:
                     # AFF4 logical containers are at v1.1
                     versionFile.Write(SmartStr(str(self.version)))
+                    versionFile.Flush()
+
 
 
     # write the logical stream as a compressed block stream using the Stream API
@@ -405,6 +423,12 @@ class WritableLogicalImageContainer(Container):
         if filename in ["information.turtle", "version.txt", "container.description"]:
             return True
         return False
+
+    def images(self):
+        _images = self.resolver.QueryPredicateObject(self.urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
+        for image in _images:
+            pathName = next(self.resolver.QuerySubjectPredicate(self.urn, image, lexicon.standard11.pathName))
+            yield aff4.LogicalImage(self, self.resolver, self.urn, image, pathName)
 
 class WritableHashBasedImageContainer(WritableLogicalImageContainer):
 
@@ -606,3 +630,85 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
         # Return ourselves to the resolver cache.
         self.resolver.Return(self.block_store_stream)
         return super(WritableHashBasedImageContainer, self).__exit__(exc_type, exc_value, traceback)
+
+class EncryptedImageContainer(Container):
+    def __init__(self, version, volumeURN, resolver, lex, encryptedBlockStreamARN=None, mode=None):
+        super(EncryptedImageContainer, self).__init__(version, volumeURN, resolver, lex)
+        self.childContainer = None
+        self.mode = mode
+        with self.resolver.AFF4FactoryOpen(self.urn) as volume:
+            container_description_urn = self.urn.Append("container.description")
+            volume.version = self.version
+
+            # create the container description if we aren't appending
+            if not volume.ContainsMember(container_description_urn):
+                with volume.CreateMember(container_description_urn) as container_description_file:
+                    container_description_file.Write(SmartStr(volume.urn.value))
+                    container_description_file.Flush()
+
+            # create the version segment if we aren't appending
+            version_urn = self.urn.Append("version.txt")
+            if not volume.ContainsMember(version_urn):
+                with volume.CreateMember(version_urn) as versionFile:
+                    # AFF4 logical containers are at v1.1
+                    versionFile.Write(SmartStr(str(self.version)))
+                    versionFile.Flush()
+
+
+        if encryptedBlockStreamARN == None:
+            encrypted_block_store_ARN = "aff4://%s" % uuid.uuid4()
+            self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
+                                                                        type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
+            self.block_store_stream.chunk_size = 512
+            self.block_store_stream.chunks_per_segment = 1024
+
+        else:
+            # loading
+            encrypted_block_store_ARN = encryptedBlockStreamARN
+            self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
+                                                                        type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
+            kbARN = resolver.GetUnique(volumeURN, encrypted_block_store_ARN, lex.keyBag)
+            kb = keybag.KeyBag.loadFromResolver(resolver, volumeURN, kbARN)
+            self.block_store_stream.setKeyBag(kb)
+
+    def init_child(self):
+        childResolver = data_store.MemoryDataStore(parent = self.resolver)
+        #childResolver.ObjectCache.Put(resolver.ObjectCache.Get(encrypted_block_store_ARN), True)
+
+        self.childZip =  zip.ZipFile.NewZipFile(childResolver, self.version, self.block_store_stream.urn)
+
+        #resolver.Set(lexicon.transient_graph, self.childZip.urn, lexicon.AFF4_TYPE,
+        #            rdfvalue.URN(lexicon.AFF4_ZIP_TYPE))
+
+        #self.resolver.Set(lexicon.transient_graph, self.block_store_stream.urn, lexicon.AFF4_STORED,
+        #             self.childZip.urn)
+
+        if self.mode != None and self.mode == "+":
+            self.childContainer = WritableLogicalImageContainer(self.version, self.childZip.urn, childResolver,
+                                                            lexicon.standard11)
+        else:
+            self.childContainer =  LogicalImageContainer(self.version, self.childZip.urn, childResolver,
+                                                            lexicon.standard11)
+
+
+    def __exit__(self, exc_type, exc_value, traceback):
+
+        # Return ourselves to the resolver cache.
+        if self.childContainer != None:
+            self.childContainer.resolver.Return(self.childContainer)
+            self.childContainer.__exit__(exc_type, exc_value, traceback)
+        #self.resolver.Return(self.block_store_stream)
+        self.block_store_stream.__exit__(exc_type, exc_value, traceback)
+        return super(EncryptedImageContainer, self).__exit__(exc_type, exc_value, traceback)
+
+    def setPassword(self, password):
+        if self.block_store_stream.keybag != None:
+            self.block_store_stream.setKey(self.block_store_stream.keybag.unwrap_key(password))
+        else:
+            kb = keybag.KeyBag.create(password)
+            self.block_store_stream.setKeyBag(kb)
+            self.block_store_stream.setKey(kb.unwrap_key(password))
+        self.init_child()
+
+    def getChildContainer(self):
+        return self.childContainer
