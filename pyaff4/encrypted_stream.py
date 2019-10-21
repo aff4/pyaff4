@@ -126,24 +126,16 @@ class RandomImageStream(AFF4SImage):
         self.size = offset
 
     def Write(self, data):
+        toWrite = len(data)
+        if toWrite == 0:
+            return 0
+
         self.MarkDirty()
         LOGGER.debug("Writing @ %x[%x]" % (self.writeptr, len(data)))
         #hexdump.hexdump(data)
-        toWrite = len(data)
+
         wrote = 0
         totalWrote = 0
-
-        if toWrite == 0:
-            return
-
-        # use "wrote" to carry a count of write between iterations of the loop
-        if len(data) < toWrite:
-            self.writeptr += wrote
-            if self.size < self.writeptr:
-                self.size = self.writeptr
-            totalWrote += wrote
-            toWrite -= wrote
-
         targetLCA = self.writeptr // self.chunk_size
 
         if self.IsFull():

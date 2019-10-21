@@ -31,7 +31,6 @@ rdflib.term._toPythonMapping[URIRef(_XSD_PFX + 'hexBinary')] = lambda s: binasci
 keysize = 0x20  # in bytes
 iterations = 147256
 saltSize = 16
-#keysize = 32
 
 class KeyBag:
     def __init__(self, salt, iterations, keySizeBytes, wrappedKey):
@@ -43,8 +42,6 @@ class KeyBag:
 
     @staticmethod
     def create(password):
-        #salt = binascii.unhexlify("000102030405060708090a0b0c0d0e0f")
-        #vek = binascii.unhexlify("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
         salt = os.urandom(saltSize)
         vek = os.urandom(keysize)
         print("VEK: " + str(binascii.hexlify(vek)))

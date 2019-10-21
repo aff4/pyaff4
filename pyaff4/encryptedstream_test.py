@@ -29,7 +29,7 @@ from pyaff4 import container
 from pyaff4 import keybag
 
 
-class AFF4ImageTest(unittest.TestCase):
+class AFF4EncryptedStreamTest(unittest.TestCase):
     filename = "/tmp/aff4_test_encrypted.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     image_name = "image.dd"
