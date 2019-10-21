@@ -1,5 +1,3 @@
-import aff4
-
 class RDFObject(object):
     def __init__(self, URN, resolver, lexicon):
         self.resolver = resolver
