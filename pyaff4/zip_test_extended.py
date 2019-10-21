@@ -28,7 +28,7 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-
+import tempfile
 
 from future import standard_library
 standard_library.install_aliases()
@@ -43,7 +43,7 @@ from pyaff4.version import Version
 import traceback
 
 class ZipTest(unittest.TestCase):
-    filename = "/tmp/aff4_test.zip"
+    filename = tempfile.gettempdir() + u"/aff4_zip_extended_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     data1 = b"I am a plain old segment!!!"
     data2 = b"I am an overwritten segment"

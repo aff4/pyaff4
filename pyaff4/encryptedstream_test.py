@@ -12,6 +12,7 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import tempfile
 
 from future import standard_library
 standard_library.install_aliases()
@@ -30,13 +31,20 @@ from pyaff4 import keybag
 
 
 class AFF4EncryptedStreamTest(unittest.TestCase):
-    filename = "/tmp/aff4_test_encrypted.zip"
+    filename = tempfile.gettempdir() + u"/aff4_encryptedstream_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     image_name = "image.dd"
 
+    def setUp(self):
+        try:
+            os.unlink(self.filename)
+            pass
+        except (IOError, OSError):
+            pass
+
     def tearDown(self):
         try:
-            #os.unlink(self.filename)
+            os.unlink(self.filename)
             pass
         except (IOError, OSError):
             pass

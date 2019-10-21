@@ -14,6 +14,7 @@ from __future__ import unicode_literals
 # the License.
 
 import os
+import tempfile
 import unittest
 
 from pyaff4 import aff4_file
@@ -25,9 +26,15 @@ from pyaff4 import zip
 from pyaff4 import container
 
 class AFF4MapTest(unittest.TestCase):
-    filename = u"/tmp/aff4_test.zip"
+    filename = tempfile.gettempdir() + u"/aff4_map_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     image_name = u"image.dd"
+
+    def setUp(self):
+        try:
+            os.unlink(self.filename)
+        except (IOError, OSError):
+            pass
 
     def tearDown(self):
         try:

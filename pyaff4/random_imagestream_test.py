@@ -12,11 +12,13 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import tempfile
 
 from future import standard_library
 standard_library.install_aliases()
 
 import unittest
+import os
 
 from pyaff4 import aff4_image
 from pyaff4 import data_store
@@ -28,13 +30,13 @@ from pyaff4 import plugins
 
 
 class AFF4ImageTest(unittest.TestCase):
-    filename = "/tmp/aff4_test_random.zip"
+    filename = tempfile.gettempdir() + u"/aff4_test_random.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     image_name = "image.dd"
 
     def tearDown(self):
         try:
-            #os.unlink(self.filename)
+            os.unlink(self.filename)
             pass
         except (IOError, OSError):
             pass

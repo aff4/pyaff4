@@ -15,7 +15,7 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-
+import tempfile
 
 from future import standard_library
 standard_library.install_aliases()
@@ -30,7 +30,7 @@ from pyaff4 import version
 
 
 class ZipTest(unittest.TestCase):
-    filename = "/tmp/aff4_test.zip"
+    filename = tempfile.gettempdir() + "/aff4_unicode2_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     segment_name = "\\犬\\ネコ.txt"
     data1 = b"I am a segment!"

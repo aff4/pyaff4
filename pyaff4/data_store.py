@@ -375,6 +375,7 @@ class MemoryDataStore(object):
                     turtle_segment.Flush()
                 self.Close(turtle_segment)
 
+                zipcontainer.RemoveSegment(u"information.turtle")
                 with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
                     turtle_segment.compression_method = ZIP_DEFLATE
                     turtle_segment.write(utils.SmartStr(directives_txt + "\r\n\r\n"))

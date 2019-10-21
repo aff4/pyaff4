@@ -12,6 +12,7 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import tempfile
 
 from future import standard_library
 standard_library.install_aliases()
@@ -32,11 +33,21 @@ src = "I am happy to join with you today in what will go down in history as the 
 
 
 class AFF4ImageTest(unittest.TestCase):
-    filenameA = "/tmp/aff4_test.aff4"
+    filenameA = tempfile.gettempdir() + "/aff4_cryptimage_test.aff4"
     filenameA_urn = rdfvalue.URN.FromFileName(filenameA)
     image_name = "image.dd"
 
-    filenameB = "/tmp/aff4_testB.aff4"
+    filenameB = tempfile.gettempdir() + "/aff4_testB.aff4"
+
+    def setUp(self):
+        try:
+            os.unlink(self.filenameA)
+        except (IOError, OSError):
+            pass
+        try:
+            os.unlink(self.filenameB)
+        except (IOError, OSError):
+            pass
 
     def remove(self):
         try:

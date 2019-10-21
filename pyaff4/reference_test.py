@@ -11,6 +11,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import tempfile
 
 from pyaff4 import data_store
 from pyaff4 import hashes
@@ -34,7 +35,7 @@ in the AFF4 Canonical Reference Image "AFF4Std/Base-Linear.aff4"
 class ReferenceTest(unittest.TestCase):
     referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images")
     stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
-    fileName = "/tmp/reference.aff4"
+    fileName = tempfile.gettempdir() + u"/reference.aff4"
 
     def setUp(self):
         with data_store.MemoryDataStore() as resolver:

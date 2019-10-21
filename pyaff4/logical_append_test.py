@@ -13,6 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import tempfile
 
 from pyaff4 import data_store, container, logical
 from pyaff4 import escaping
@@ -38,7 +39,7 @@ class LogicalAppendTest(unittest.TestCase):
     @unittest.skip
     def testCreateAndAppendSinglePathImageLarge2(self):
         try:
-            containerName = "/tmp/test-append-large2.aff4"
+            containerName = tempfile.gettempdir() + u"/test-append-large2.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
             largedata = io.BytesIO(os.urandom(1100000))
@@ -95,7 +96,7 @@ class LogicalAppendTest(unittest.TestCase):
     def testCreateAndAppendSinglePathImageLarge(self):
         try:
             length = 10000
-            containerName = "/tmp/test-append-large.aff4"
+            containerName = tempfile.gettempdir() + u"/test-append-large.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
             largedata = io.BytesIO(os.urandom(1100000))
@@ -158,7 +159,7 @@ class LogicalAppendTest(unittest.TestCase):
 
     def testCreateAndAppendSinglePathImage(self):
         try:
-            containerName = "/tmp/test-append.aff4"
+            containerName = tempfile.gettempdir() + u"/test-append.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
 

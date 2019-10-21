@@ -12,7 +12,7 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-
+import tempfile
 import unittest
 
 from pyaff4 import aff4_directory
@@ -26,7 +26,7 @@ from pyaff4 import plugins
 from nose.tools import nottest
 
 class AFF4DirectoryTest(unittest.TestCase):
-    root_path = "/tmp/aff4_directory/"
+    root_path = tempfile.gettempdir() + "/aff4_directory/"
     segment_name = "Foobar.txt"
 
     def tearDown(self):

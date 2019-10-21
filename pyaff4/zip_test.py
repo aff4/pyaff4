@@ -19,6 +19,7 @@ standard_library.install_aliases()
 import os
 import io
 import unittest
+import tempfile
 
 from pyaff4 import data_store
 from pyaff4 import lexicon
@@ -29,7 +30,7 @@ from pyaff4 import version
 
 
 class ZipTest(unittest.TestCase):
-    filename = "/tmp/aff4_test.zip"
+    filename = tempfile.gettempdir() + "/aff4_ziptest.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     segment_name = "Foobar.txt"
     streamed_segment = "streamed.txt"
@@ -37,6 +38,11 @@ class ZipTest(unittest.TestCase):
     data2 = b"I am another segment!"
 
     def setUp(self):
+        try:
+            os.unlink(self.filename)
+        except (IOError, OSError):
+            pass
+        
         with data_store.MemoryDataStore() as resolver:
             resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
                          rdfvalue.XSDString("truncate"))

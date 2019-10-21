@@ -16,7 +16,7 @@ from __future__ import unicode_literals
 from pyaff4.rdfvalue import *
 from pyaff4 import lexicon
 import hashlib
-import nacl.hash
+import nacl.hashlib
 
 def new(datatype):
     return hashNameToFunctionMap[datatype]()
@@ -57,7 +57,7 @@ hashNameToFunctionMap = {
     lexicon.HASH_SHA1: hashlib.sha1,
     lexicon.HASH_SHA256: hashlib.sha256,
     lexicon.HASH_SHA512: hashlib.sha512,
-    lexicon.HASH_BLAKE2B: nacl.hash.blake2b
+    lexicon.HASH_BLAKE2B: nacl.hashlib.blake2b
 }
 
 nameMap = dict(md5=lexicon.HASH_MD5, sha1=lexicon.HASH_SHA1, sha256=lexicon.HASH_SHA256, sha512=lexicon.HASH_SHA512,

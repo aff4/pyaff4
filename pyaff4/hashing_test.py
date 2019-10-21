@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 # the License.
 import os
 import unittest
+import logging
 
 from pyaff4 import data_store
 from pyaff4 import lexicon
@@ -25,6 +26,7 @@ from pyaff4 import hashes
 from pyaff4 import block_hasher
 from pyaff4 import linear_hasher
 
+LOGGER = logging.getLogger("pyaff4")
 
 referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..",
                                    u"test_images")
