@@ -19,6 +19,8 @@ import hashlib
 import nacl.hashlib
 
 def new(datatype):
+    if datatype == lexicon.HASH_BLAKE2B:
+        return nacl.hashlib.blake2b(digest_size=512//8)
     return hashNameToFunctionMap[datatype]()
 
 def newImmutableHash(value, datatype):
@@ -41,7 +43,7 @@ def newImmutableHash(value, datatype):
 
 
 def toShortAlgoName(datatype):
-    return hashNameToFunctionMap[datatype]().name
+    return new(datatype).name
 
 
 def fromShortName(name):
@@ -49,15 +51,22 @@ def fromShortName(name):
 
 
 def length(datatype):
-    return hashNameToFunctionMap[datatype]().digest_size
+    return hashNameToLengthMap[datatype]
 
 
 hashNameToFunctionMap = {
     lexicon.HASH_MD5: hashlib.md5,
     lexicon.HASH_SHA1: hashlib.sha1,
     lexicon.HASH_SHA256: hashlib.sha256,
-    lexicon.HASH_SHA512: hashlib.sha512,
-    lexicon.HASH_BLAKE2B: nacl.hashlib.blake2b
+    lexicon.HASH_SHA512: hashlib.sha512
+}
+
+hashNameToLengthMap = {
+    lexicon.HASH_MD5: new(lexicon.HASH_MD5).digest_size,
+    lexicon.HASH_SHA1: new(lexicon.HASH_SHA1).digest_size,
+    lexicon.HASH_SHA256: new(lexicon.HASH_SHA256).digest_size,
+    lexicon.HASH_SHA512: new(lexicon.HASH_SHA512).digest_size,
+    lexicon.HASH_BLAKE2B: new(lexicon.HASH_BLAKE2B).digest_size,
 }
 
 nameMap = dict(md5=lexicon.HASH_MD5, sha1=lexicon.HASH_SHA1, sha256=lexicon.HASH_SHA256, sha512=lexicon.HASH_SHA512,
