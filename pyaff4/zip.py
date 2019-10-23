@@ -401,6 +401,17 @@ class FileWrapper(object):
 
             return result
 
+class WritableFileWrapper(FileWrapper):
+    def write(self, buf):
+        with self.resolver.AFF4FactoryOpen(self.file_urn) as fd:
+            fd.SeekWrite(self.slice_offset + self.readptr, 0)
+            to_write = min(self.slice_size - self.readptr, len(buf))
+            fd.write(buf)
+            self.readptr += to_write
+            return to_write
+
+    def flush(self):
+        pass
 
 def DecompressBuffer(buffer):
     """Decompress using deflate a single buffer.
@@ -476,8 +487,12 @@ class ZipFileSegment(aff4_file.FileBackedObject):
 
             elif file_header.compression_method == ZIP_STORED:
                 # Otherwise we map a slice into it.
-                self.fd = FileWrapper(self.resolver, backing_store_urn,
-                                      backing_store.TellRead(), buffer_size)
+                if backing_store.properties.writable:
+                    self.fd = WritableFileWrapper(self.resolver, backing_store_urn,
+                                          backing_store.TellRead(), buffer_size)
+                else:
+                    self.fd = FileWrapper(self.resolver, backing_store_urn,
+                      backing_store.TellRead(), buffer_size)
 
             else:
                 LOGGER.info("Unsupported compression method.")
@@ -961,7 +976,9 @@ class BasicZipFile(aff4.AFF4Volume):
                 for child in list(self.children):
                     if (self.resolver.CacheContains(child)):
                         with self.resolver.CacheGet(child) as obj:
-                            obj.Flush()
+                            if obj.urn != self.urn.Append("information.turtle"):
+                                # we dont flush the existing information.turtle
+                                obj.Flush()
                     if child in self.children:
                         self.children.remove(child)
 

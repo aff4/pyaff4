@@ -403,6 +403,56 @@ class AFF4EncryptedStreamTest(unittest.TestCase):
                     self.assertEquals(512*1024+1, image.Size())
                     self.assertEqual(txt, image.ReadAll())
 
+    #@unittest.skip
+    def testAppendOfEncryptedSingleChunk(self):
+        version = container.Version(0, 1, "pyaff4")
+        print(self.filename)
+        kb = keybag.KeyBag.create("secret")
+        txt = b'a' * 512 * 1024 + b'b'
+        with data_store.MemoryDataStore() as resolver:
+            resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                         rdfvalue.XSDString("truncate"))
+
+            with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
+                self.volume_urn = zip_file.urn
+                self.image_urn = self.volume_urn.Append(self.image_name)
+
+                self.image_urn_2 = self.image_urn.Append("2")
+                with aff4_image.AFF4Image.NewAFF4Image(
+                    resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE) as image:
+                    image.DEBUG = True
+                    image.setKeyBag(kb)
+                    image.setKey(kb.unwrap_key("secret"))
+                    image.Write(b'a' * 512)
+
+        with data_store.MemoryDataStore() as resolver:
+            resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                         rdfvalue.XSDString("random"))
+
+            with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
+                self.volume_urn = zip_file.urn
+                self.image_urn = self.volume_urn.Append(self.image_name)
+
+                self.image_urn_2 = self.image_urn.Append("2")
+                with aff4_image.AFF4Image.NewAFF4Image(
+                    resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE) as image:
+                    image.DEBUG = True
+                    image.setKeyBag(kb)
+                    image.setKey(kb.unwrap_key("secret"))
+                    image.Write(b'b')
+
+        with data_store.MemoryDataStore() as resolver:
+            with zip.ZipFile.NewZipFile(resolver, version, self.filename_urn) as zip_file:
+                image_urn = zip_file.urn.Append(self.image_name)
+
+                self.image_urn_2 = self.image_urn.Append("2")
+                with resolver.AFF4FactoryOpen(self.image_urn_2) as image:
+                    image.setKeyBag(kb)
+                    image.setKey(kb.unwrap_key("secret"))
+                    image.DEBUG = True
+                    self.assertEquals(512, image.Size())
+                    self.assertEquals(b'b' + b'a'*511, image.ReadAll())
+
 if __name__ == '__main__':
     #logging.getLogger().setLevel(logging.DEBUG)
     unittest.main()

@@ -99,6 +99,11 @@ class FileBackedObject(aff4.AFF4Stream):
             self.properties.writable = True
             self._CreateIntermediateDirectories(directory_components)
 
+        elif mode == "random":
+            flags = "r+b"
+            self.properties.writable = True
+            self._CreateIntermediateDirectories(directory_components)
+
         LOGGER.info("Opening file %s", filename)
         self.fd = open(filename, flags)
         try:
