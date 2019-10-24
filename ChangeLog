@@ -1,8 +1,8 @@
+-- v0.30
++ In-progress support for encrypted image streams.
 -- v0.29
 + Fix double load of RDF
-
 -- v0.28
-
 + Replace dependency pyblake2 with pynacl (Apache Licence)
 + Add another sample - simple_block_read.py
 + Fix invalid dateTime RDF

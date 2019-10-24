@@ -140,8 +140,11 @@ class AFF4Image(aff4.AFF4Stream):
 
         self.cache = ExpiringDict(max_len=1000, max_age_seconds=10)
 
-        # this property is used for flagging in-place writes to bevvys
+        # used for identifying in-place writes to bevys
         self.bevy_is_loaded_from_disk = False
+
+        # used for identifying if a bevy now exceeds its initial size
+        self.bevy_size_has_changed = False
 
 
 
@@ -604,7 +607,7 @@ class AFF4SImage(AFF4PreSImage):
                                          for offset, length in bevy_index))
             bevy_index_segment.Write(serialized_index)
 
-        if self.bevy_is_loaded_from_disk:
+        if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
             # no need to flush the bevy
             bevy_index_segment._dirty = False
         if flush:

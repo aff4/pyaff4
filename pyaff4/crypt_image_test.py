@@ -39,6 +39,11 @@ class AFF4ImageTest(unittest.TestCase):
 
     filenameB = tempfile.gettempdir() + "/aff4_testB.aff4"
 
+    referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..",
+                                       u"test_images")
+    cert = os.path.join(referenceImagesPath, u"keys", u"certificate.pem")
+    privateKey = os.path.join(referenceImagesPath, u"keys", u"key.pem")
+
     def setUp(self):
         try:
             os.unlink(self.filenameA)
@@ -99,6 +104,36 @@ class AFF4ImageTest(unittest.TestCase):
             with container.Container.createURN(resolver, container_urn, encryption=False) as volume:
                 #volume.setPassword("password")
                 pass
+
+    def testCreateAndReadContainerWithCertEncrypted(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+
+        try:
+            os.unlink(self.filenameB)
+        except (IOError, OSError):
+            pass
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                volume.setPassword("password")
+                volume.setSetPublicKeyCert(self.cert)
+                logicalContainer = volume.getChildContainer()
+                with logicalContainer.newLogicalStream("hello", 137) as w:
+                    w.Write(b'a' * 512)
+                    w.Write(b'b' * 512)
+                    w.SeekWrite(0,0)
+                    w.Write(b'c' * 512)
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.setPrivateKey(self.privateKey)
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    self.assertEqual(b'c' * 512, fd.Read(512))
+                    self.assertEqual(b'b' * 512, fd.Read(512))
 
     def testCreateAndReadContainerRandom(self):
         version = container.Version(1, 1, "pyaff4")

@@ -43,7 +43,7 @@ from pyaff4 import streams
 from pyaff4 import aff4_map
 from pyaff4 import aff4_image, encrypted_stream
 from pyaff4 import escaping
-from pyaff4 import turtle
+from pyaff4 import turtle, hexdump
 from pyaff4.zip import ZIP_DEFLATE, ZIP_STORED
 from pyaff4.lexicon import transient_graph, any
 from pyaff4.aff4_map import isByteRangeARN
@@ -327,8 +327,20 @@ class MemoryDataStore(object):
 
         return False
 
-    def DumpToTurtle(self, zipcontainer):
+    def DumpToTurtle(self, zipcontainer, ):
         infoARN = escaping.urn_from_member_name(u"information.turtle", zipcontainer.urn, zipcontainer.version)
+        mode = self.GetUnique(lexicon.transient_graph, zipcontainer.backing_store_urn, lexicon.AFF4_STREAM_WRITE_MODE)
+        if mode == "random":
+            # random mode is used for appending to encrypted streams, where the stream size changes
+            # snapshot mode creates the situation where we have multiple versions of the stream object
+            # mashed together, and we cant tell the most recent
+            turtle_append_mode="latest"
+        else:
+            # in append mode, we assume that each time we append, we are adding to the container, rather
+            # than modifying any existing objects in the container. Because of this, we get to save multiple
+            # independent copies of the turtle from each run, and join them together as text for efficiency
+            turtle_append_mode="snapshot"
+
         if not zipcontainer.ContainsMember(infoARN):
             with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
                 turtle_segment.compression_method = ZIP_STORED
@@ -340,11 +352,24 @@ class MemoryDataStore(object):
         else:
             # append to an existng container
             self.invalidateCachedMetadata(zipcontainer)
+            if turtle_append_mode == "latest":
+                zipcontainer.RemoveMember(infoARN)
+                with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
+                    turtle_segment.compression_method = ZIP_STORED
+
+                    result = self._DumpToTurtle(zipcontainer.urn)
+                    turtle_segment.write(utils.SmartStr(result))
+                    turtle_segment.Flush()
+                turtle_segment.Close()
+                return
+
             explodedTurtleDirectivesARN = escaping.urn_from_member_name(u"information.turtle/directives", zipcontainer.urn, zipcontainer.version)
             if not zipcontainer.ContainsMember(explodedTurtleDirectivesARN):
                 # this is the first append operation. Create the chunked turtle structures
                 with zipcontainer.OpenZipSegment(u"information.turtle") as turtle_segment:
-                    currentturtle = utils.SmartUnicode(streams.ReadAll(turtle_segment))
+                    currentTurtleBytes= streams.ReadAll(turtle_segment)
+                    currentturtle = utils.SmartUnicode(currentTurtleBytes)
+                    hexdump.hexdump(currentTurtleBytes)
                     (directives_txt, triples_txt) = turtle.toDirectivesAndTripes(currentturtle)
                     with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
                         directives_segment.compression_method = ZIP_DEFLATE
@@ -377,7 +402,7 @@ class MemoryDataStore(object):
 
                 zipcontainer.RemoveSegment(u"information.turtle")
                 with zipcontainer.CreateZipSegment(u"information.turtle") as turtle_segment:
-                    turtle_segment.compression_method = ZIP_DEFLATE
+                    turtle_segment.compression_method = ZIP_STORED
                     turtle_segment.write(utils.SmartStr(directives_txt + "\r\n\r\n"))
 
                     turtleContainerIndex = 0

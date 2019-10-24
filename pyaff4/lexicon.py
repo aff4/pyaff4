@@ -126,6 +126,11 @@ AFF4_WRAPPEDKEY = (AFF4_NAMESPACE + "wrappedKey")
 AFF4_SALT = (AFF4_NAMESPACE + "salt")
 AFF4_ITERATIONS = (AFF4_NAMESPACE + "iterations")
 AFF4_KEYSIZEBYTES = (AFF4_NAMESPACE + "keySizeInBytes")
+AFF4_CERT_ENCRYPTED_KEYBAG = (AFF4_NAMESPACE + "CertEncryptedKeyBag")
+AFF4_PASSWORD_WRAPPED_KEYBAG = (AFF4_NAMESPACE + "PasswordWrappedKeyBag")
+AFF4_SERIALNUMBER = (AFF4_NAMESPACE + "serialNumber")
+AFF4_SUBJECTNAME = (AFF4_NAMESPACE + "subjectName")
+
 
 # Categories describe the general type of an image.
 AFF4_CATEGORY = (AFF4_NAMESPACE + "category")
@@ -214,6 +219,10 @@ class Std11Lexicon(StdLexicon):
     keySizeInBytes = AFF4_KEYSIZEBYTES
     wrappedKey = AFF4_WRAPPEDKEY
     EncryptedStream = AFF4_ENCRYPTEDSTREAM_TYPE
+    CertEncryptedKeyBag =  AFF4_CERT_ENCRYPTED_KEYBAG
+    PasswordWrappedKeyBag = AFF4_PASSWORD_WRAPPED_KEYBAG
+    serialNumber = AFF4_SERIALNUMBER
+    subjectName = AFF4_SUBJECTNAME
 
 
 class LegacyLexicon(Lexicon):

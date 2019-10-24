@@ -667,9 +667,14 @@ class EncryptedImageContainer(Container):
             encrypted_block_store_ARN = encryptedBlockStreamARN
             self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
                                                                         type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
-            kbARN = resolver.GetUnique(volumeURN, encrypted_block_store_ARN, lex.keyBag)
-            kb = keybag.KeyBag.loadFromResolver(resolver, volumeURN, kbARN)
-            self.block_store_stream.setKeyBag(kb)
+            for kbARN in self.resolver.Get(volumeURN, encrypted_block_store_ARN, lex.keyBag):
+                typ = self.resolver.GetUnique(volumeURN, kbARN, lexicon.AFF4_TYPE)
+                if typ == lexicon.standard11.PasswordWrappedKeyBag:
+                    kb = keybag.PasswordWrappedKeyBag.loadFromResolver(resolver, volumeURN, kbARN)
+                    self.block_store_stream.addKeyBag(kb)
+                elif typ == lexicon.standard11.CertEncryptedKeyBag:
+                    kb = keybag.CertEncryptedKeyBag.loadFromResolver(resolver, volumeURN, kbARN)
+                    self.block_store_stream.addKeyBag(kb)
 
     def init_child(self):
         childResolver = data_store.MemoryDataStore(parent = self.resolver)
@@ -702,12 +707,26 @@ class EncryptedImageContainer(Container):
         return super(EncryptedImageContainer, self).__exit__(exc_type, exc_value, traceback)
 
     def setPassword(self, password):
-        if self.block_store_stream.keybag != None:
-            self.block_store_stream.setKey(self.block_store_stream.keybag.unwrap_key(password))
+        if len(self.block_store_stream.keybags) > 0:
+            for passKeyBag in filter(lambda x: type(x) == keybag.PasswordWrappedKeyBag, self.block_store_stream.keybags):
+                vek = passKeyBag.unwrap_key(password)
+                self.block_store_stream.setKey(vek)
         else:
-            kb = keybag.KeyBag.create(password)
+            kb = keybag.PasswordWrappedKeyBag.create(password)
             self.block_store_stream.setKeyBag(kb)
             self.block_store_stream.setKey(kb.unwrap_key(password))
+        self.init_child()
+
+    def setSetPublicKeyCert(self, publicKeyCert):
+        passKeyBag = next(filter(lambda x: type(x) == keybag.PasswordWrappedKeyBag, self.block_store_stream.keybags))
+        kb = keybag.CertEncryptedKeyBag.create(self.block_store_stream.vek, passKeyBag.keySizeBytes, publicKeyCert)
+        kb.write(self.resolver, self.block_store_stream.urn)
+        self.resolver.Add(self.urn, self.block_store_stream.urn, lexicon.standard11.keyBag, kb.ID)
+
+    def setPrivateKey(self, privateKey):
+        for certKeyBag in filter(lambda x: type(x) == keybag.CertEncryptedKeyBag, self.block_store_stream.keybags):
+            vek = certKeyBag.unwrap_key(privateKey)
+            self.block_store_stream.setKey(vek)
         self.init_child()
 
     def getChildContainer(self):

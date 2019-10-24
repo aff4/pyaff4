@@ -6,13 +6,20 @@ import unittest
 
 import binascii
 from pyaff4.aes_keywrap import aes_wrap_key, aes_unwrap_key
-from passlib.hash import pbkdf2_sha256
 from passlib.crypto import digest
-import hashlib
 from CryptoPlus.Cipher import python_AES
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256, SHA1
+from Crypto.Signature import pss
 import codecs
 import rdflib
 from pyaff4 import keybag
+
+referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..",
+                                   u"test_images")
+cert = os.path.join(referenceImagesPath, u"keys", u"certificate.pem")
+privateKey = os.path.join(referenceImagesPath, u"keys", u"key.pem")
 
 keybagturtle = """
 @prefix :      <aff4://685e15cc-d0fb-4dbc-ba47-48117fc77044> .
@@ -49,7 +56,7 @@ class CryptoTest(unittest.TestCase):
         g = rdflib.Graph()
         g.parse(data=keybagturtle, format="turtle")
 
-        kb = keybag.KeyBag.load(g)
+        kb = keybag.PasswordWrappedKeyBag.load(g)
         self.assertEquals(wrapped, kb.wrappedKey)
 
     def testExtractWrappedKey(self):
@@ -59,7 +66,7 @@ class CryptoTest(unittest.TestCase):
 
         g = rdflib.Graph()
         g.parse(data=keybagturtle, format="turtle")
-        kb = keybag.KeyBag.load(g)
+        kb = keybag.PasswordWrappedKeyBag.load(g)
 
         key = "password"
         kek = digest.pbkdf2_hmac("sha256", key, kb.salt, kb.iterations, kb.keySizeBytes);
@@ -85,7 +92,7 @@ class CryptoTest(unittest.TestCase):
 
         g = rdflib.Graph()
         g.parse(data=keybagturtle, format="turtle")
-        kb = keybag.KeyBag.load(g)
+        kb = keybag.PasswordWrappedKeyBag.load(g)
 
         key = "password"
         kek = digest.pbkdf2_hmac("sha256", key, kb.salt, kb.iterations, kb.keySizeBytes);
@@ -142,6 +149,15 @@ class CryptoTest(unittest.TestCase):
         print(len(ciphertext))
         print(binascii.hexlify(ciphertext))
 
+    def testPKIWrap(self):
+        vek = binascii.unhexlify("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
 
+        publicKey = RSA.importKey(open(cert).read())
+        cipher = PKCS1_OAEP.new(key=publicKey, hashAlgo=SHA256, mgfunc=lambda x, y: pss.MGF1(x, y, SHA1))
+        ciphertext = cipher.encrypt(vek)
 
+        key = RSA.importKey(open(privateKey).read())
+        cipher = PKCS1_OAEP.new(key=key, hashAlgo=SHA256, mgfunc=lambda x, y: pss.MGF1(x, y, SHA1))
+        vek2 = cipher.decrypt(ciphertext)
+        self.assertEquals(vek, vek2)
 

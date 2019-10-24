@@ -24,6 +24,7 @@ AFF4 Reference Images github project at https://github.com/aff4/ReferenceImages
 4. Verification of linear and block hashed images.
 5. Reading & writing logical images (*new*) .
 6. Reading & writing deduplicated logical images (*new*).
+7. Encrypted AFF4 logical volumes (*new*).
 
 ## What is not yet supported:
 
@@ -31,11 +32,10 @@ The write support in the libraries is currently broken and being worked on.
 Other aspects of the AFF4 that have not yet been implemented in this codebase
 include:
 
-1. Encrypted AFF4 volumes.
-2. Persistent data store.
-3. HTTP backed streams.
-4. Support for signed statements or Bill of Materials.
-5. Directory based volumes.
+1. Persistent data store (resolver).
+2. HTTP backed streams.
+3. Support for signed statements or Bill of Materials.
+4. Directory based volumes.
 
 ## Notice
 
