@@ -279,6 +279,9 @@ class AFF4Stream(AFF4Object):
         if self.writeptr < 0:
             self.writeptr = 0
 
+        if self.size < self.writeptr:
+            self.size = self.writeptr
+
     def SeekRead(self, offset, whence=0):
         if whence == SEEK_SET:
             self.readptr = offset
@@ -375,3 +378,4 @@ EMPTY_PROGRESS = EmptyProgressContext()
 
 
 WIN32 = platform.system() == "Windows"
+MacOS = platform.system() == "Darwin"

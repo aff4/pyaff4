@@ -1,5 +1,4 @@
-from __future__ import unicode_literals
-# Copyright 2019 Schatz Forensic Pty. Ltd. All rights reserved.
+# Copyright 2019 Schatz Forensic Pty Ltd All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -12,6 +11,10 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+#
+# Author: Bradley L Schatz bradley@evimetry.com
+
+from __future__ import unicode_literals
 import tempfile
 
 from future import standard_library
@@ -27,7 +30,7 @@ from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import zip
 from pyaff4 import container
-from pyaff4 import keybag, lexicon
+from pyaff4 import keybag, lexicon, hexdump
 
 src = "I am happy to join with you today in what will go down in history as the greatest demonstration for freedom in the history of our nation.".encode()
 
@@ -118,7 +121,55 @@ class AFF4ImageTest(unittest.TestCase):
         with data_store.MemoryDataStore() as resolver:
             with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
                 volume.setPassword("password")
-                volume.setSetPublicKeyCert(self.cert)
+                volume.setPublicKeyCert(self.cert)
+                logicalContainer = volume.getChildContainer()
+                with logicalContainer.newLogicalStream("hello", 137) as w:
+                    w.SeekWrite(2*512,0)
+                    w.Write(b'c')
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.setPrivateKey(self.privateKey)
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    w.SeekWrite(0, 0)
+                    w.Write(b'a' * 512)
+                    w.Write(b'b')
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.setPrivateKey(self.privateKey)
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    w.SeekWrite(512, 0)
+                    w.Write(b'b' * 512)
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.setPrivateKey(self.privateKey)
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    self.assertEqual(b'a' * 512, fd.Read(512))
+                    self.assertEqual(b'b' * 512, fd.Read(512))
+                    self.assertEqual(b'c', fd.Read(512))
+
+    def testCreateAndReadContainerWithCertEncrypted(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+
+        try:
+            os.unlink(self.filenameB)
+        except (IOError, OSError):
+            pass
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                volume.setPassword("password")
+                volume.setPublicKeyCert(self.cert)
                 logicalContainer = volume.getChildContainer()
                 with logicalContainer.newLogicalStream("hello", 137) as w:
                     w.Write(b'a' * 512)
@@ -135,7 +186,8 @@ class AFF4ImageTest(unittest.TestCase):
                     self.assertEqual(b'c' * 512, fd.Read(512))
                     self.assertEqual(b'b' * 512, fd.Read(512))
 
-    def testCreateAndReadContainerRandom(self):
+    # test that we cant write to an encrypted container that hasnt been opened for append
+    def testCreateAndReadContainerAppendFails(self):
         version = container.Version(1, 1, "pyaff4")
         lex = lexicon.standard11
 
@@ -150,19 +202,122 @@ class AFF4ImageTest(unittest.TestCase):
                 volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 with logicalContainer.newLogicalStream("hello", 137) as w:
-                    w.Write(b'a' * 512)
-                    w.Write(b'b' * 512)
+                    w.compression = zip.ZIP_STORED
+                    w.SeekWrite(512*1024, 0)
+                    w.Write(b'b' * 512*1024)
+                    w.Write(b'c' * 512)
+
+        with data_store.MemoryDataStore() as resolver:
+            container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.setPassword("password")
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                try:
+                    with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as w:
+                        w.SeekWrite(0,0)
+                        w.Write(b'c' * 512)
+                    self.fail("Wrote to container")
+                except:
+                    pass
+        print()
+
+
+    def testCreateAndReadContainerAppendTiny(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+
+        try:
+            os.unlink(self.filenameB)
+        except (IOError, OSError):
+            pass
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                volume.block_store_stream.DEBUG = True
+                volume.chunk_size = 5
+                volume.chunks_per_segment = 2
+                volume.setPassword("password")
+                logicalContainer = volume.getChildContainer()
+                with logicalContainer.newLogicalStream("hello", 137) as w:
+                    w.compression_method = zip.ZIP_STORED
+                    w.SeekWrite(10, 0)
+                    #hexdump.hexdump(w.fd.getvalue())
+                    w.Write(b'b' * 10)
+                    #hexdump.hexdump(w.fd.getvalue())
+                    w.Write(b'c' * 5)
+
+
+        with data_store.MemoryDataStore() as resolver:
+            container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+            with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+                volume.block_store_stream.DEBUG = True
+                volume.chunk_size = 5
+                volume.chunks_per_segment = 2
+                volume.setPassword("password")
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as w:
+                    w.SeekWrite(0,0)
+                    w.Write(b'c' * 5)
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.block_store_stream.DEBUG = True
+                volume.setPassword("password")
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    expected = b'c' * 5 + b'\0' * 5 + b'b' * 10 + b'c' * 5
+                    self.assertEqual(expected, fd.ReadAll())
+
+
+    def testCreateAndReadContainerAppend(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+
+        try:
+            os.unlink(self.filenameB)
+        except (IOError, OSError):
+            pass
+
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                volume.block_store_stream.DEBUG = True
+                volume.setPassword("password")
+                logicalContainer = volume.getChildContainer()
+                with logicalContainer.newLogicalStream("hello", 137) as w:
+                    w.compression_method = zip.ZIP_STORED
+                    w.SeekWrite(512*1024, 0)
+                    #hexdump.hexdump(w.fd.getvalue())
+                    w.Write(b'b' * 512*1024)
+                    #hexdump.hexdump(w.fd.getvalue())
+                    w.Write(b'c' * 512)
+
+
+        with data_store.MemoryDataStore() as resolver:
+            container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+            with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+                volume.block_store_stream.DEBUG = True
+                volume.setPassword("password")
+                childVolume = volume.getChildContainer()
+                images = list(childVolume.images())
+                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as w:
                     w.SeekWrite(0,0)
                     w.Write(b'c' * 512)
 
         container_urn = rdfvalue.URN.FromFileName(self.filenameB)
         with container.Container.openURNtoContainer(container_urn) as volume:
+                volume.block_store_stream.DEBUG = True
                 volume.setPassword("password")
                 childVolume = volume.getChildContainer()
                 images = list(childVolume.images())
                 with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
-                    self.assertEqual(b'c' * 512, fd.Read(512))
-                    self.assertEqual(b'b' * 512, fd.Read(512))
+                    expected = b'c' * 512 + b'\0' * 512*1023 + b'b' * 512*1024 + b'c' * 512
+                    self.assertEqual(expected, fd.ReadAll())
+
 
     def testCreateAndReadContainerBadPassword(self):
         version = container.Version(1, 1, "pyaff4")

@@ -403,6 +403,8 @@ class FileWrapper(object):
 
 class WritableFileWrapper(FileWrapper):
     def write(self, buf):
+        if len(buf) > self.slice_size:
+            raise IOError("Size of write exceeds in-place writing of existing ZIP segment")
         with self.resolver.AFF4FactoryOpen(self.file_urn) as fd:
             fd.SeekWrite(self.slice_offset + self.readptr, 0)
             to_write = min(self.slice_size - self.readptr, len(buf))
@@ -431,11 +433,13 @@ class ZipFileSegment(aff4_file.FileBackedObject):
         owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(owner_urn, version=self.version) as owner:
             self.LoadFromZipFile(owner)
+            self.properties.writable = owner.properties.writable
 
     def LoadFromZipFile(self, owner):
         """Read the segment data from the ZipFile owner."""
         # Parse the ZipFileHeader for this filename.
         zip_info = owner.members.get(self.urn)
+        self.properties.writable = owner.properties.writable
         if zip_info is None:
             # The owner does not have this file yet - we add it when closing.
             self.fd = io.BytesIO()
@@ -509,11 +513,13 @@ class ZipFileSegment(aff4_file.FileBackedObject):
         if self.IsDirty():
             owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
             with self.resolver.AFF4FactoryOpen(owner_urn) as owner:
-                self.SeekRead(0)
+                if not owner.ContainsMember(self.urn):
+                    # only copy into the owner if we dont already exist there
+                    self.SeekRead(0)
 
-                # Copy ourselves into the owner.
-                owner.StreamAddMember(
-                    self.urn, self, self.compression_method)
+                    # Copy ourselves into the owner.
+                    owner.StreamAddMember(
+                        self.urn, self, self.compression_method)
 
         super(ZipFileSegment, self).Flush()
 
@@ -773,6 +779,8 @@ class BasicZipFile(aff4.AFF4Volume):
 
 
     def CreateZipSegment(self, filename, arn=None):
+        if not self.properties.writable:
+            raise IOError("Appempt to create Zip Segment in R/O Object")
         self.MarkDirty()
         segment_urn = arn
         if arn is None:
@@ -795,7 +803,7 @@ class BasicZipFile(aff4.AFF4Volume):
 
         result = ZipFileSegment(resolver=self.resolver, urn=segment_urn)
         result.LoadFromZipFile(self)
-
+        result.properties.writable = True
         # FIXME commenting due to unicode logging issue
         #LOGGER.info(u"Creating ZipFileSegment %s",
         #            result.urn.SerializeToString())
@@ -834,6 +842,12 @@ class BasicZipFile(aff4.AFF4Volume):
     def LoadFromURN(self):
         self.backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph,
             self.urn, lexicon.AFF4_STORED)
+        appendMode = self.resolver.GetUnique(lexicon.transient_graph,
+                                                         self.backing_store_urn , lexicon.AFF4_STREAM_WRITE_MODE)
+        if str(appendMode) in ["truncate", "append", "random" ]:
+            self.properties.writable = True
+
+
 
         if not self.backing_store_urn:
             raise IOError("Unable to load backing urn.")
@@ -959,7 +973,7 @@ class BasicZipFile(aff4.AFF4Volume):
 
                     if arn in self.children:
                         self.children.remove(arn)
-                    if self.members[arn] != None:
+                    if arn in self.members:
                         del self.members[arn]
 
 

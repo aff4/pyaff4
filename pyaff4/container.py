@@ -135,7 +135,7 @@ class Container(object):
             version = Version(1, 2, "pyaff4")
             with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
                 volume_urn = zip_file.urn
-                return EncryptedImageContainer(version, volume_urn, resolver, lexicon.standard, mode="+")
+                return EncryptedImageContainer(version, volume_urn, resolver, lexicon.standard)
 
     @staticmethod
     def openURN(urn):
@@ -172,7 +172,7 @@ class Container(object):
             resolver.lexicon = lex
             if mode != None and mode == "+":
                 resolver.Set(lexicon.transient_graph, urn, lexicon.AFF4_STREAM_WRITE_MODE,
-                             rdfvalue.XSDString("append"))
+                             rdfvalue.XSDString("random"))
 
             with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
                 volumeURN = zip_file.urn
@@ -333,8 +333,6 @@ class WritableLogicalImageContainer(Container):
                     # AFF4 logical containers are at v1.1
                     versionFile.Write(SmartStr(str(self.version)))
                     versionFile.Flush()
-
-
 
     # write the logical stream as a compressed block stream using the Stream API
     def writeCompressedBlockStream(self, image_urn, filename, readstream):
@@ -657,6 +655,15 @@ class EncryptedImageContainer(Container):
 
         if encryptedBlockStreamARN == None:
             encrypted_block_store_ARN = "aff4://%s" % uuid.uuid4()
+
+            if self.mode != None and self.mode == "+":
+                resolver.Set(lexicon.transient_graph, encrypted_block_store_ARN, lexicon.AFF4_STREAM_WRITE_MODE,
+                             rdfvalue.XSDString("random"))
+            else:
+                self.mode = "w"
+                resolver.Set(lexicon.transient_graph, encrypted_block_store_ARN, lexicon.AFF4_STREAM_WRITE_MODE,
+                             rdfvalue.XSDString("truncate"))
+
             self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
                                                                         type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
             self.block_store_stream.chunk_size = 512
@@ -665,6 +672,14 @@ class EncryptedImageContainer(Container):
         else:
             # loading
             encrypted_block_store_ARN = encryptedBlockStreamARN
+
+            if self.mode != None and self.mode == "+":
+                resolver.Set(lexicon.transient_graph, encrypted_block_store_ARN, lexicon.AFF4_STREAM_WRITE_MODE,
+                             rdfvalue.XSDString("random"))
+            else:
+                # regular read only open path
+                pass
+
             self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
                                                                         type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
             for kbARN in self.resolver.Get(volumeURN, encrypted_block_store_ARN, lex.keyBag):
@@ -677,10 +692,10 @@ class EncryptedImageContainer(Container):
                     self.block_store_stream.addKeyBag(kb)
 
     def init_child(self):
-        childResolver = data_store.MemoryDataStore(parent = self.resolver)
+        self.childResolver = data_store.MemoryDataStore(parent = self.resolver)
         #childResolver.ObjectCache.Put(resolver.ObjectCache.Get(encrypted_block_store_ARN), True)
 
-        self.childZip =  zip.ZipFile.NewZipFile(childResolver, self.version, self.block_store_stream.urn)
+        self.childZip =  zip.ZipFile.NewZipFile(self.childResolver, self.version, self.block_store_stream.urn)
 
         #resolver.Set(lexicon.transient_graph, self.childZip.urn, lexicon.AFF4_TYPE,
         #            rdfvalue.URN(lexicon.AFF4_ZIP_TYPE))
@@ -688,13 +703,19 @@ class EncryptedImageContainer(Container):
         #self.resolver.Set(lexicon.transient_graph, self.block_store_stream.urn, lexicon.AFF4_STORED,
         #             self.childZip.urn)
 
-        if self.mode != None and self.mode == "+":
-            self.childContainer = WritableLogicalImageContainer(self.version, self.childZip.urn, childResolver,
-                                                            lexicon.standard11)
+        if self.mode != None:
+            if self.mode == "+" or self.mode == "w":
+                # explicitly set writable as the above factory allocates its ARN dynamically, so
+                # we cant setup the right relationship
+                self.childZip.properties.writable = True
+                self.childContainer = WritableLogicalImageContainer(self.version, self.childZip.urn, self.childResolver,
+                                                                lexicon.standard11)
+
         else:
-            self.childContainer =  LogicalImageContainer(self.version, self.childZip.urn, childResolver,
+            self.childContainer =  LogicalImageContainer(self.version, self.childZip.urn, self.childResolver,
                                                             lexicon.standard11)
 
+        #self.childResolver.Return(self.childZip)
 
     def __exit__(self, exc_type, exc_value, traceback):
 
@@ -703,6 +724,8 @@ class EncryptedImageContainer(Container):
             self.childContainer.resolver.Return(self.childContainer)
             self.childContainer.__exit__(exc_type, exc_value, traceback)
         #self.resolver.Return(self.block_store_stream)
+        #if self.childZip != None:
+        #    self.childResolver.Return(self.childZip)
         self.block_store_stream.__exit__(exc_type, exc_value, traceback)
         return super(EncryptedImageContainer, self).__exit__(exc_type, exc_value, traceback)
 
@@ -717,7 +740,7 @@ class EncryptedImageContainer(Container):
             self.block_store_stream.setKey(kb.unwrap_key(password))
         self.init_child()
 
-    def setSetPublicKeyCert(self, publicKeyCert):
+    def setPublicKeyCert(self, publicKeyCert):
         passKeyBag = next(filter(lambda x: type(x) == keybag.PasswordWrappedKeyBag, self.block_store_stream.keybags))
         kb = keybag.CertEncryptedKeyBag.create(self.block_store_stream.vek, passKeyBag.keySizeBytes, publicKeyCert)
         kb.write(self.resolver, self.block_store_stream.urn)

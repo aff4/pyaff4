@@ -144,20 +144,26 @@ class FileBackedObject(aff4.AFF4Stream):
             progress.Report(self.readptr)
 
     def Write(self, data):
+        if not self.properties.writable:
+            raise IOError("Attempt to write to read only object")
         self.MarkDirty()
 
         # On OSX, the following test doesn't work
         # so we need to do the seek every time
-        # if self.fd.tell() != self.readptr:
-        #    self.fd.seek(self.readptr)
-        # TODO: make this platform aware
-        self.fd.seek(self.writeptr)
+        if aff4.MacOS:
+            self.fd.seek(self.writeptr)
+        else:
+            if self.fd.tell() != self.writeptr:
+                self.fd.seek(self.writeptr)
 
         self.fd.write(utils.SmartStr(data))
         # self.fd.flush()
 
-        self.size = len(data)
-        self.writeptr += self.size
+        #self.size = len(data)
+        #self.size = len(data)
+        self.writeptr += len(data)
+        if self.writeptr > self.size:
+            self.size = self.writeptr
 
     def Flush(self):
         if self.IsDirty():
@@ -204,3 +210,4 @@ class AFF4MemoryStream(FileBackedObject):
     def __init__(self, *args, **kwargs):
         super(AFF4MemoryStream, self).__init__(*args, **kwargs)
         self.fd = io.BytesIO()
+        self.properties.writable = True

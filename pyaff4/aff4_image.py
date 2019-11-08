@@ -109,6 +109,11 @@ class AFF4Image(aff4.AFF4Stream):
         #if not volume_urn:
         #    raise IOError("Unable to find storage for urn %s" % self.urn)
 
+        appendMode = self.resolver.GetUnique(lexicon.transient_graph,
+                                                         self.urn , lexicon.AFF4_STREAM_WRITE_MODE)
+        if appendMode != None and str(appendMode) in ["truncate", "append", "random" ]:
+            self.properties.writable = True
+
         self.lexicon = self.resolver.lexicon
 
         self.chunk_size = int(self.resolver.GetUnique(volume_urn,
@@ -333,7 +338,8 @@ class AFF4Image(aff4.AFF4Stream):
                 # if the data is sub chunk sized, pad with zeros
                 # (this generally only happens for the last chunk in the image stream)
                 topad = self.chunk_size - (self.size % self.chunk_size)
-                chunk += b"\x00" * topad
+                if topad < self.chunk_size:
+                    chunk += b"\x00" * topad
 
             self.FlushChunk(chunk)
 
@@ -361,6 +367,7 @@ class AFF4Image(aff4.AFF4Stream):
                     bevvys_to_remove.append(idx_arn)
 
                 volume.RemoveMembers(bevvys_to_remove)
+                volume.children.remove(self.urn)
 
             self.resolver.DeleteSubject(self.urn)
             self._dirty = False
@@ -460,6 +467,8 @@ class AFF4Image(aff4.AFF4Stream):
         result = b""
 
         while chunks_to_read > 0:
+            local_chunk_index = chunk_id % self.chunks_per_segment
+            bevy_id = chunk_id // self.chunks_per_segment
 
             r = self.cache.get(chunk_id)
             if r != None:
@@ -469,26 +478,27 @@ class AFF4Image(aff4.AFF4Stream):
                 chunks_read += 1
                 continue
 
-            if self._dirty:
-                # try reading directly from the yet-to-be persisted bevvy
-                if chunk_id < self.chunk_count_in_bevy:
-                    r = self.bevy[chunk_id]
-                    result += self.doDecompress(r, chunk_id)
+            if self._dirty and bevy_id == self.bevy_number:
+                # try reading from the write buffer
+                if local_chunk_index == self.chunk_count_in_bevy:
+                    #if len(self.buffer) == self.chunk_size:
+                    r = self.buffer
+                    result += r
                     chunks_to_read -= 1
                     chunk_id += 1
                     chunks_read += 1
                     continue
 
-                # try reading from the write buffer
-                if chunk_id == self.chunk_count_in_bevy:
-                    if len(self.buffer) == self.chunk_size:
-                        r = self.buffer
-                        result += r
-                        chunks_to_read -= 1
-                        chunk_id += 1
-                        chunks_read += 1
-                        continue
-
+                # try reading directly from the yet-to-be persisted bevvy
+                ss = len(self.bevy)
+                if local_chunk_index < len(self.bevy):
+                    r = self.bevy[local_chunk_index]
+                    #result += self.doDecompress(r, chunk_id)
+                    result += r
+                    chunks_to_read -= 1
+                    chunk_id += 1
+                    chunks_read += 1
+                    continue
 
             bevy_id = old_div(chunk_id, self.chunks_per_segment)
             bevy_urn = self.urn.Append("%08d" % bevy_id)

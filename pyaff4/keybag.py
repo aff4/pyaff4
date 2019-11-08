@@ -1,7 +1,4 @@
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
-# Copyright 2019 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright 2019 Schatz Forensic Pty Ltd All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -14,6 +11,12 @@ from __future__ import unicode_literals
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+#
+# Author: Bradley L Schatz bradley@evimetry.com
+
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
 
 from builtins import next
 from builtins import str
@@ -33,9 +36,6 @@ from Crypto.Signature import pss
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
-_XSD_PFX = 'http://www.w3.org/2001/XMLSchema#'
-rdflib.term._toPythonMapping[URIRef(_XSD_PFX + 'hexBinary')] = lambda s: binascii.unhexlify(s)
-
 keysize = 0x20  # in bytes
 iterations = 147256
 saltSize = 16
@@ -52,10 +52,10 @@ class PasswordWrappedKeyBag:
     def create(password):
         salt = Random.get_random_bytes(saltSize)
         vek = Random.get_random_bytes(keysize)
-        print("VEK: " + str(binascii.hexlify(vek)))
+        #print("VEK: " + str(binascii.hexlify(vek)))
         kek = digest.pbkdf2_hmac("sha256", password, salt, iterations, keysize);
         wrapped_key = aes_wrap_key(kek, vek)
-        print("WrappedKey: " + str(binascii.hexlify(wrapped_key)))
+        #print("WrappedKey: " + str(binascii.hexlify(wrapped_key)))
         return PasswordWrappedKeyBag(salt, iterations, keysize, wrapped_key)
 
     @staticmethod
@@ -70,7 +70,7 @@ class PasswordWrappedKeyBag:
     def unwrap_key(self, password):
         kek = digest.pbkdf2_hmac("sha256", password, self.salt, self.iterations, self.keySizeBytes);
         vek = aes_unwrap_key(kek, self.wrappedKey)
-        print("VEK: " + str(binascii.hexlify(vek)))
+        #print("VEK: " + str(binascii.hexlify(vek)))
         return vek
 
     def write(self, resolver, volumeARN):
@@ -86,8 +86,8 @@ class PasswordWrappedKeyBag:
         iterations = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.iterations)
         keySizeInBytes = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.keySizeInBytes)
         wrappedKey = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.wrappedKey)
-        print("WrappedKey: " + str(binascii.hexlify(wrappedKey.value._value)))
-        return PasswordWrappedKeyBag(salt.value._value, iterations.value, keySizeInBytes.value, wrappedKey.value._value)
+        #print("WrappedKey: " + str(binascii.hexlify(wrappedKey.value)))
+        return PasswordWrappedKeyBag(salt.value, iterations.value, keySizeInBytes.value, wrappedKey.value)
 
 class CertEncryptedKeyBag:
     def __init__(self, subjectName, serialNumber, keySizeBytes, wrappedKey):
@@ -100,7 +100,7 @@ class CertEncryptedKeyBag:
 
     @staticmethod
     def create(vek, keySizeBytes, certificatePath):
-        print("VEK: " + str(binascii.hexlify(vek)))
+        #print("VEK: " + str(binascii.hexlify(vek)))
         publicKeyPem = open(certificatePath).read()
         publicKey = RSA.importKey(publicKeyPem)
         # Convert from PEM to DER
@@ -114,7 +114,7 @@ class CertEncryptedKeyBag:
 
         cipher = PKCS1_OAEP.new(key=publicKey, hashAlgo=SHA256, mgfunc=lambda x, y: pss.MGF1(x, y, SHA1))
         wrapped_key = cipher.encrypt(vek)
-        print("WrappedKey: " + str(binascii.hexlify(wrapped_key)))
+        #print("WrappedKey: " + str(binascii.hexlify(wrapped_key)))
 
         return CertEncryptedKeyBag(subjectName, serial, keySizeBytes, wrapped_key)
 
@@ -123,7 +123,7 @@ class CertEncryptedKeyBag:
         key = RSA.importKey(open(privateKey).read())
         cipher = PKCS1_OAEP.new(key=key, hashAlgo=SHA256, mgfunc=lambda x, y: pss.MGF1(x, y, SHA1))
         vek = cipher.decrypt(self.wrappedKey)
-        print("VEK: " + str(binascii.hexlify(vek)))
+        #print("VEK: " + str(binascii.hexlify(vek)))
         return vek
 
     def write(self, resolver, volumeARN):
@@ -140,5 +140,5 @@ class CertEncryptedKeyBag:
         serial = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.serialNumber)
         keySizeInBytes = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.keySizeInBytes)
         wrappedKey = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.wrappedKey)
-        print("WrappedKey: " + str(binascii.hexlify(wrappedKey.value._value)))
-        return CertEncryptedKeyBag(subjectName.value, serial.value, keySizeInBytes.value, wrappedKey.value._value)
+        #print("WrappedKey: " + str(binascii.hexlify(wrappedKey.value)))
+        return CertEncryptedKeyBag(subjectName.value, serial.value, keySizeInBytes.value, wrappedKey.value)

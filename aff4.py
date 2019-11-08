@@ -1,4 +1,4 @@
-# Copyright 2018 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright 2018-2019 Schatz Forensic Pty Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -37,11 +37,17 @@ from pyaff4 import aff4_map
 VERBOSE = False
 TERSE = False
 
+def printImageMetadata(resolver, volume, image):
+    print("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
+    with resolver.AFF4FactoryOpen(image.urn) as srcStream:
+        if type(srcStream) == aff4_map.AFF4Map2:
+            source_ranges = sorted(srcStream.tree)
+            for n in source_ranges:
+                d = n.data
+                print("\t\t[%x,%x] -> %s[%x,%x]" % (
+                d.map_offset, d.length, srcStream.targets[d.target_id], d.target_offset, d.length))
 
-def meta(file):
-    volume = container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file))
-    resolver = volume.resolver
-
+def printTurtle(resolver, volume):
     metadataURN = volume.urn.Append("information.turtle")
     try:
         with resolver.AFF4FactoryOpen(metadataURN) as fd:
@@ -50,25 +56,37 @@ def meta(file):
     except:
         pass
 
-    for image in volume.images():
-        print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
-        with resolver.AFF4FactoryOpen(image.urn) as srcStream:
-            if type(srcStream) == aff4_map.AFF4Map2:
-                source_ranges = sorted(srcStream.tree)
-                for n in source_ranges:
-                    d = n.data
-                    print("\t\t[%x,%x] -> %s[%x,%x]" % (d.map_offset, d.length, srcStream.targets[d.target_id], d.target_offset, d.length))
+def meta(file, password):
+    with container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file)) as volume:
+        printTurtle(volume.resolver, volume)
+
+        if password != None:
+            assert not issubclass(volume.__class__, container.PhysicalImageContainer)
+            volume.setPassword(password[0])
+            childVolume = volume.getChildContainer()
+            printTurtle(childVolume.resolver, childVolume)
+            for image in childVolume.images():
+                printImageMetadata(childVolume.resolver, childVolume, image)
+        else:
+            for image in volume.images():
+                printImageMetadata(volume.resolver, volume, image)
 
 
-def list(file):
+
+def list(file, password):
     start = time.time()
-    volume = container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file))
-
-    print("Finished in %d (s)" % int(time.time() - start))
-    if issubclass(volume.__class__, container.PhysicalImageContainer):
-        printDiskImageInfo(file, volume)
-    elif issubclass(volume.__class__, container.LogicalImageContainer):
-        printLogicalImageInfo(file, volume)
+    with container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file)) as volume:
+        if password != None:
+            assert not issubclass(volume.__class__, container.PhysicalImageContainer)
+            volume.setPassword(password[0])
+            childVolume = volume.getChildContainer()
+            printLogicalImageInfo(file, childVolume)
+        else:
+            print("Finished in %d (s)" % int(time.time() - start))
+            if issubclass(volume.__class__, container.PhysicalImageContainer):
+                printDiskImageInfo(file, volume)
+            elif issubclass(volume.__class__, container.LogicalImageContainer):
+                printLogicalImageInfo(file, volume)
 
 
 
@@ -155,26 +173,38 @@ def trimVolume(volume, image):
         return image
 
 
-def verify(file):
-    volume = container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file))
-    printVolumeInfo(file, volume)
-    printCaseInfo(volume)
-    resolver = volume.resolver
+def verify(file, password):
+    with container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file)) as volume:
+        if password != None:
+            assert not issubclass(volume.__class__, container.PhysicalImageContainer)
+            volume.setPassword(password[0])
+            childVolume = volume.getChildContainer()
+            printVolumeInfo(file, childVolume)
+            printCaseInfo(childVolume)
+            resolver = childVolume.resolver
+            hasher = linear_hasher.LinearHasher2(resolver, LinearVerificationListener())
+            for image in childVolume.images():
+                print("\t%s <%s>" % (image.name(), trimVolume(childVolume.urn, image.urn)))
+                hasher.hash(image)
+        else:
+            printVolumeInfo(file, volume)
+            printCaseInfo(volume)
+            resolver = volume.resolver
 
-    if type(volume) == container.PhysicalImageContainer:
-        image = volume.image
-        listener = VerificationListener()
-        validator = block_hasher.Validator(listener)
-        print("Verifying AFF4 File: %s" % file)
-        validator.validateContainer(rdfvalue.URN.FromFileName(file))
-        for result in listener.results:
-            print("\t%s" % result)
-    elif type(volume) == container.LogicalImageContainer:
-        #print ("\tLogical Images:")
-        hasher = linear_hasher.LinearHasher2(resolver, LinearVerificationListener())
-        for image in volume.images():
-            print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
-            hasher.hash(image)
+            if type(volume) == container.PhysicalImageContainer:
+                image = volume.image
+                listener = VerificationListener()
+                validator = block_hasher.Validator(listener)
+                print("Verifying AFF4 File: %s" % file)
+                validator.validateContainer(rdfvalue.URN.FromFileName(file))
+                for result in listener.results:
+                    print("\t%s" % result)
+            elif type(volume) == container.LogicalImageContainer:
+                #print ("\tLogical Images:")
+                hasher = linear_hasher.LinearHasher2(resolver, LinearVerificationListener())
+                for image in volume.images():
+                    print ("\t%s <%s>" % (image.name(), trimVolume(volume.urn, image.urn)))
+                    hasher.hash(image)
 
 def ingestZipfile(container_name, zipfiles, append, check_bytes):
     # TODO: check path in exists
@@ -232,54 +262,74 @@ def ingestZipfile(container_name, zipfiles, append, check_bytes):
         print ("Finished in %d (s)" % int(time.time() - start))
         return urn
 
-def addPathNames(container_name, pathnames, recursive, append, hashbased):
+def addPathNamesToVolume(resolver, volume, pathnames, recursive, hashbased):
+    for pathname in pathnames:
+        if not os.path.exists(pathname):
+            print("Path %s not found. Skipping.")
+            continue
+        pathname = utils.SmartUnicode(pathname)
+        print("\tAdding: %s" % pathname)
+        fsmeta = logical.FSMetadata.create(pathname)
+        if os.path.isdir(pathname):
+            image_urn = None
+            if volume.isAFF4Collision(pathname):
+                image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
+            else:
+                image_urn = volume.urn.Append(escaping.arnPathFragment_from_path(pathname), quote=False)
+
+            fsmeta.urn = image_urn
+            fsmeta.store(resolver)
+            resolver.Set(volume.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(pathname))
+            resolver.Add(volume.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE),
+                         rdfvalue.URN(lexicon.standard11.FolderImage))
+            resolver.Add(volume.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
+            if recursive:
+                for child in os.listdir(pathname):
+                    pathnames.append(os.path.join(pathname, child))
+        else:
+            with open(pathname, "rb") as src:
+                hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
+                if hashbased == False:
+                    urn = volume.writeLogicalStream(pathname, hasher, fsmeta.length)
+                else:
+                    urn = volume.writeLogicalStreamRabinHashBased(pathname, hasher, fsmeta.length)
+                fsmeta.urn = urn
+                fsmeta.store(resolver)
+                for h in hasher.hashes:
+                    hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
+                    resolver.Add(urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
+
+def addPathNames(container_name, pathnames, recursive, append, hashbased, password):
     with data_store.MemoryDataStore() as resolver:
         container_urn = rdfvalue.URN.FromFileName(container_name)
         urn = None
+        encryption = False
+        parentVolume = None
+
+        if password != None:
+            encryption = True
 
         if append == False:
-            volume = container.Container.createURN(resolver, container_urn)
-            print("Creating AFF4Container: file://%s <%s>" % (container_name, volume.urn))
-        else:
-            volume = container.Container.openURNtoContainer(container_urn, mode="+", resolver=resolver)
-            print("Appending to AFF4Container: file://%s <%s>" % (container_name, volume.urn))
-
-        with volume as volume:
-            for pathname in pathnames:
-                if not os.path.exists(pathname):
-                    print("Path %s not found. Skipping.")
-                    continue
-                pathname = utils.SmartUnicode(pathname)
-                print ("\tAdding: %s" % pathname)
-                fsmeta = logical.FSMetadata.create(pathname)
-                if os.path.isdir(pathname):
-                    image_urn = None
-                    if volume.isAFF4Collision(pathname):
-                        image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
-                    else:
-                        image_urn = volume.urn.Append(escaping.arnPathFragment_from_path(pathname), quote=False)
-
-                    fsmeta.urn = image_urn
-                    fsmeta.store(resolver)
-                    resolver.Set(volume.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(pathname))
-                    resolver.Add(volume.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FolderImage))
-                    resolver.Add(volume.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
-                    if recursive:
-                        for child in os.listdir(pathname):
-                            pathnames.append(os.path.join(pathname, child))
+            with container.Container.createURN(resolver, container_urn, encryption=encryption) as volume:
+                print("Creating AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+                if password != None:
+                    volume.setPassword(password[0])
+                    childVolume = volume.getChildContainer()
+                    addPathNamesToVolume(childVolume.resolver, childVolume, pathnames, recursive, hashbased)
                 else:
-                    with open(pathname, "rb") as src:
-                        hasher = linear_hasher.StreamHasher(src, [lexicon.HASH_SHA1, lexicon.HASH_MD5])
-                        if hashbased == False:
-                            urn = volume.writeLogicalStream(pathname, hasher, fsmeta.length)
-                        else:
-                            urn = volume.writeLogicalStreamRabinHashBased(pathname, hasher, fsmeta.length)
-                        fsmeta.urn = urn
-                        fsmeta.store(resolver)
-                        for h in hasher.hashes:
-                            hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
-                            resolver.Add(urn, urn, rdfvalue.URN(lexicon.standard.hash), hh)
+                    addPathNamesToVolume(resolver, volume, pathnames, recursive, hashbased)
+        else:
+            with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+                print("Appending to AFF4Container: file://%s <%s>" % (container_name, volume.urn))
+                if password != None:
+                    volume.setPassword(password[0])
+                    childVolume = volume.getChildContainer()
+                    addPathNamesToVolume(childVolume.resolver, childVolume, pathnames, recursive, hashbased)
+                else:
+                    addPathNamesToVolume(resolver, volume, pathnames, recursive, hashbased)
+
         return urn
+
 
 def nextOrNone(iterable):
     try:
@@ -287,71 +337,95 @@ def nextOrNone(iterable):
     except:
         return None
 
-def extractAll(container_name, destFolder):
+def extractAllFromVolume(container_urn, volume, destFolder):
+    printVolumeInfo(container_urn.original_filename, volume)
+    resolver = volume.resolver
+    for imageUrn in resolver.QueryPredicateObject(volume.urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage):
+        imageUrn = utils.SmartUnicode(imageUrn)
+
+        pathName = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.pathName)).value
+        if pathName.startswith("/"):
+            pathName = "." + pathName
+        with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
+            if destFolder != "-":
+                destFile = os.path.join(destFolder, pathName)
+                if not os.path.exists(os.path.dirname(destFile)):
+                    try:
+                        os.makedirs(os.path.dirname(destFile))
+                    except OSError as exc:  # Guard against race condition
+                        if exc.errno != errno.EEXIST:
+                            raise
+                with open(destFile, "wb") as destStream:
+                    shutil.copyfileobj(srcStream, destStream)
+                    print("\tExtracted %s to %s" % (pathName, destFile))
+
+                lastWritten = nextOrNone(
+                    resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastWritten))
+                lastAccessed = nextOrNone(
+                    resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastAccessed))
+                recordChanged = nextOrNone(
+                    resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.recordChanged))
+                birthTime = nextOrNone(
+                    resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.birthTime))
+                logical.resetTimestamps(destFile, lastWritten, lastAccessed, recordChanged, birthTime)
+
+            else:
+                shutil.copyfileobj(srcStream, sys.stdout)
+def extractAll(container_name, destFolder, password):
     container_urn = rdfvalue.URN.FromFileName(container_name)
     urn = None
 
     with container.Container.openURNtoContainer(container_urn) as volume:
-        printVolumeInfo(container_urn.original_filename, volume)
-        resolver = volume.resolver
-        for imageUrn in resolver.QueryPredicateObject(volume.urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage):
-            imageUrn = utils.SmartUnicode(imageUrn)
+        if password != None:
+            assert not issubclass(volume.__class__, container.PhysicalImageContainer)
+            volume.setPassword(password[0])
+            childVolume = volume.getChildContainer()
+            extractAllFromVolume(container_urn, childVolume, destFolder)
+        else:
+            extractAllFromVolume(container_urn, volume, destFolder)
 
-            pathName = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.pathName)).value
-            if pathName.startswith("/"):
-                pathName = "." + pathName
-            with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
-                if destFolder != "-":
-                    destFile = os.path.join(destFolder, pathName)
-                    if not os.path.exists(os.path.dirname(destFile)):
-                        try:
-                            os.makedirs(os.path.dirname(destFile))
-                        except OSError as exc:  # Guard against race condition
-                            if exc.errno != errno.EEXIST:
-                                raise
-                    with open(destFile, "wb") as destStream:
-                        shutil.copyfileobj(srcStream, destStream)
-                        print ("\tExtracted %s to %s" % (pathName, destFile))
 
-                    lastWritten = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastWritten))
-                    lastAccessed = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.lastAccessed))
-                    recordChanged = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.recordChanged))
-                    birthTime = nextOrNone(resolver.QuerySubjectPredicate(volume.urn, imageUrn, lexicon.standard11.birthTime))
-                    logical.resetTimestamps(destFile, lastWritten, lastAccessed, recordChanged, birthTime)
 
-                else:
-                    shutil.copyfileobj(srcStream, sys.stdout)
+def extractFromVolume(container_urn, volume, imageURNs, destFolder):
+    printVolumeInfo(container_urn.original_filename, volume)
+    resolver = volume.resolver
+    for imageUrn in imageURNs:
+        imageUrn = utils.SmartUnicode(imageUrn)
 
-def extract(container_name, imageURNs, destFolder):
+        pathName = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, volume.lexicon.pathName))
+
+        with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
+            if destFolder != "-":
+                pathName = escaping.arnPathFragment_from_path(pathName.value)
+                while pathName.startswith("/"):
+                    pathName = pathName[1:]
+                destFile = os.path.join(destFolder, pathName)
+                if not os.path.exists(os.path.dirname(destFile)):
+                    try:
+                        os.makedirs(os.path.dirname(destFile))
+                    except OSError as exc:  # Guard against race condition
+                        if exc.errno != errno.EEXIST:
+                            raise
+                with open(destFile, "wb") as destStream:
+                    shutil.copyfileobj(srcStream, destStream, length=32 * 2014)
+                    print("\tExtracted %s to %s" % (pathName, destFile))
+            else:
+                shutil.copyfileobj(srcStream, sys.stdout)
+
+def extract(container_name, imageURNs, destFolder, password):
     with data_store.MemoryDataStore() as resolver:
         container_urn = rdfvalue.URN.FromFileName(container_name)
         urn = None
 
         with container.Container.openURNtoContainer(container_urn) as volume:
-            printVolumeInfo(container_urn.original_filename, volume)
-            resolver = volume.resolver
-            for imageUrn in imageURNs:
-                imageUrn = utils.SmartUnicode(imageUrn)
+            if password != None:
+                assert not issubclass(volume.__class__, container.PhysicalImageContainer)
+                volume.setPassword(password[0])
+                childVolume = volume.getChildContainer()
+                extractFromVolume(container_urn, childVolume, imageURNs, destFolder)
+            else:
+                extractFromVolume(container_urn, volume, imageURNs, destFolder)
 
-                pathName = next(resolver.QuerySubjectPredicate(volume.urn, imageUrn, volume.lexicon.pathName))
-
-                with resolver.AFF4FactoryOpen(imageUrn) as srcStream:
-                    if destFolder != "-":
-                        pathName = escaping.arnPathFragment_from_path(pathName.value)
-                        while pathName.startswith("/"):
-                            pathName = pathName[1:]
-                        destFile = os.path.join(destFolder, pathName)
-                        if not os.path.exists(os.path.dirname(destFile)):
-                            try:
-                                os.makedirs(os.path.dirname(destFile))
-                            except OSError as exc:  # Guard against race condition
-                                if exc.errno != errno.EEXIST:
-                                    raise
-                        with open(destFile, "wb") as destStream:
-                            shutil.copyfileobj(srcStream, destStream, length=32*2014)
-                            print ("\tExtracted %s to %s" % (pathName, destFile))
-                    else:
-                        shutil.copyfileobj(srcStream, sys.stdout)
 
 
 def main(argv):
@@ -366,7 +440,7 @@ def main(argv):
                         help='list the objects in the container')
     parser.add_argument('-m', "--meta", action="store_true",
                         help='dump the AFF4 metadata found in the container')
-    parser.add_argument('-f', "--folder", default=os.getcwd(),
+    parser.add_argument('-f', "--folder", nargs=1, action="store", default=os.getcwd(),
                         help='the destination folder for extraction of logical images')
     parser.add_argument('-r', "--recursive", action="store_true",
                         help='add files and folders recursively')
@@ -384,6 +458,8 @@ def main(argv):
                         help='append to an existing image')
     parser.add_argument('-i', "--ingest", action="store_true",
                         help='ingest a zip file into a hash based image')
+    parser.add_argument('-e', "--password", nargs=1, action="store",
+                        help='provide a password for encryption. This causes an encrypted container to be used.')
     parser.add_argument('aff4container', help='the pathname of the AFF4 container')
     parser.add_argument('srcFiles', nargs="*", help='source files and folders to add as logical image')
 
@@ -396,22 +472,22 @@ def main(argv):
 
     if args.create_logical == True:
         dest = args.aff4container
-        addPathNames(dest, args.srcFiles, args.recursive, args.append, args.hash)
+        addPathNames(dest, args.srcFiles, args.recursive, args.append, args.hash, args.password)
     elif  args.meta == True:
         dest = args.aff4container
-        meta(dest)
+        meta(dest, args.password)
     elif  args.list == True:
         dest = args.aff4container
-        list(dest)
+        list(dest, args.password)
     elif  args.verify == True:
         dest = args.aff4container
-        verify(dest)
+        verify(dest, args.password)
     elif args.extract == True:
         dest = args.aff4container
-        extract(dest, args.srcFiles, args.folder)
+        extract(dest, args.srcFiles, args.folder[0], args.password)
     elif args.extract_all == True:
         dest = args.aff4container
-        extractAll(dest, args.folder)
+        extractAll(dest, args.folder[0], args.password)
     elif args.ingest == True:
         dest = args.aff4container
         ingestZipfile(dest, args.srcFiles, False, args.paranoid)

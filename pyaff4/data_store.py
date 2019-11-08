@@ -30,7 +30,9 @@ import traceback
 import subprocess
 import sys
 import types
+import binascii
 
+from rdflib import URIRef
 from itertools import chain
 
 from pyaff4 import aff4
@@ -45,7 +47,7 @@ from pyaff4 import aff4_image, encrypted_stream
 from pyaff4 import escaping
 from pyaff4 import turtle, hexdump
 from pyaff4.zip import ZIP_DEFLATE, ZIP_STORED
-from pyaff4.lexicon import transient_graph, any
+from pyaff4.lexicon import transient_graph, XSD_NAMESPACE, any
 from pyaff4.aff4_map import isByteRangeARN
 
 LOGGER = logging.getLogger("pyaff4")
@@ -56,6 +58,9 @@ try:
     HAS_HDT = True
 except:
     pass
+
+# Coerce rdflib to use
+rdflib.term._toPythonMapping[URIRef(XSD_NAMESPACE + 'hexBinary')] = lambda s: binascii.unhexlify(s)
 
 #HAS_HDT = False
 def CHECK(condition, error):
@@ -274,8 +279,13 @@ class MemoryDataStore(object):
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.Flush()
+    def __exit__(self, exc_type, exc_value, tb):
+        try:
+            self.Flush()
+        except:
+            traceback.print_exc()
+        if exc_type != None:
+            return False
 
     def Flush(self):
         # Flush and expunge the cache.
@@ -369,7 +379,7 @@ class MemoryDataStore(object):
                 with zipcontainer.OpenZipSegment(u"information.turtle") as turtle_segment:
                     currentTurtleBytes= streams.ReadAll(turtle_segment)
                     currentturtle = utils.SmartUnicode(currentTurtleBytes)
-                    hexdump.hexdump(currentTurtleBytes)
+                    #hexdump.hexdump(currentTurtleBytes)
                     (directives_txt, triples_txt) = turtle.toDirectivesAndTripes(currentturtle)
                     with zipcontainer.CreateZipSegment(u"information.turtle/directives") as directives_segment:
                         directives_segment.compression_method = ZIP_DEFLATE

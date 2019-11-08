@@ -93,13 +93,19 @@ class RDFBytes(RDFValue):
     datatype = rdflib.XSD.hexBinary
 
     def SerializeToString(self):
-        return binascii.hexlify(self.value)
+        try:
+            return binascii.hexlify(self.value)
+        except:
+            print()
 
     def UnSerializeFromString(self, string):
         self.Set(binascii.unhexlify(string))
 
     def Set(self, data):
-        self.value = data
+        if type(data) == type(b''):
+            self.value = data
+        else:
+            self.value = data._value
 
     def __eq__(self, other):
         if isinstance(other, RDFBytes):

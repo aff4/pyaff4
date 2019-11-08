@@ -33,7 +33,6 @@ AFF4_MEMORY_NAMESPACE = "http://aff4.org/Schema#memory/"
 AFF4_DISK_NAMESPACE = "http://aff4.org/Schema#disk/"
 AFF4_MACOS_NAMESPACE = "http://aff4.org/Schema#macos/"
 
-
 # Attributes in this namespace will never be written to persistant
 # storage. They are simply used as a way for storing metadata about an AFF4
 # object internally.
@@ -126,10 +125,10 @@ AFF4_WRAPPEDKEY = (AFF4_NAMESPACE + "wrappedKey")
 AFF4_SALT = (AFF4_NAMESPACE + "salt")
 AFF4_ITERATIONS = (AFF4_NAMESPACE + "iterations")
 AFF4_KEYSIZEBYTES = (AFF4_NAMESPACE + "keySizeInBytes")
-AFF4_CERT_ENCRYPTED_KEYBAG = (AFF4_NAMESPACE + "CertEncryptedKeyBag")
+AFF4_CERT_ENCRYPTED_KEYBAG = (AFF4_NAMESPACE + "PublicKeyEncryptedKeyBag")
 AFF4_PASSWORD_WRAPPED_KEYBAG = (AFF4_NAMESPACE + "PasswordWrappedKeyBag")
 AFF4_SERIALNUMBER = (AFF4_NAMESPACE + "serialNumber")
-AFF4_SUBJECTNAME = (AFF4_NAMESPACE + "subjectName")
+AFF4_SUBJECTNAME = (AFF4_NAMESPACE + "x509SubjectName")
 
 
 # Categories describe the general type of an image.

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-#
-# Copyright 2018 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright 2018-2019 Schatz Forensic Pty Ltd All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -13,21 +12,10 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+#
+# Author: Bradley L Schatz bradley@evimetry.com
 
 from __future__ import unicode_literals
-# Copyright 2015 Google Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not
-# use this file except in compliance with the License.  You may obtain a copy of
-# the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-# License for the specific language governing permissions and limitations under
-# the License.
 import tempfile
 
 from future import standard_library
@@ -84,6 +72,49 @@ class ZipTest(unittest.TestCase):
 
         self.assertEquals(687, os.stat(self.filename).st_size)
 
+    #@unittest.skip
+    def testEditInplaceZip(self):
+        try:
+            os.unlink(self.filename)
+        except (IOError, OSError):
+            pass
+
+        with data_store.MemoryDataStore() as resolver:
+            resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                         rdfvalue.XSDString("truncate"))
+
+            with zip.ZipFile.NewZipFile(resolver, Version(1, 1, "pyaff4"), self.filename_urn) as zip_container:
+                self.volume_urn = zip_container.urn
+
+                with zip_container.CreateZipSegment("foo") as segment:
+                    segment.compression_method = zip.ZIP_STORED
+                    segment.Write(b'abcdefghijk')
+                    segment.Flush()
+
+                with zip_container.CreateZipSegment("bar") as segment:
+                    segment.compression_method = zip.ZIP_STORED
+                    segment.Write(b'alkjflajdflaksjdadflkjd')
+                    segment.Flush()
+
+                backing_store_urn = resolver.GetUnique(lexicon.transient_graph, self.volume_urn, lexicon.AFF4_STORED)
+                with resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
+                    print()
+
+        self.assertEquals(716, os.stat(self.filename).st_size)
+
+
+        with data_store.MemoryDataStore() as resolver:
+            resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                         rdfvalue.XSDString("random"))
+
+            with zip.ZipFile.NewZipFile(resolver, Version(1, 1, "pyaff4"), self.filename_urn) as zip_file:
+                self.volume_urn = zip_file.urn
+
+                with zip_file.OpenZipSegment("foo") as segment:
+                    segment.SeekWrite(0,0)
+                    segment.Write(b'0000')
+
+        self.assertEquals(716, os.stat(self.filename).st_size)
 
     #@unittest.skip
     def testRemoveDoesRewind(self):

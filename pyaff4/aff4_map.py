@@ -200,7 +200,9 @@ class AFF4Map(aff4.AFF4Stream):
             resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
                          rdfvalue.URN(volume_urn))
 
-            return resolver.AFF4FactoryOpen(image_urn)
+            res = resolver.AFF4FactoryOpen(image_urn)
+            res.properties.writable = volume.properties.writable
+            return res
 
     def deserializeMapPoint(self, data):
         return Range.FromSerialized(data)

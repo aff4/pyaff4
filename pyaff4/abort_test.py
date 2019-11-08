@@ -1,4 +1,4 @@
-# Copyright 2019 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright 2019 Schatz Forensic Pty Ltd All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -11,6 +11,8 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+#
+# Author: Bradley L Schatz bradley@evimetry.com
 
 from future import standard_library
 
@@ -42,7 +44,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
             pass
 
     #@unittest.skip
-    def testAbortEncryptedAnotherWrite(self):
+    def testAbortEncryptedImageStreamMultiBevy(self):
         version = container.Version(1, 1, "pyaff4")
         lex = lexicon.standard11
 
@@ -54,9 +56,9 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
         container_urn = rdfvalue.URN.FromFileName(self.filename)
         with data_store.MemoryDataStore() as resolver:
             with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
-                #volume.block_store_stream.chunks_per_segment = 1
-                volume.setPassword("password")
+                volume.block_store_stream.chunks_per_segment = 1
                 #volume.block_store_stream.DEBUG = True
+                volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 logicalContainer.maxSegmentResidentSize = 512
                 with logicalContainer.newLogicalStream("hello", 1024) as w:
@@ -75,8 +77,99 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                     w.Write(b'e' * 512)
 
         container_urn = rdfvalue.URN.FromFileName(self.filename)
-        with container.Container.openURNtoContainer(container_urn) as volume:
+        with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
             #volume.block_store_stream.DEBUG = True
+            volume.setPassword("password")
+
+            childVolume = volume.getChildContainer()
+            images = list(childVolume.images())
+            self.assertEquals(1, len(images))
+            with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                self.assertEqual(b'd' * 512, fd.Read(512))
+                self.assertEqual(b'e' * 512, fd.Read(512))
+
+    #@unittest.skip
+    def testAbortEncryptedImageStreamSingleBevy(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+
+        try:
+            os.unlink(self.filename)
+        except (IOError, OSError):
+            pass
+
+        container_urn = rdfvalue.URN.FromFileName(self.filename)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                volume.block_store_stream.chunks_per_segment = 1
+                volume.setPassword("password")
+                volume.block_store_stream.DEBUG = True
+                logicalContainer = volume.getChildContainer()
+                logicalContainer.maxSegmentResidentSize = 512
+                with logicalContainer.newLogicalStream("hello", 1024) as w:
+                    w.chunks_per_segment = 2
+                    w.chunk_size = 512
+                    w.compression_method = zip.ZIP_STORED
+                    w.Write(b'a' * 512)
+                    w.Write(b'b' * 512)
+                    w.Abort()
+
+                with logicalContainer.newLogicalStream("foo", 1024) as w:
+                    w.chunks_per_segment = 2
+                    w.chunk_size = 512
+                    w.compression_method = zip.ZIP_STORED
+                    w.Write(b'd' * 512)
+                    w.Write(b'e' * 512)
+
+        container_urn = rdfvalue.URN.FromFileName(self.filename)
+        with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+            volume.block_store_stream.DEBUG = True
+            volume.setPassword("password")
+
+            childVolume = volume.getChildContainer()
+            images = list(childVolume.images())
+            self.assertEquals(1, len(images))
+            with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                self.assertEqual(b'd' * 512, fd.Read(512))
+                self.assertEqual(b'e' * 512, fd.Read(512))
+
+
+    #@unittest.skip
+    def testAbortEncryptedZipStream(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+
+        try:
+            os.unlink(self.filename)
+        except (IOError, OSError):
+            pass
+
+        container_urn = rdfvalue.URN.FromFileName(self.filename)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                volume.block_store_stream.chunks_per_segment = 1
+                volume.setPassword("password")
+                volume.block_store_stream.DEBUG = True
+                logicalContainer = volume.getChildContainer()
+                logicalContainer.maxSegmentResidentSize = 2048
+                with logicalContainer.newLogicalStream("hello", 1024) as w:
+                    w.chunks_per_segment = 1
+                    w.chunk_size = 512
+                    w.compression_method = zip.ZIP_STORED
+                    w.Write(b'a' * 512)
+                    w.Write(b'b' * 512)
+                    w.Abort()
+
+                with logicalContainer.newLogicalStream("foo", 1024) as w:
+                    w.chunks_per_segment = 1
+                    w.chunk_size = 512
+                    w.compression_method = zip.ZIP_STORED
+                    w.Write(b'd' * 512)
+                    w.Write(b'e' * 512)
+
+        container_urn = rdfvalue.URN.FromFileName(self.filename)
+        with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
+            volume.block_store_stream.DEBUG = True
             volume.setPassword("password")
 
             childVolume = volume.getChildContainer()

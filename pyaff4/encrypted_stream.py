@@ -24,7 +24,7 @@ from builtins import object
 import binascii
 import logging
 import struct
-
+import math
 from CryptoPlus.Cipher import python_AES
 
 from pyaff4 import lexicon
@@ -114,6 +114,12 @@ class RandomImageStream(AFF4SImage):
         self.size = offset
 
     def Write(self, data):
+        wrote = 0
+        totalWrote = 0
+
+        if wrote > 0:
+            self.writeptr += wrote
+
         toWrite = len(data)
         if toWrite == 0:
             return 0
@@ -122,8 +128,7 @@ class RandomImageStream(AFF4SImage):
         LOGGER.debug("Writing @ %x[%x]" % (self.writeptr, len(data)))
         #hexdump.hexdump(data)
 
-        wrote = 0
-        totalWrote = 0
+
         targetLCA = self.writeptr // self.chunk_size
 
         #if self.IsFull():
@@ -182,23 +187,18 @@ class RandomImageStream(AFF4SImage):
             else:
                 firstPiece = self.buffer[0:offsetInChunk]
 
-            fragmentSize = 0
             if offsetInChunk + len(data) < len(self.buffer):
                 lastPiece = self.buffer[offsetInChunk + len(data):]
                 self.buffer = firstPiece + data + lastPiece
-                fragmentSize = len(data)
-                wrote = fragmentSize
-                data = b''
             else:
                 # full overwrite of the remainder of the buffer
                 self.buffer = firstPiece + data
-                wrote = len(data)
-                data = b''
         else:
             raise RuntimeError("Illegal state.")
 
 
         idx = 0
+        #chunksToWrite = math.ceil(len(self.buffer) / self.chunk_size)
         chunksToWrite = len(self.buffer) // self.chunk_size
         remainderToWrite = len(self.buffer) % self.chunk_size
 
@@ -206,7 +206,9 @@ class RandomImageStream(AFF4SImage):
             # only do this if the write changed chunks outside the current one.
             # i.e. we will have leftover in the buffer, or need to flush more than one
             # chunk from the buffer to the bevy
-            for targetLCA in range(self.currentLCA, self.currentLCA + chunksToWrite):
+            startLCA = self.currentLCA
+            endLCA = startLCA + chunksToWrite
+            for targetLCA in range(startLCA, endLCA):
                 flushed = False
                 if self.chunk_count_in_bevy == self.chunks_per_segment:
                     # full bevvy
@@ -225,32 +227,46 @@ class RandomImageStream(AFF4SImage):
                             #writing into a new bevvy at eof
                             pass
 
-                chunk = self.buffer[idx:idx + self.chunk_size]
-                idx += self.chunk_size
-                chunksToWrite -= 1
-                self.FlushChunk(chunk)
+                if idx + self.chunk_size <= len(self.buffer):
+                    chunk = self.buffer[idx:idx + self.chunk_size]
+                    idx += self.chunk_size
+                    chunksToWrite -= 1
+                    self.FlushChunk(chunk)
 
-        # deal with the partial remainder if it exists
-        remainderBuf = b''
-        if idx > 0:
-            remainderBuf = self.buffer[idx:]
-        else:
-            remainderBuf = self.buffer
 
         # if the bevy is full and there is no remainder, flush it
-        if self.chunk_count_in_bevy == self.chunks_per_segment and len(remainderBuf) > 0:
+        if self.chunk_count_in_bevy == self.chunks_per_segment:
             self._FlushBevy()
             # if the following bevy is persisted, load it from storage
             if self.bevy_number <= self.maxBevyIdx:
                 self.reloadBevy(self.bevy_number)
 
-        self.buffer = remainderBuf
+        # deal with the partial remainder if it exists
+        if idx > 0:
+            remainderBuf = self.buffer[idx:]
+            if len(remainderBuf) > 0:
+                self.buffer = self.mergeBufferWithChunk(remainderBuf)
 
+        wrote = len(data)
         self.writeptr += wrote
         totalWrote += wrote
         if self.writeptr > self.size:
             self.size = self.writeptr
         return totalWrote
+
+    def mergeBufferWithChunk(self, buf):
+        assert len(buf) <= self.chunk_size
+
+        if self.chunk_count_in_bevy >= len(self.bevy):
+            return buf
+        else:
+            chunk = self.bevy[self.chunk_count_in_bevy]
+            #assert len(chunk) == self.chunk_size
+            if len(buf) == 0:
+                return chunk
+            joinPoint = len(buf)
+            end = chunk[joinPoint:]
+            return  buf + end
 
     def reloadBevy(self, bevy_id):
         bevy_urn = self.urn.Append("%08d" % bevy_id)
@@ -264,7 +280,7 @@ class RandomImageStream(AFF4SImage):
                 off, sz = bevy_index[i]
                 bevy.SeekRead(off, 0)
                 chunk = bevy.Read(self.chunk_size)
-                chunks.append(self.onChunkLoad(chunk))
+                chunks.append(self.onChunkLoad(chunk, bevy_id, i))
 
                 # trim the chunk if it is the final one and it exceeds the size of the stream
                 endOfChunkAddress = (bevy_id * self.chunks_per_segment + i + 1) * self.chunk_size
@@ -282,7 +298,7 @@ class RandomImageStream(AFF4SImage):
 
 
     # hook for decryption
-    def onChunkLoad(self, chunk):
+    def onChunkLoad(self, chunk, bevy_index, chunk_index):
         return chunk
 
     def LoadFromURN(self):
@@ -291,9 +307,19 @@ class RandomImageStream(AFF4SImage):
         self.bevy_is_loaded_from_disk = False
         super(RandomImageStream, self).LoadFromURN()
         if self.size > 0:
-            self.reloadBevy(0)
-            self.bevy_is_loaded_from_disk = True
-            self.buffer = self.bevy[0]
+            self.loadInitialBevy()
+            self.maxBevyIdx = math.ceil(self.size / (self.chunk_size*self.chunks_per_segment)) -1
+
+    # extension point so that for this class we load the initial bevy on load
+    # the encryption oriented subclass NOOP overrides this to defer the initialization to
+    # after the set of the keys
+    def loadInitialBevy(self):
+        self.doLoadInitialBevy()
+
+    def doLoadInitialBevy(self):
+        self.reloadBevy(0)
+        self.bevy_is_loaded_from_disk = True
+        self.buffer = self.bevy[0]
 
     def _FlushBevy(self):
         # Bevy is empty nothing to do.
@@ -311,6 +337,7 @@ class RandomImageStream(AFF4SImage):
             with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
                 bevy_urn = self.urn.Append("%08d" % self.bevy_number)
                 bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
+                #if self.bevy_is_loaded_from_disk:
                 volume.RemoveMember(bevy_urn)
                 volume.RemoveMember(bevy_index_urn)
 
@@ -350,7 +377,8 @@ class RandomImageStream(AFF4SImage):
                         buf = self.buffer + self.bevy[self.chunk_count_in_bevy][offset:]
                         self.FlushChunk(buf)
                     else:
-                        assert len(self.buffer) == self.chunk_size
+                        l=  len(self.buffer)
+                        assert l == self.chunk_size
                         self.FlushChunk(self.buffer)
                 else:
                     if self.chunk_count_in_bevy == self.chunks_per_segment:
@@ -404,6 +432,12 @@ class AFF4EncryptedStream(RandomImageStream):
         self.key1 = vek[0:16]
         self.key2 = vek[16:]
         self.cipher = python_AES.new((self.key1, self.key2), python_AES.MODE_XTS)
+        if self.size > 0:
+            self.doLoadInitialBevy()
+
+    def loadInitialBevy(self):
+        # dont load the initial bevy info if the key isnt set
+        pass
 
     def Flush(self):
         super(AFF4EncryptedStream, self).Flush()
@@ -424,6 +458,7 @@ class AFF4EncryptedStream(RandomImageStream):
             with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
                 bevy_urn = self.urn.Append("%08d" % self.bevy_number)
                 bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
+                #if self.bevy_is_loaded_from_disk:
                 volume.RemoveMember(bevy_urn)
                 volume.RemoveMember(bevy_index_urn)
 
@@ -467,6 +502,10 @@ class AFF4EncryptedStream(RandomImageStream):
         self.bevy_length = 0
         self.bevy_is_loaded_from_disk = False
         self.bevy_size_has_changed = False
+
+    def onChunkLoad(self, chunk, bevy_index, chunk_index):
+        chunk_id = bevy_index * self.chunks_per_segment + chunk_index
+        return self.doDecompress(chunk, chunk_id)
 
     def doDecompress(self, cbuffer, chunk_id):
         if self.DEBUG:

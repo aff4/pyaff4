@@ -26,7 +26,7 @@ from pyaff4 import lexicon
 from pyaff4 import plugins
 from pyaff4 import rdfvalue
 from pyaff4 import zip
-from pyaff4 import version
+from pyaff4 import version, hexdump
 
 
 class ZipTest(unittest.TestCase):
@@ -90,6 +90,27 @@ class ZipTest(unittest.TestCase):
             segment_urn = zip_file.urn.Append(self.segment_name)
         with resolver.AFF4FactoryOpen(segment_urn) as segment:
             self.assertEquals(segment.Read(1000), self.data1 + self.data2)
+
+    def testSeekThrowsWhenWriting(self):
+        resolver = data_store.MemoryDataStore()
+        resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
+                     rdfvalue.XSDString("truncate"))
+
+        with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn) as zip_file:
+            segment_urn = zip_file.urn.Append(self.streamed_segment)
+
+            with zip_file.CreateMember(segment_urn) as segment:
+                try:
+                    segment.SeekWrite(100,0)
+                    segment.Write("foo")
+                    hexdump.hexdump(segment.fd.getvalue())
+                    segment.SeekWrite(0, 0)
+                    segment.Write("bar")
+                    hexdump.hexdump(segment.fd.getvalue())
+                    self.fail("Seeking when writing not supported")
+                except:
+                    pass
+
 
 if __name__ == '__main__':
     unittest.main()
