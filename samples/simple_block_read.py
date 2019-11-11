@@ -15,7 +15,7 @@
 from pyaff4 import container
 import binascii
 import os
-import hexdump
+from pyaff4 import hexdump
 
 referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images")
 stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
