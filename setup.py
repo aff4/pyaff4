@@ -28,6 +28,8 @@ ENV = {"__file__": __file__}
 exec(open("pyaff4/_version.py").read(), ENV)
 VERSION = ENV["get_versions"]()
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
 
 class NoseTestCommand(TestCommand):
     def finalize_options(self):
@@ -47,6 +49,7 @@ commands["test"] = NoseTestCommand
 setup(
     name='pyaff4',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     version=VERSION["pep440"],
     cmdclass=commands,
     description='Advanced Forensic Format Version 4 (AFF4) Python module.',
@@ -55,19 +58,7 @@ setup(
     url='https://www.aff4.org/',
     packages=['pyaff4'],
     package_dir={"pyaff4": "pyaff4"},
-    install_requires=[
-        "future",
-        "aff4-snappy == 0.5.1",
-        "rdflib[sparql] == 4.2.2",
-        "intervaltree == 2.1.0",
-        "pyblake2 >= 0.9.3",
-        "expiringdict == 1.1.4",
-        "pyyaml",
-        "tzlocal",
-        "html5lib",
-        "python-dateutil",
-        "fastchunking"
-    ],
+    install_requires=requirements,
     extras_require=dict(
         cloud="google-api-python-client"
     )
