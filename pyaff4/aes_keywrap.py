@@ -5,7 +5,7 @@ The purpose of this algorithm is to encrypt a key multiple times to add an extra
 '''
 import struct
 # TODO: dependency flexibility; make pip install aes_keywrap[cryptography], etc work
-from Cryptodome.Cipher import AES
+from Crypto.Cipher import AES
 
 QUAD = struct.Struct('>Q')
 
