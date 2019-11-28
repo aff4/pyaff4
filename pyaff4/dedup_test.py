@@ -25,7 +25,7 @@ from pyaff4.container import Container
 from pyaff4 import hashes
 import unittest, traceback
 from pyaff4 import utils
-import os, io
+import os, tempfile
 
 """
 Tests logical file creation
@@ -35,7 +35,7 @@ Tests logical file creation
 
 class DedupeTest(unittest.TestCase):
     testImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images", u"AFF4-L")
-
+    containerName = tempfile.gettempdir() + "/test-append-dedup.aff4"
 
     def setUp(self):
         pass
@@ -48,14 +48,12 @@ class DedupeTest(unittest.TestCase):
 
     def testCreateAndAppendSinglePathImage(self):
         try:
-
-            containerName = "/tmp/test-append-dedup.aff4"
             try:
-                os.unlink(containerName)
+                os.unlink(self.containerName)
             except:
                 pass
 
-            container_urn = rdfvalue.URN.FromFileName(containerName)
+            container_urn = rdfvalue.URN.FromFileName(self.containerName)
             resolver = data_store.MemoryDataStore()
             urn = None
 
