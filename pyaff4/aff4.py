@@ -164,6 +164,7 @@ class AFF4Object(object):
         self.resolver = resolver
         self._dirty = False
         self.version = version
+        self.closed = False
 
         if urn is None:
             urn = "aff4://%s" % uuid.uuid4()
