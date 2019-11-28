@@ -404,7 +404,7 @@ class FileWrapper(object):
 class WritableFileWrapper(FileWrapper):
     def write(self, buf):
         if len(buf) > self.slice_size:
-            raise IOError("Size of write exceeds in-place writing of existing ZIP segment")
+            raise IOError("Size of write exceeds in-place writing of existing ZIP segment (size=%d)" % len(buf))
         with self.resolver.AFF4FactoryOpen(self.file_urn) as fd:
             fd.SeekWrite(self.slice_offset + self.readptr, 0)
             to_write = min(self.slice_size - self.readptr, len(buf))
@@ -508,6 +508,10 @@ class ZipFileSegment(aff4_file.FileBackedObject):
             owner.StreamAddMember(
                 self.urn, stream, compression_method=self.compression_method,
                 progress=progress)
+
+    def FlushAndClose(self):
+        self.Flush()
+        self.closed = True
 
     def Flush(self):
         if self.IsDirty():
@@ -879,10 +883,10 @@ class BasicZipFile(aff4.AFF4Volume):
 
         backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
-            LOGGER.info("Writing member %s", member_urn)
-
             # Append member at the end of the file.
             backing_store.SeekWrite(0, aff4.SEEK_END)
+
+            LOGGER.info("Appending ZIP file header %s @ %x", member_urn, backing_store.TellWrite())
 
             # zip_info offsets are relative to the start of the zip file (take
             # global_offset into account).
@@ -894,6 +898,9 @@ class BasicZipFile(aff4.AFF4Volume):
             # For now we do not support streamed writing so we need to seek back
             # to this position later with an updated crc32.
             zip_info.WriteFileHeader(backing_store)
+
+            start_of_stream_addr = backing_store.TellWrite()
+
             if compression_method == ZIP_DEFLATE:
                 zip_info.compression_method = ZIP_DEFLATE
                 compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
@@ -937,7 +944,10 @@ class BasicZipFile(aff4.AFF4Volume):
             else:
                 raise RuntimeError("Unsupported compression method")
 
+            LOGGER.info("Wrote ZIP stream @ %x[%x]", start_of_stream_addr, zip_info.compress_size)
+
             # Update the local file header now that CRC32 is calculated.
+            LOGGER.info("Updating ZIP file header %s @ %x", member_urn, zip_info.file_header_offset)
             zip_info.WriteFileHeader(backing_store)
             self.members[member_urn] = zip_info
 
