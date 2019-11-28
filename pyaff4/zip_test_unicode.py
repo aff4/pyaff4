@@ -25,10 +25,10 @@ from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import zip
 from pyaff4.version import Version
-import traceback
+import traceback, tempfile
 
 class ZipTest(unittest.TestCase):
-    filename = "/tmp/aff4_test.zip"
+    filename = tempfile.gettempdir() + "/aff4_test.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     segment_name = "/犬/ネコ.txt"
     unc_segment_name = "\\\\foo\\bar\\ネコ.txt"
