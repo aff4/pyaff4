@@ -21,6 +21,7 @@ from builtins import range
 import os
 import unittest
 import traceback
+import tempfile
 
 from pyaff4 import aff4_image
 from pyaff4 import zip
@@ -32,7 +33,7 @@ from pyaff4 import rdfvalue, linear_hasher, hashes
 
 
 class AFF4AbortImageStreamTest(unittest.TestCase):
-    filename = "/tmp/aff4_test_abort.zip"
+    filename = tempfile.gettempdir()  + u"/aff4_test_abort.zip"
     filename_urn = rdfvalue.URN.FromFileName(filename)
     image_name = "image.dd"
 
