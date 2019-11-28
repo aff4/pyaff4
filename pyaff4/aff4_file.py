@@ -89,8 +89,8 @@ class FileBackedObject(aff4.AFF4Stream):
         mode = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE)
         if mode == "truncate":
             flags = "w+b"
-            self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE,
-                              rdfvalue.XSDString("append"))
+            #self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE,
+            #                 rdfvalue.XSDString("append"))
             self.properties.writable = True
             self._CreateIntermediateDirectories(directory_components)
 
@@ -144,6 +144,7 @@ class FileBackedObject(aff4.AFF4Stream):
             progress.Report(self.readptr)
 
     def Write(self, data):
+        LOGGER.info("ZipFileSegment.Write %s @ %x[%x]", self.urn, self.writeptr, len(data))
         if not self.properties.writable:
             raise IOError("Attempt to write to read only object")
         self.MarkDirty()
