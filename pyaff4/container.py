@@ -62,6 +62,7 @@ class Container(object):
         self.lexicon = lex
         self.resolver = resolver
         self.version = version
+        self.closed = False
 
     def getMetadata(self, klass):
         try:
@@ -634,6 +635,8 @@ class EncryptedImageContainer(Container):
         super(EncryptedImageContainer, self).__init__(version, volumeURN, resolver, lex)
         self.childContainer = None
         self.mode = mode
+        self.initial_debug_state = None
+
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             container_description_urn = self.urn.Append("container.description")
             volume.version = self.version
@@ -667,7 +670,7 @@ class EncryptedImageContainer(Container):
             self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
                                                                         type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
             self.block_store_stream.chunk_size = 512
-            self.block_store_stream.chunks_per_segment = 1024
+            self.block_store_stream.chunks_per_segment = 2048
 
         else:
             # loading
@@ -692,6 +695,7 @@ class EncryptedImageContainer(Container):
                     self.block_store_stream.addKeyBag(kb)
 
     def init_child(self):
+        self.initial_debug_state = self.block_store_stream.DEBUG
         self.childResolver = data_store.MemoryDataStore(parent = self.resolver)
         #childResolver.ObjectCache.Put(resolver.ObjectCache.Get(encrypted_block_store_ARN), True)
 
@@ -753,4 +757,6 @@ class EncryptedImageContainer(Container):
         self.init_child()
 
     def getChildContainer(self):
+        if self.initial_debug_state != None and (self.initial_debug_state != self.block_store_stream.DEBUG):
+            raise RuntimeError("The debug status of the encrypted stream has been changed after initialization.")
         return self.childContainer

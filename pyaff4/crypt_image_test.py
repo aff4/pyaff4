@@ -343,8 +343,28 @@ class AFF4ImageTest(unittest.TestCase):
             except:
                 pass
 
+    #@unittest.skip
+    def testBadAPIUsage(self):
+        version = container.Version(1, 1, "pyaff4")
+        lex = lexicon.standard11
+        try:
+            os.unlink(self.filenameB)
+        except (IOError, OSError):
+            pass
 
-    @unittest.skip
+        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
+        with data_store.MemoryDataStore() as resolver:
+            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
+                try:
+                    volume.setPassword("password")
+                    volume.block_store_stream.DEBUG = True
+                    logicalContainer = volume.getChildContainer()
+                    self.fail("Set DEBUG after init() should fail")
+                except:
+                    pass
+
+
+    #@unittest.skip
     def testCreateAndReadContainer(self):
         version = container.Version(1, 1, "pyaff4")
         lex = lexicon.standard11
@@ -412,5 +432,5 @@ class AFF4ImageTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    #logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(logging.DEBUG)
     unittest.main()
