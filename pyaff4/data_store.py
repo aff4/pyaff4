@@ -108,7 +108,7 @@ class AFF4ObjectCache(object):
         max_items = size or self.max_items
         while len(self.lru_map) > max_items:
             older_item = self.lru_list.prev
-            LOGGER.debug("Trimming %s from cache" % older_item.key)
+            #LOGGER.debug("Trimming %s from cache" % older_item.key)
 
             self.lru_map.pop(older_item.key)
             older_item.unlink()
@@ -240,6 +240,7 @@ class AFF4ObjectCache(object):
             for it in self.lru_list:
                 if it.aff4_obj.IsDirty():
                     dirty_objects_found = True
+                    LOGGER.debug("Flushing %s in cache" % it.key)
                     it.aff4_obj.Flush()
 
             if not dirty_objects_found:
@@ -248,6 +249,7 @@ class AFF4ObjectCache(object):
         # Now delete all entries.
         for it in list(self.lru_map.values()):
             aff4o = it.aff4_obj
+            LOGGER.debug("Closing %s in cache" % it.key)
             aff4o.Close()
             it.unlink()
 
@@ -316,7 +318,10 @@ class MemoryDataStore(object):
 
     def Return(self, obj):
         #LOGGER.debug("Returning %s" % obj.urn)
-        self.ObjectCache.Return(obj)
+        if obj.closed:
+            self.Close(obj)
+        else:
+            self.ObjectCache.Return(obj)
 
     def Close(self, obj):
         self.ObjectCache.Remove(obj)
