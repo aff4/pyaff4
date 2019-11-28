@@ -78,6 +78,7 @@ def list(file, password):
     with container.Container.openURNtoContainer(rdfvalue.URN.FromFileName(file)) as volume:
         if password != None:
             assert not issubclass(volume.__class__, container.PhysicalImageContainer)
+            #volume.block_store_stream.DEBUG = True
             volume.setPassword(password[0])
             childVolume = volume.getChildContainer()
             printLogicalImageInfo(file, childVolume)
