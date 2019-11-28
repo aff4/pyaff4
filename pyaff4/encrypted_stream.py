@@ -125,7 +125,7 @@ class RandomImageStream(AFF4SImage):
             return 0
 
         self.MarkDirty()
-        LOGGER.debug("Writing @ %x[%x]" % (self.writeptr, len(data)))
+        LOGGER.debug("EncryptedStream::Write %x[%x]" % (self.writeptr, len(data)))
         #hexdump.hexdump(data)
 
 
@@ -271,7 +271,7 @@ class RandomImageStream(AFF4SImage):
     def reloadBevy(self, bevy_id):
         bevy_urn = self.urn.Append("%08d" % bevy_id)
         bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
-
+        LOGGER.info("Reload Bevy %s", bevy_urn)
         chunks = []
 
         with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
@@ -322,6 +322,7 @@ class RandomImageStream(AFF4SImage):
         self.buffer = self.bevy[0]
 
     def _FlushBevy(self):
+        LOGGER.info("Flushing Bevy id=%x, entries=%x", self.bevy_number, len(self.bevy_index))
         # Bevy is empty nothing to do.
         if not self.bevy:
             return
@@ -329,7 +330,7 @@ class RandomImageStream(AFF4SImage):
         volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         if not volume_urn:
             raise IOError("Unable to find storage for urn %s" % self.urn)
-
+        
         if self.bevy_number > self.maxBevyIdx:
             self.maxBevyIdx = self.bevy_number
         if len(self.bevy) > self.bevy_length or self.bevy_size_has_changed:
@@ -338,7 +339,9 @@ class RandomImageStream(AFF4SImage):
                 bevy_urn = self.urn.Append("%08d" % self.bevy_number)
                 bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
                 #if self.bevy_is_loaded_from_disk:
+                LOGGER.info("Removing bevy member %s", bevy_urn)
                 volume.RemoveMember(bevy_urn)
+                LOGGER.info("Removing bevy member %s", bevy_index_urn)
                 volume.RemoveMember(bevy_index_urn)
 
         bevy_urn = self.urn.Append("%08d" % self.bevy_number)
@@ -346,7 +349,9 @@ class RandomImageStream(AFF4SImage):
             self._write_bevy_index(volume, bevy_urn, self.bevy_index, flush=True)
 
             with volume.CreateMember(bevy_urn) as bevy:
-                bevy.Write(b"".join(self.bevy))
+                content = b"".join(self.bevy)
+                LOGGER.info("Writing Bevy Content len=%x", len(content))
+                bevy.Write(content)
                 if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
                     # no need to rewrite the bevy as the zip header is still good
                     # and the blocks have been rewritten in-place
