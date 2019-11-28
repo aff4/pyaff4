@@ -96,7 +96,7 @@ class RDFBytes(RDFValue):
         try:
             return binascii.hexlify(self.value)
         except:
-            print()
+            pass
 
     def UnSerializeFromString(self, string):
         self.Set(binascii.unhexlify(string))
