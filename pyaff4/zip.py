@@ -429,6 +429,14 @@ def DecompressBuffer(buffer):
 class ZipFileSegment(aff4_file.FileBackedObject):
     compression_method = ZIP_STORED
 
+    def setCompressionMethod(self, method):
+        if method in [ZIP_STORED, lexicon.AFF4_IMAGE_COMPRESSION_STORED]:
+            self.compression_method = ZIP_STORED
+        elif method == ZIP_DEFLATE:
+            self.compression_method = ZIP_DEFLATE
+        else:
+            raise RuntimeError("Bad compression parameter")
+
     def LoadFromURN(self):
         owner_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         with self.resolver.AFF4FactoryOpen(owner_urn, version=self.version) as owner:
@@ -927,8 +935,8 @@ class BasicZipFile(aff4.AFF4Volume):
                 zip_info.compress_size += len(c_data)
                 backing_store.Write(c_data)
 
-            # Just write the data directly.
-            elif compression_method == ZIP_STORED:
+            # Just write the data directly. We allow usage of the AFF4 store synonym for simplicity
+            elif compression_method == ZIP_STORED or lexicon.AFF4_IMAGE_COMPRESSION_STORED:
                 zip_info.compression_method = ZIP_STORED
                 while True:
                     data = stream.read(BUFF_SIZE)
@@ -996,6 +1004,7 @@ class BasicZipFile(aff4.AFF4Volume):
         if self.IsDirty():
             # First Flush all our children, but only if they are still in the
             # cache.
+
             while len(self.children):
                 for child in list(self.children):
                     if (self.resolver.CacheContains(child)):

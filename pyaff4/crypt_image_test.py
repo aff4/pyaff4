@@ -202,7 +202,7 @@ class AFF4ImageTest(unittest.TestCase):
                 volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 with logicalContainer.newLogicalStream("hello", 137) as w:
-                    w.compression = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.SeekWrite(512*1024, 0)
                     w.Write(b'b' * 512*1024)
                     w.Write(b'c' * 512)
@@ -241,7 +241,7 @@ class AFF4ImageTest(unittest.TestCase):
                 volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 with logicalContainer.newLogicalStream("hello", 137) as w:
-                    w.compression_method = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.SeekWrite(10, 0)
                     #hexdump.hexdump(w.fd.getvalue())
                     w.Write(b'b' * 10)
@@ -289,7 +289,7 @@ class AFF4ImageTest(unittest.TestCase):
                 volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 with logicalContainer.newLogicalStream("hello", 137) as w:
-                    w.compression_method = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.SeekWrite(512*1024, 0)
                     #hexdump.hexdump(w.fd.getvalue())
                     w.Write(b'b' * 512*1024)

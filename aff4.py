@@ -89,8 +89,6 @@ def list(file, password):
             elif issubclass(volume.__class__, container.LogicalImageContainer):
                 printLogicalImageInfo(file, volume)
 
-
-
 def printLogicalImageInfo(file, volume):
     printVolumeInfo(file, volume)
     printCaseInfo(volume)

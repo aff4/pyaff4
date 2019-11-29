@@ -268,35 +268,6 @@ class RandomImageStream(AFF4SImage):
             end = chunk[joinPoint:]
             return  buf + end
 
-    def reloadBevy(self, bevy_id):
-        bevy_urn = self.urn.Append("%08d" % bevy_id)
-        bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
-        LOGGER.info("Reload Bevy %s", bevy_urn)
-        chunks = []
-
-        with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
-            bevy_index = self._parse_bevy_index(bevy)
-            for i in range(0, len(bevy_index)):
-                off, sz = bevy_index[i]
-                bevy.SeekRead(off, 0)
-                chunk = bevy.Read(self.chunk_size)
-                chunks.append(self.onChunkLoad(chunk, bevy_id, i))
-
-                # trim the chunk if it is the final one and it exceeds the size of the stream
-                endOfChunkAddress = (bevy_id * self.chunks_per_segment + i + 1) * self.chunk_size
-                if endOfChunkAddress > self.size:
-                    toKeep = self.chunk_size - (endOfChunkAddress - self.size)
-                    chunks[i] = chunks[i][0:toKeep]
-                    bevy_index = bevy_index[0:i+1]
-                    break
-        self.bevy = chunks
-        self.bevy_index = bevy_index
-        self.bevy_length = len(bevy_index)
-        self.bevy_number = bevy_id
-        self.bevy_is_loaded_from_disk = True
-
-
-
     # hook for decryption
     def onChunkLoad(self, chunk, bevy_index, chunk_index):
         return chunk

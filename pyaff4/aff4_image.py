@@ -33,7 +33,7 @@ from pyaff4 import aff4
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
-from pyaff4 import hashes, hexdump
+from pyaff4 import hashes, zip
 
 
 LOGGER = logging.getLogger("pyaff4")
@@ -89,6 +89,14 @@ class _CompressorStream(object):
 
 class AFF4Image(aff4.AFF4Stream):
 
+    def setCompressionMethod(self, method):
+        if method in [zip.ZIP_STORED, lexicon.AFF4_IMAGE_COMPRESSION_STORED]:
+            self.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+        elif method in [lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY, lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY_SCUDETTE, lexicon.AFF4_IMAGE_COMPRESSION_ZLIB ]:
+            self.compression = method
+        else:
+            raise RuntimeError("Bad compression parameter")
+
     @staticmethod
     def NewAFF4Image(resolver, image_urn, volume_urn, type=lexicon.AFF4_IMAGE_TYPE):
         with resolver.AFF4FactoryOpen(volume_urn) as volume:
@@ -102,7 +110,9 @@ class AFF4Image(aff4.AFF4Stream):
             resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
                          rdfvalue.URN(volume_urn))
 
-            return resolver.AFF4FactoryOpen(image_urn)
+            res = resolver.AFF4FactoryOpen(image_urn)
+            res.properties.writable = True
+            return res
 
     def LoadFromURN(self):
         volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
@@ -150,7 +160,6 @@ class AFF4Image(aff4.AFF4Stream):
 
         # used for identifying if a bevy now exceeds its initial size
         self.bevy_size_has_changed = False
-
 
 
     def _write_bevy_index(self, volume, bevy_urn, bevy_index, flush=False):
@@ -393,7 +402,11 @@ class AFF4Image(aff4.AFF4Stream):
         result = b""
 
         while chunks_to_read > 0:
-            chunks_read, data = self._ReadPartial(chunk_id, chunks_to_read)
+            #chunks_read, data = self._ReadPartial(chunk_id, chunks_to_read)
+            if self.properties.writable:
+                chunks_read, data = self._ReadPartial(chunk_id, chunks_to_read)
+            else:
+                chunks_read, data = self._ReadPartialRO(chunk_id, chunks_to_read)
             if chunks_read == 0:
                 break
 
@@ -461,6 +474,71 @@ class AFF4Image(aff4.AFF4Stream):
                                bevy.Size() - chunk_offsets[-1]))
             LOGGER.info("Loaded Bevy Index %s entries=%x", bevy_index_urn, len(result))
             return result
+
+    def reloadBevy(self, bevy_id):
+        bevy_urn = self.urn.Append("%08d" % bevy_id)
+        bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
+        LOGGER.info("Reload Bevy %s", bevy_urn)
+        chunks = []
+
+        with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
+            bevy_index = self._parse_bevy_index(bevy)
+            for i in range(0, len(bevy_index)):
+                off, sz = bevy_index[i]
+                bevy.SeekRead(off, 0)
+                chunk = bevy.Read(sz)
+                chunks.append(self.onChunkLoad(chunk, bevy_id, i))
+
+                # trim the chunk if it is the final one and it exceeds the size of the stream
+                endOfChunkAddress = (bevy_id * self.chunks_per_segment + i + 1) * self.chunk_size
+                if endOfChunkAddress > self.size:
+                    toKeep = self.chunk_size - (endOfChunkAddress - self.size)
+                    chunks[i] = chunks[i][0:toKeep]
+                    bevy_index = bevy_index[0:i+1]
+                    break
+        self.bevy = chunks
+        self.bevy_index = bevy_index
+        self.bevy_length = len(bevy_index)
+        self.bevy_number = bevy_id
+        self.bevy_is_loaded_from_disk = True
+
+    def onChunkLoad(self, chunk, bevy_id, chunk_id):
+        return self.doDecompress(chunk, bevy_id*self.chunks_per_segment + chunk_id)
+
+    def _ReadPartialRO(self, chunk_id, chunks_to_read):
+        chunks_read = 0
+        result = b""
+
+        while chunks_to_read > 0:
+            local_chunk_index = chunk_id % self.chunks_per_segment
+            bevy_id = chunk_id // self.chunks_per_segment
+
+            if not self.bevy_is_loaded_from_disk:
+                self.reloadBevy(0)
+                self.buffer = self.bevy[0]
+
+            r = self.cache.get(chunk_id)
+            if r != None:
+                result += r
+                chunks_to_read -= 1
+                chunk_id += 1
+                chunks_read += 1
+                continue
+
+            if bevy_id != self.bevy_number:
+                self.reloadBevy(bevy_id)
+
+            # read directly from the bevvy
+            ss = len(self.bevy)
+            if local_chunk_index < len(self.bevy):
+                r = self.bevy[local_chunk_index]
+                result += r
+                chunks_to_read -= 1
+                chunk_id += 1
+                chunks_read += 1
+                continue
+
+        return chunks_read, result
 
     def _ReadPartial(self, chunk_id, chunks_to_read):
         chunks_read = 0

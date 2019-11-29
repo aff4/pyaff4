@@ -65,7 +65,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                 with logicalContainer.newLogicalStream("hello", 1024) as w:
                     w.chunks_per_segment = 1
                     w.chunk_size = 512
-                    w.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.Write(b'a' * 512)
                     w.Write(b'b' * 512)
                     w.Abort()
@@ -73,7 +73,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                 with logicalContainer.newLogicalStream("foo", 1024) as w:
                     w.chunks_per_segment = 1
                     w.chunk_size = 512
-                    w.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.Write(b'd' * 512)
                     w.Write(b'e' * 512)
 
@@ -103,14 +103,14 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
         with data_store.MemoryDataStore() as resolver:
             with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
                 volume.block_store_stream.chunks_per_segment = 1
-                volume.setPassword("password")
                 volume.block_store_stream.DEBUG = True
+                volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 logicalContainer.maxSegmentResidentSize = 512
                 with logicalContainer.newLogicalStream("hello", 1024) as w:
                     w.chunks_per_segment = 2
                     w.chunk_size = 512
-                    w.compression_method = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.Write(b'a' * 512)
                     w.Write(b'b' * 512)
                     w.Abort()
@@ -118,7 +118,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                 with logicalContainer.newLogicalStream("foo", 1024) as w:
                     w.chunks_per_segment = 2
                     w.chunk_size = 512
-                    w.compression_method = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.Write(b'd' * 512)
                     w.Write(b'e' * 512)
 
@@ -149,14 +149,14 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
         with data_store.MemoryDataStore() as resolver:
             with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
                 volume.block_store_stream.chunks_per_segment = 1
-                volume.setPassword("password")
                 volume.block_store_stream.DEBUG = True
+                volume.setPassword("password")
                 logicalContainer = volume.getChildContainer()
                 logicalContainer.maxSegmentResidentSize = 2048
                 with logicalContainer.newLogicalStream("hello", 1024) as w:
                     w.chunks_per_segment = 1
                     w.chunk_size = 512
-                    w.compression_method = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.Write(b'a' * 512)
                     w.Write(b'b' * 512)
                     w.Abort()
@@ -164,7 +164,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                 with logicalContainer.newLogicalStream("foo", 1024) as w:
                     w.chunks_per_segment = 1
                     w.chunk_size = 512
-                    w.compression_method = zip.ZIP_STORED
+                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     w.Write(b'd' * 512)
                     w.Write(b'e' * 512)
 
@@ -234,7 +234,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                     resolver, image_urn_2, self.volume_urn) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdefgabcdefgabcdefgabcdefg")
 
@@ -271,7 +271,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                     resolver, image_urn_2, self.volume_urn) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.Write(b"abcdefg")
                     image.Abort()
 
@@ -280,7 +280,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                     resolver, self.image_urn_3, self.volume_urn) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.Write(b"abcdefg")
 
         with data_store.MemoryDataStore() as resolver:
@@ -322,7 +322,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                     resolver, image_urn_2, self.volume_urn) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdefg")
 
@@ -359,7 +359,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                     resolver, image_urn_2, self.volume_urn) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcde")
 

@@ -57,7 +57,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcd")
                     image.Trim(2)
@@ -88,7 +88,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcd")
                     image.Trim(3)
@@ -119,7 +119,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"ab")
                     image.Trim(1)
@@ -151,7 +151,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdef")
 
@@ -188,7 +188,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdefg")
 
@@ -226,7 +226,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 2
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b'bzm')
                     image.SeekWrite(8,0)
@@ -257,7 +257,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 2
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b'bz')
                     image.SeekWrite(8,0)
@@ -288,7 +288,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 2
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b'b')
                     image.SeekWrite(8,0)
@@ -319,7 +319,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 2
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.SeekWrite(8,0)
                     image.Write(b'a')
@@ -349,7 +349,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 2
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcd")
                     image.SeekWrite(0,0)
@@ -383,7 +383,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 5
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdefghijklmnopqrst0123456789!!")
 
@@ -425,7 +425,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 5
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdefghijlmnopq")
 
@@ -467,7 +467,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 5
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdefghijlmnopq")
 
@@ -509,7 +509,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdeabcdeabcdeabcde")
 
@@ -551,7 +551,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.SeekWrite(0, 0)
                     image.Write(b"abcd")
@@ -593,7 +593,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(8, 0)
                     image.Write(b"abcd")
 
@@ -624,7 +624,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(2, 0)
                     image.Write(b"ab")
 
@@ -653,7 +653,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(10, 0)
                     image.Write(b"ab")
 
@@ -683,7 +683,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(5, 0)
                     image.Write(b"abcdefabcdefabcdef")
 
@@ -712,7 +712,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(4, 0)
                     image.Write(b"abcdefabcdefabcdef")
 
@@ -741,7 +741,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(3, 0)
                     image.Write(b"abcdefabcdefabcdef")
 
@@ -770,7 +770,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(1, 0)
                     image.Write(b"abcdefabcdefabcdef")
 
@@ -799,7 +799,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(1, 0)
                     image.Write(b"abcdef")
 
@@ -828,7 +828,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(1, 0)
                     image.Write(b"abcde")
 
@@ -857,7 +857,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(1, 0)
                     image.Write(b"abc")
 
@@ -886,7 +886,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(1, 0)
                     image.Write(b"ab")
 
@@ -915,7 +915,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.SeekWrite(1, 0)
                     image.Write(b"a")
 
@@ -945,7 +945,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcabca")
 
@@ -974,7 +974,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcabc")
 
@@ -1003,7 +1003,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdeabcdeabcdeabcdea")
 
@@ -1032,7 +1032,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
 
                     image.Write(b"abcdeabcdeabcdeabcde")
 
@@ -1061,7 +1061,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.Write(b"abcd")
 
         with data_store.MemoryDataStore() as resolver:
@@ -1089,7 +1089,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 3
                     image.chunks_per_segment = 2
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.Write(b"abc")
 
         with data_store.MemoryDataStore() as resolver:
@@ -1118,7 +1118,7 @@ class AFF4ImageTest(unittest.TestCase):
                     resolver, self.image_urn_2, self.volume_urn, type=lexicon.AFF4_RANDOMSTREAM_TYPE) as image:
                     image.chunk_size = 10
                     image.chunks_per_segment = 3
-                    image.compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
+                    image.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
                     image.Write(b"ab")
 
         with data_store.MemoryDataStore() as resolver:
