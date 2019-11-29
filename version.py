@@ -127,7 +127,7 @@ def get_config_file(version_file="version.yaml"):
     version_path = os.path.join(os.path.dirname(
         os.path.abspath(__file__)), version_file)
 
-    return yaml.load(open(version_path, "rt").read()), version_path
+    return yaml.load(open(version_path, "rt").read(), Loader=yaml.SafeLoader), version_path
 
 
 def get_versions(version_file="version.yaml"):
