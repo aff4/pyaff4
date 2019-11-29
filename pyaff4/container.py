@@ -374,6 +374,7 @@ class WritableLogicalImageContainer(Container):
             writer = self.newCompressedBlockStream(image_urn, filename)
         else:
             writer = self.newZipStream(image_urn, filename)
+            writer._dirty = True
 
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
