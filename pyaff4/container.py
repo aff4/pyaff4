@@ -676,15 +676,17 @@ class EncryptedImageContainer(Container):
             # loading
             encrypted_block_store_ARN = encryptedBlockStreamARN
 
+            isWritable = True
             if self.mode != None and self.mode == "+":
                 resolver.Set(lexicon.transient_graph, encrypted_block_store_ARN, lexicon.AFF4_STREAM_WRITE_MODE,
                              rdfvalue.XSDString("random"))
             else:
                 # regular read only open path
-                pass
+                isWritable = False
 
             self.block_store_stream = aff4_image.AFF4Image.NewAFF4Image(resolver, encrypted_block_store_ARN, self.urn,
                                                                         type=lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
+            self.block_store_stream.properties.writable = isWritable
             for kbARN in self.resolver.Get(volumeURN, encrypted_block_store_ARN, lex.keyBag):
                 typ = self.resolver.GetUnique(volumeURN, kbARN, lexicon.AFF4_TYPE)
                 if typ == lexicon.standard11.PasswordWrappedKeyBag:
