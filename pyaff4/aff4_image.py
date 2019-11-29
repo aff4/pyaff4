@@ -23,8 +23,6 @@ import binascii
 import logging
 import struct
 
-from expiringdict import ExpiringDict
-
 from CryptoPlus.Cipher import python_AES
 import snappy
 import zlib
@@ -152,8 +150,6 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_index = []
         self.chunk_count_in_bevy = 0
         self.bevy_number = 0
-
-        self.cache = ExpiringDict(max_len=1000, max_age_seconds=10)
 
         # used for identifying in-place writes to bevys
         self.bevy_is_loaded_from_disk = False
@@ -517,14 +513,6 @@ class AFF4Image(aff4.AFF4Stream):
                 self.reloadBevy(0)
                 self.buffer = self.bevy[0]
 
-            r = self.cache.get(chunk_id)
-            if r != None:
-                result += r
-                chunks_to_read -= 1
-                chunk_id += 1
-                chunks_read += 1
-                continue
-
             if bevy_id != self.bevy_number:
                 self.reloadBevy(bevy_id)
 
@@ -547,14 +535,6 @@ class AFF4Image(aff4.AFF4Stream):
         while chunks_to_read > 0:
             local_chunk_index = chunk_id % self.chunks_per_segment
             bevy_id = chunk_id // self.chunks_per_segment
-
-            r = self.cache.get(chunk_id)
-            if r != None:
-                result += r
-                chunks_to_read -= 1
-                chunk_id += 1
-                chunks_read += 1
-                continue
 
             if self._dirty and bevy_id == self.bevy_number:
                 # try reading from the write buffer
@@ -583,17 +563,9 @@ class AFF4Image(aff4.AFF4Stream):
 
             with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
                 while chunks_to_read > 0:
-                    r = self.cache.get(chunk_id)
-                    if r != None:
-                        result += r
-                        chunks_to_read -= 1
-                        chunk_id += 1
-                        chunks_read += 1
-                        continue
 
                     # Read a full chunk from the bevy.
                     data = self._ReadChunkFromBevy(chunk_id, bevy)
-                    self.cache[chunk_id] = data
 
                     result += data
 
