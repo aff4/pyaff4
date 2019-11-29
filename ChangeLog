@@ -1,3 +1,7 @@
+--v0.32
++ Fix bug in reference counting
++ Tune lower encryption container for efficiency
++ Improve logging
 -- v0.31
 + Support for encrypted image streams.
 + Enable abort of single logical file acqusitions before close, reclaiming space.

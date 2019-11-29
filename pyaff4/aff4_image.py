@@ -504,7 +504,7 @@ class AFF4Image(aff4.AFF4Stream):
     def _ReadPartialRO(self, chunk_id, chunks_to_read):
         chunks_read = 0
         result = b""
-
+        LOGGER.info("ReadPartialRO chunk=%x count=%x", chunk_id, chunks_to_read)
         while chunks_to_read > 0:
             local_chunk_index = chunk_id % self.chunks_per_segment
             bevy_id = chunk_id // self.chunks_per_segment
@@ -531,7 +531,7 @@ class AFF4Image(aff4.AFF4Stream):
     def _ReadPartial(self, chunk_id, chunks_to_read):
         chunks_read = 0
         result = b""
-
+        LOGGER.info("ReadPartial chunk=%x count=%x", chunk_id, chunks_to_read)
         while chunks_to_read > 0:
             local_chunk_index = chunk_id % self.chunks_per_segment
             bevy_id = chunk_id // self.chunks_per_segment
