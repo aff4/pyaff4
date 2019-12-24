@@ -23,6 +23,8 @@ import binascii
 import logging
 import struct
 
+from expiringdict import ExpiringDict
+
 from CryptoPlus.Cipher import python_AES
 import snappy
 import zlib
@@ -150,6 +152,8 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_index = []
         self.chunk_count_in_bevy = 0
         self.bevy_number = 0
+
+        self.cache = ExpiringDict(max_len=1000, max_age_seconds=10)
 
         # used for identifying in-place writes to bevys
         self.bevy_is_loaded_from_disk = False
@@ -443,7 +447,8 @@ class AFF4Image(aff4.AFF4Stream):
           bevy size.
         """
         bevy_index_urn = bevy.urn.Append("index")
-        LOGGER.info("Loading Bevy Index %s", bevy_index_urn)
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("Loading Bevy Index %s", bevy_index_urn)
         with self.resolver.AFF4FactoryOpen(bevy_index_urn) as bevy_index:
             bevy_index_data = bevy_index.Read(bevy_index.Size())
             format_string = "<" + "I" * (bevy_index.Size() // struct.calcsize("I"))
@@ -468,13 +473,15 @@ class AFF4Image(aff4.AFF4Stream):
             if chunk_offsets[-1] < bevy.Size():
                 result.append((chunk_offsets[-1],
                                bevy.Size() - chunk_offsets[-1]))
-            LOGGER.info("Loaded Bevy Index %s entries=%x", bevy_index_urn, len(result))
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Loaded Bevy Index %s entries=%x", bevy_index_urn, len(result))
             return result
 
     def reloadBevy(self, bevy_id):
         bevy_urn = self.urn.Append("%08d" % bevy_id)
         bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
-        LOGGER.info("Reload Bevy %s", bevy_urn)
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("Reload Bevy %s", bevy_urn)
         chunks = []
 
         with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
@@ -489,7 +496,9 @@ class AFF4Image(aff4.AFF4Stream):
                 endOfChunkAddress = (bevy_id * self.chunks_per_segment + i + 1) * self.chunk_size
                 if endOfChunkAddress > self.size:
                     toKeep = self.chunk_size - (endOfChunkAddress - self.size)
-                    chunks[i] = chunks[i][0:toKeep]
+                    chunk = chunks[i][0:toKeep]
+                    chunks[i] = chunk
+                    self.cache[i] = chunk
                     bevy_index = bevy_index[0:i+1]
                     break
         self.bevy = chunks
@@ -504,10 +513,19 @@ class AFF4Image(aff4.AFF4Stream):
     def _ReadPartialRO(self, chunk_id, chunks_to_read):
         chunks_read = 0
         result = b""
-        LOGGER.info("ReadPartialRO chunk=%x count=%x", chunk_id, chunks_to_read)
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("ReadPartialRO chunk=%x count=%x", chunk_id, chunks_to_read)
         while chunks_to_read > 0:
             local_chunk_index = chunk_id % self.chunks_per_segment
             bevy_id = chunk_id // self.chunks_per_segment
+
+            r = self.cache.get(chunk_id)
+            if r != None:
+                result += r
+                chunks_to_read -= 1
+                chunk_id += 1
+                chunks_read += 1
+                continue
 
             if not self.bevy_is_loaded_from_disk:
                 self.reloadBevy(0)
@@ -520,6 +538,7 @@ class AFF4Image(aff4.AFF4Stream):
             ss = len(self.bevy)
             if local_chunk_index < len(self.bevy):
                 r = self.bevy[local_chunk_index]
+                self.cache[chunk_id] = r
                 result += r
                 chunks_to_read -= 1
                 chunk_id += 1
@@ -531,16 +550,26 @@ class AFF4Image(aff4.AFF4Stream):
     def _ReadPartial(self, chunk_id, chunks_to_read):
         chunks_read = 0
         result = b""
-        LOGGER.info("ReadPartial chunk=%x count=%x", chunk_id, chunks_to_read)
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("ReadPartial chunk=%x count=%x", chunk_id, chunks_to_read)
         while chunks_to_read > 0:
             local_chunk_index = chunk_id % self.chunks_per_segment
             bevy_id = chunk_id // self.chunks_per_segment
+
+            r = self.cache.get(chunk_id)
+            if r != None:
+                result += r
+                chunks_to_read -= 1
+                chunk_id += 1
+                chunks_read += 1
+                continue
 
             if self._dirty and bevy_id == self.bevy_number:
                 # try reading from the write buffer
                 if local_chunk_index == self.chunk_count_in_bevy:
                     #if len(self.buffer) == self.chunk_size:
                     r = self.buffer
+                    self.cache[chunk_id] = r
                     result += r
                     chunks_to_read -= 1
                     chunk_id += 1
@@ -551,6 +580,7 @@ class AFF4Image(aff4.AFF4Stream):
                 ss = len(self.bevy)
                 if local_chunk_index < len(self.bevy):
                     r = self.bevy[local_chunk_index]
+                    self.cache[chunk_id] = r
                     #result += self.doDecompress(r, chunk_id)
                     result += r
                     chunks_to_read -= 1
@@ -563,9 +593,17 @@ class AFF4Image(aff4.AFF4Stream):
 
             with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
                 while chunks_to_read > 0:
+                    r = self.cache.get(chunk_id)
+                    if r != None:
+                        result += r
+                        chunks_to_read -= 1
+                        chunk_id += 1
+                        chunks_read += 1
+                        continue
 
                     # Read a full chunk from the bevy.
                     data = self._ReadChunkFromBevy(chunk_id, bevy)
+                    self.cache[chunk_id] = data
 
                     result += data
 
@@ -662,7 +700,8 @@ class AFF4SImage(AFF4PreSImage):
     def _write_bevy_index(self, volume, bevy_urn, bevy_index, flush=False):
         """Write the index segment for the specified bevy_urn."""
         bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
-        LOGGER.info("Writing Bevy Index %s entries=%x", bevy_index_urn, len(bevy_index))
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("Writing Bevy Index %s entries=%x", bevy_index_urn, len(bevy_index))
 
         with volume.CreateMember(bevy_index_urn) as bevy_index_segment:
             serialized_index = b"".join((struct.pack("<QI", offset, length)
@@ -686,7 +725,8 @@ class AFF4SImage(AFF4PreSImage):
             data = struct.unpack(format_string, bevy_index_data)
 
             res = [(data[2*i], data[2*i+1]) for i in range(len(data)//2)]
-            LOGGER.info("Parse Bevy Index %s size=%x entries=%x", bevy_index_urn, bevy_index.Size(), len(res))
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Parse Bevy Index %s size=%x entries=%x", bevy_index_urn, bevy_index.Size(), len(res))
             return res
 
 
