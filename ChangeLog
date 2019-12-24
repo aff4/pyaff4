@@ -1,3 +1,7 @@
+--v0.33
++ Fix performance regressions.
++ Make logging more efficient.
++ Remove invalid unit test.
 --v0.32
 + Fix bug in reference counting
 + Tune lower encryption container for efficiency
