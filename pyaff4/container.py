@@ -701,7 +701,7 @@ class EncryptedImageContainer(Container):
         self.childResolver = data_store.MemoryDataStore(parent = self.resolver)
         #childResolver.ObjectCache.Put(resolver.ObjectCache.Get(encrypted_block_store_ARN), True)
 
-        self.childZip =  zip.ZipFile.NewZipFile(self.childResolver, self.version, self.block_store_stream.urn)
+        self.childZip =  zip.ZipFile.NewZipFile(self.childResolver, self.version, self.block_store_stream.urn, appendmode=self.mode)
 
         #resolver.Set(lexicon.transient_graph, self.childZip.urn, lexicon.AFF4_TYPE,
         #            rdfvalue.URN(lexicon.AFF4_ZIP_TYPE))

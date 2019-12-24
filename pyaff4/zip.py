@@ -593,7 +593,8 @@ class BasicZipFile(aff4.AFF4Volume):
                 # trim trailing null if there
                 if urn_string[len(urn_string)-1] == chr(0):
                     urn_string = urn_string[0:len(urn_string)-1]
-                LOGGER.info("Loaded AFF4 volume URN %s from zip file.",
+                if LOGGER.isEnabledFor(logging.INFO):
+                    LOGGER.info("Loaded AFF4 volume URN %s from zip file.",
                             urn_string)
 
             #if end_cd.size_of_cd == 0xFFFFFFFF:
@@ -638,7 +639,8 @@ class BasicZipFile(aff4.AFF4Volume):
                     # Claimed CD offset.
                     directory_offset)
 
-                LOGGER.info("Global offset: %#x", self.global_offset)
+                if LOGGER.isEnabledFor(logging.INFO):
+                    LOGGER.info("Global offset: %#x", self.global_offset)
 
             # This is a 64 bit archive, find the Zip64EndCD.
             else:
@@ -679,7 +681,8 @@ class BasicZipFile(aff4.AFF4Volume):
                     # The directory offset in zip file offsets.
                     directory_offset)
 
-                LOGGER.info("Global offset: %#x", self.global_offset)
+                if LOGGER.isEnabledFor(logging.INFO):
+                    LOGGER.info("Global offset: %#x", self.global_offset)
 
             # Now iterate over the directory and read all the ZipInfo structs.
             entry_offset = directory_offset
@@ -689,8 +692,8 @@ class BasicZipFile(aff4.AFF4Volume):
                     backing_store.Read(CDFileHeader.sizeof()))
 
                 if not entry.IsValid():
-                    LOGGER.info(
-                        "CDFileHeader at offset %#x invalid", entry_offset)
+                    if LOGGER.isEnabledFor(logging.INFO):
+                        LOGGER.info("CDFileHeader at offset %#x invalid", entry_offset)
                     raise RuntimeError()
 
                 fn = backing_store.Read(entry.file_name_length)
@@ -737,7 +740,8 @@ class BasicZipFile(aff4.AFF4Volume):
                             extrabuf = extrabuf[dataSize + 4:]
 
 
-                LOGGER.info("Found file %s @ %#x", zip_info.filename,
+                if LOGGER.isEnabledFor(logging.INFO):
+                    LOGGER.info("Found file %s @ %#x", zip_info.filename,
                             zip_info.local_header_offset)
 
                 # Store this information in the resolver. Ths allows
@@ -761,7 +765,7 @@ class BasicZipFile(aff4.AFF4Volume):
                                  entry.file_comment_length)
 
     @staticmethod
-    def NewZipFile(resolver, vers, backing_store_urn):
+    def NewZipFile(resolver, vers, backing_store_urn, appendmode=None):
         rdfvalue.AssertURN(backing_store_urn)
         if vers == None:
             vers = Version(0,1,"pyaff4")
@@ -772,6 +776,9 @@ class BasicZipFile(aff4.AFF4Volume):
 
         resolver.Set(lexicon.transient_graph, result.urn, lexicon.AFF4_STORED,
                      rdfvalue.URN(backing_store_urn))
+
+        if appendmode != None and appendmode != "w":
+            resolver.Set(lexicon.transient_graph, backing_store_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("append"))
 
         return resolver.AFF4FactoryOpen(result.urn,  version=vers)
 
@@ -836,7 +843,8 @@ class BasicZipFile(aff4.AFF4Volume):
         res = self.resolver.CacheGet(segment_urn)
 
         if res:
-            LOGGER.info("Openning ZipFileSegment (cached) %s", res.urn)
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Openning ZipFileSegment (cached) %s", res.urn)
             res.Reset()
             return res
 
@@ -845,7 +853,8 @@ class BasicZipFile(aff4.AFF4Volume):
         result = ZipFileSegment(resolver=self.resolver, urn=segment_urn)
         result.LoadFromZipFile(owner=self)
 
-        LOGGER.info("Openning ZipFileSegment %s", result.urn)
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("Opening ZipFileSegment %s", result.urn)
 
         return self.resolver.CachePut(result)
 
@@ -894,7 +903,8 @@ class BasicZipFile(aff4.AFF4Volume):
             # Append member at the end of the file.
             backing_store.SeekWrite(0, aff4.SEEK_END)
 
-            LOGGER.info("Appending ZIP file header %s @ %x", member_urn, backing_store.TellWrite())
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Appending ZIP file header %s @ %x", member_urn, backing_store.TellWrite())
 
             # zip_info offsets are relative to the start of the zip file (take
             # global_offset into account).
@@ -952,10 +962,12 @@ class BasicZipFile(aff4.AFF4Volume):
             else:
                 raise RuntimeError("Unsupported compression method")
 
-            LOGGER.info("Wrote ZIP stream @ %x[%x]", start_of_stream_addr, zip_info.compress_size)
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Wrote ZIP stream @ %x[%x]", start_of_stream_addr, zip_info.compress_size)
 
             # Update the local file header now that CRC32 is calculated.
-            LOGGER.info("Updating ZIP file header %s @ %x", member_urn, zip_info.file_header_offset)
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Updating ZIP file header %s @ %x", member_urn, zip_info.file_header_offset)
             zip_info.WriteFileHeader(backing_store)
             self.members[member_urn] = zip_info
 
@@ -1039,7 +1051,8 @@ class BasicZipFile(aff4.AFF4Volume):
 
             total_entries = len(self.members)
             for urn, zip_info in list(self.members.items()):
-                LOGGER.info("Writing CD entry for %s", urn)
+                if LOGGER.isEnabledFor(logging.INFO):
+                    LOGGER.info("Writing CD entry for %s", urn)
                 zip_info.WriteCDFileHeader(cd_stream)
 
             offset_of_end_cd = cd_stream.tell() + ecd_real_offset - self.global_offset
@@ -1062,7 +1075,8 @@ class BasicZipFile(aff4.AFF4Volume):
                     size_of_cd=size_of_cd,
                     offset_of_cd=offset_of_cd)
 
-                LOGGER.info("Writing Zip64EndCD at %#x",
+                if LOGGER.isEnabledFor(logging.INFO):
+                    LOGGER.info("Writing Zip64EndCD at %#x",
                             cd_stream.tell() + ecd_real_offset)
                 cd_stream.write(end_cd.Pack())
                 cd_stream.write(locator.Pack())
@@ -1084,7 +1098,8 @@ class BasicZipFile(aff4.AFF4Volume):
                 end.total_entries_in_cd_on_disk = 0xffff
                 end.total_entries_in_cd = 0xffff
 
-            LOGGER.info("Writing ECD at %#x",
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Writing ECD at %#x",
                         cd_stream.tell() + ecd_real_offset)
 
             cd_stream.write(end.Pack())

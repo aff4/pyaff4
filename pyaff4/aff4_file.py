@@ -60,7 +60,8 @@ class FileBackedObject(aff4.AFF4Stream):
 
         for component in components:
             path = path + component + os.sep
-            LOGGER.info("Creating intermediate directories %s", path)
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Creating intermediate directories %s", path)
 
             if os.isdir(path):
                 continue
@@ -104,7 +105,8 @@ class FileBackedObject(aff4.AFF4Stream):
             self.properties.writable = True
             self._CreateIntermediateDirectories(directory_components)
 
-        LOGGER.info("Opening file %s", filename)
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("Opening file %s", filename)
         self.fd = open(filename, flags)
         try:
             self.fd.seek(0, 2)
@@ -144,7 +146,8 @@ class FileBackedObject(aff4.AFF4Stream):
             progress.Report(self.readptr)
 
     def Write(self, data):
-        LOGGER.info("ZipFileSegment.Write %s @ %x[%x]", self.urn, self.writeptr, len(data))
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info("ZipFileSegment.Write %s @ %x[%x]", self.urn, self.writeptr, len(data))
         if not self.properties.writable:
             raise IOError("Attempt to write to read only object")
         self.MarkDirty()

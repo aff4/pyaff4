@@ -243,7 +243,5 @@ class LogicalTest(unittest.TestCase):
                     continue
 
 
-
-
 if __name__ == '__main__':
     unittest.main()

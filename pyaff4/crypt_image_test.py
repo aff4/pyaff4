@@ -272,53 +272,6 @@ class AFF4ImageTest(unittest.TestCase):
                     expected = b'c' * 5 + b'\0' * 5 + b'b' * 10 + b'c' * 5
                     self.assertEqual(expected, fd.ReadAll())
 
-
-    def testCreateAndReadContainerAppend(self):
-        version = container.Version(1, 1, "pyaff4")
-        lex = lexicon.standard11
-
-        try:
-            os.unlink(self.filenameB)
-        except (IOError, OSError):
-            pass
-
-        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
-        with data_store.MemoryDataStore() as resolver:
-            with container.Container.createURN(resolver, container_urn, encryption=True) as volume:
-                volume.block_store_stream.DEBUG = True
-                volume.setPassword("password")
-                logicalContainer = volume.getChildContainer()
-                with logicalContainer.newLogicalStream("hello", 137) as w:
-                    w.setCompressionMethod(lexicon.AFF4_IMAGE_COMPRESSION_STORED)
-                    w.SeekWrite(512*1024, 0)
-                    #hexdump.hexdump(w.fd.getvalue())
-                    w.Write(b'b' * 512*1024)
-                    #hexdump.hexdump(w.fd.getvalue())
-                    w.Write(b'c' * 512)
-
-
-        with data_store.MemoryDataStore() as resolver:
-            container_urn = rdfvalue.URN.FromFileName(self.filenameB)
-            with container.Container.openURNtoContainer(container_urn, mode="+") as volume:
-                volume.block_store_stream.DEBUG = True
-                volume.setPassword("password")
-                childVolume = volume.getChildContainer()
-                images = list(childVolume.images())
-                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as w:
-                    w.SeekWrite(0,0)
-                    w.Write(b'c' * 512)
-
-        container_urn = rdfvalue.URN.FromFileName(self.filenameB)
-        with container.Container.openURNtoContainer(container_urn) as volume:
-                volume.block_store_stream.DEBUG = True
-                volume.setPassword("password")
-                childVolume = volume.getChildContainer()
-                images = list(childVolume.images())
-                with childVolume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
-                    expected = b'c' * 512 + b'\0' * 512*1023 + b'b' * 512*1024 + b'c' * 512
-                    self.assertEqual(expected, fd.ReadAll())
-
-
     def testCreateAndReadContainerBadPassword(self):
         version = container.Version(1, 1, "pyaff4")
         lex = lexicon.standard11

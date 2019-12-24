@@ -555,6 +555,8 @@ class MemoryDataStore(object):
                 # Default to a string literal.
                 value = rdfvalue.XSDString(value)
 
+            if attr == rdfvalue.URN(lexicon.AFF4_TYPE) and value == rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE):
+                self.Add(lexicon.transient_graph, urn, lexicon.AFF4_STORED, volume_arn)
             self.Add(volume_arn, urn, attr, value)
 
         # look for the AFF4 namespace defined in the turtle
