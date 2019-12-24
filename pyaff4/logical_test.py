@@ -155,6 +155,96 @@ class LogicalTest(unittest.TestCase):
         containerName = tempfile.gettempdir() + "/test-windowsdrive.aff4"
         self.createAndReadSinglePathImage(containerName, u"c:\\犬\\ネコ.txt", u"/c:/犬/ネコ.txt")
 
+    def testZeroLengthLogicalStreamNoWrite(self):
+        containerName = tempfile.gettempdir() + "/test-zerolength.aff4"
+        try:
+            container_urn = rdfvalue.URN.FromFileName(containerName)
+            with data_store.MemoryDataStore() as resolver:
+                with container.Container.createURN(resolver, container_urn) as volume:
+                    with volume.newLogicalStream("foobar", 0) as writer:
+                        print()
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                self.assertEqual(1, len(images), "Only one logical image")
+                self.assertEqual("foobar", images[0].name(), "information.turtle should be escaped")
+
+                with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    try:
+                        txt = fd.ReadAll()
+                        self.assertEqual(b"", txt, "escaped file returned")
+                        pass
+                    except Exception:
+                        traceback.print_exc()
+                        self.fail("content of information.turtle is wrong")
+
+        except Exception:
+            traceback.print_exc()
+            self.fail()
+
+        finally:
+            os.unlink(containerName)
+
+    def testZeroLengthLogicalStream(self):
+        containerName = tempfile.gettempdir() + "/test-zerolength.aff4"
+        try:
+            container_urn = rdfvalue.URN.FromFileName(containerName)
+            with data_store.MemoryDataStore() as resolver:
+                with container.Container.createURN(resolver, container_urn) as volume:
+
+                    with volume.newLogicalStream("foobar", 0) as writer:
+                        writer.Write(b"")
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                self.assertEqual(1, len(images), "Only one logical image")
+                self.assertEqual("foobar", images[0].name(), "information.turtle should be escaped")
+
+                with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    try:
+                        txt = fd.ReadAll()
+                        self.assertEqual(b"", txt, "escaped file returned")
+                        pass
+                    except Exception:
+                        traceback.print_exc()
+                        self.fail("content of information.turtle is wrong")
+
+        except Exception:
+            traceback.print_exc()
+            self.fail()
+
+        finally:
+            os.unlink(containerName)
+
+    def testZeroLengthLogical(self):
+        containerName = tempfile.gettempdir() + "/test-zerolength.aff4"
+        try:
+            container_urn = rdfvalue.URN.FromFileName(containerName)
+            with data_store.MemoryDataStore() as resolver:
+                with container.Container.createURN(resolver, container_urn) as volume:
+                    src = io.BytesIO(u"".encode('utf-8'))
+                    volume.writeLogical(u"foobar", src, 0)
+
+            with container.Container.openURNtoContainer(container_urn) as volume:
+                images = list(volume.images())
+                self.assertEqual(1, len(images), "Only one logical image")
+                self.assertEqual("foobar", images[0].name(), "information.turtle should be escaped")
+
+                with volume.resolver.AFF4FactoryOpen(images[0].urn) as fd:
+                    try:
+                        txt = fd.ReadAll()
+                        self.assertEqual(b"", txt, "escaped file returned")
+                        pass
+                    except Exception:
+                        traceback.print_exc()
+                        self.fail("content of information.turtle is wrong")
+
+        except Exception:
+            traceback.print_exc()
+            self.fail()
+
+        finally:
+            os.unlink(containerName)
 
     def testAFF4ReservedSegmentCollision(self):
         containerName = tempfile.gettempdir() + "/test.aff4"
@@ -219,10 +309,11 @@ class LogicalTest(unittest.TestCase):
                                         hasher.update(data)
                                         pos += toread
 
-                                    # write in the hashes before auto-close
-                                    for h in hasher.hashes:
-                                        hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
-                                        volume.resolver.Add(volume.urn, writer_arn, rdfvalue.URN(lexicon.standard.hash), hh)
+                            # write in the hashes before auto-close
+                            for h in hasher.hashes:
+                                hh = hashes.newImmutableHash(h.hexdigest(), hasher.hashToType[h])
+                                volume.resolver.Add(volume.urn, writer_arn, rdfvalue.URN(lexicon.standard.hash), hh)
+                            print()
 
                     with container.Container.openURNtoContainer(container_urn) as volume:
                         images = list(volume.images())
@@ -232,7 +323,7 @@ class LogicalTest(unittest.TestCase):
                         fragment = escaping.member_name_for_urn(images[0].urn.value, volume.version,
                                                                 base_urn=volume.urn, use_unicode=True)
 
-                        hasher = linear_hasher.LinearHasher2(resolver, self)
+                        hasher = linear_hasher.LinearHasher2(volume.resolver, self)
                         for image in volume.images():
                             hasher.hash(image)
 
