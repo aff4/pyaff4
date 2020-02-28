@@ -783,9 +783,11 @@ class BasicZipFile(aff4.AFF4Volume):
         return resolver.AFF4FactoryOpen(result.urn,  version=vers)
 
     def ContainsMember(self, arn):
-        for member in self.members:
-            if member == arn:
-                return True
+        #for member in self.members:
+        #    if member == arn:
+        #        return True
+        if arn in self.members:
+            return True
         return False
 
     def ContainsSegment(self, segment_name):
