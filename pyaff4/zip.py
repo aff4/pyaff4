@@ -870,8 +870,6 @@ class BasicZipFile(aff4.AFF4Volume):
         if str(appendMode) in ["truncate", "append", "random" ]:
             self.properties.writable = True
 
-
-
         if not self.backing_store_urn:
             raise IOError("Unable to load backing urn.")
 
@@ -1014,6 +1012,7 @@ class BasicZipFile(aff4.AFF4Volume):
         self.RemoveMember(segment_arn)
 
     def Flush(self):
+
         # If the zip file was changed, re-write the central directory.
         if self.IsDirty():
             # First Flush all our children, but only if they are still in the

@@ -57,8 +57,6 @@ class ZipTest(unittest.TestCase):
                 with zip_file.CreateMember(period_start_segment_urn) as segment:
                     segment.Write(self.data1)
 
-
-
     def tearDown(self):
         try:
             os.unlink(self.filename)

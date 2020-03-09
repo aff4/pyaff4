@@ -222,10 +222,10 @@ class AFF4ObjectCache(object):
         for entry in self.lru_list:
             print(u"%s - %s" % (utils.SmartUnicode(entry.key), entry.use_count))
 
-    def Flush(self):
+    def Flush(self, partial=False):
         # It is an error to flush the object cache while there are still items
         # in use.
-        if len(self.in_use):
+        if not partial and len(self.in_use):
             self.Dump()
             CHECK(len(self.in_use) == 0,
                   "ObjectCache flushed while some objects in use!")
@@ -246,6 +246,9 @@ class AFF4ObjectCache(object):
             if not dirty_objects_found:
                 break
 
+        if partial:
+            return
+
         # Now delete all entries.
         for it in list(self.lru_map.values()):
             aff4o = it.aff4_obj
@@ -257,7 +260,6 @@ class AFF4ObjectCache(object):
         # Clear the map.
         self.lru_map.clear()
 
-
 class MemoryDataStore(object):
     aff4NS = None
 
@@ -266,7 +268,10 @@ class MemoryDataStore(object):
         self.loadedVolumes = []
         self.store = collections.OrderedDict()
         self.transient_store = collections.OrderedDict()
-        self.ObjectCache = AFF4ObjectCache(10)
+        if parent == None:
+            self.ObjectCache = AFF4ObjectCache(10)
+        else:
+            self.ObjectCache = parent.ObjectCache
         self.flush_callbacks = {}
         self.parent = parent
 
@@ -291,7 +296,10 @@ class MemoryDataStore(object):
 
     def Flush(self):
         # Flush and expunge the cache.
-        self.ObjectCache.Flush()
+        if self.parent == None:
+            self.ObjectCache.Flush()
+        else:
+            self.ObjectCache.Flush(partial=True)
         for cb in list(self.flush_callbacks.values()):
             cb()
 
