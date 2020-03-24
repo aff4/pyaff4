@@ -127,10 +127,10 @@ class WindowsFSMetadata(FSMetadata):
         self.birthTime = birthTime
 
     def store(self, resolver):
-        resolver.Set(resolver.urn, self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
-        resolver.Set(resolver.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
-        resolver.Set(resolver.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
-        resolver.Set(resolver.urn, self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
 def resetTimestampsPosix(destFile, lastWritten, lastAccessed, recordChanged, birthTime):
     if lastWritten == None or lastAccessed == None:
