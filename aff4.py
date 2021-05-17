@@ -264,7 +264,7 @@ def ingestZipfile(container_name, zipfiles, append, check_bytes):
 def addPathNamesToVolume(resolver, volume, pathnames, recursive, hashbased):
     for pathname in pathnames:
         if not os.path.exists(pathname):
-            print("Path %s not found. Skipping.")
+            print("Path %s not found. Skipping." % pathname)
             continue
         pathname = utils.SmartUnicode(pathname)
         print("\tAdding: %s" % pathname)
