@@ -82,6 +82,11 @@ class _CompressorStream(object):
             self.bevy_length += compressedLen
             return compressed_chunk
         else:
+            # On final chunks that aren't compressed, pad if they are less than chunk_size
+            # so that at decompression we won't try to decompress an already decompressed chunk.
+            if chunkLen < self.owner.chunk_size:
+                padding = self.owner.chunk_size - chunkLen
+                chunk += b"\x00" * padding
             self.bevy_index.append((self.bevy_length, self.owner.chunk_size))
             self.bevy_length += self.owner.chunk_size
             return chunk
