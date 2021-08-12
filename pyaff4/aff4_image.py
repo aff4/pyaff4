@@ -78,6 +78,7 @@ class _CompressorStream(object):
                                         lexicon.AFF4_IMAGE_COMPRESSION_NONE):
             compressed_chunk = chunk
 
+        chunkLen = len(chunk)
         compressedLen = len(compressed_chunk)
         self.chunk_count_in_bevy += 1
 
