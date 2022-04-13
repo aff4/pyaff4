@@ -35,7 +35,6 @@ from pyaff4 import utils
 import yaml
 import uuid
 import base64
-import fastchunking
 
 class Image(object):
     def __init__(self, image, resolver, dataStream):
@@ -496,71 +495,7 @@ class WritableHashBasedImageContainer(WritableLogicalImageContainer):
                 logical_file_map.AddRange(chunk_offset, 0, len(chunk), hashid)
 
     def writeLogicalStreamRabinHashBased(self, filename, readstream, length, check_bytes=False):
-        logical_file_id = None
-        if self.isAFF4Collision(filename):
-            logical_file_id = rdfvalue.URN("aff4://%s" % uuid.uuid4())
-        else:
-            logical_file_id = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
-
-        chunk_size = 32*1024
-        cdc = fastchunking.RabinKarpCDC(window_size=48, seed=0)
-        chunker = cdc.create_chunker(chunk_size=4096)
-
-
-        with aff4_map.AFF4Map.NewAFF4Map(
-                self.resolver, logical_file_id, self.urn) as logical_file_map:
-            file_offset = 0
-            lastbuffer = None
-            lastoffset = 0
-            chunk_offset = 0
-            while file_offset < length:
-                toread = min(length-file_offset, chunk_size)
-                buffer = readstream.read(toread)
-
-                foundBoundaries = False
-                for boundary in chunker.next_chunk_boundaries(buffer):
-                    foundBoundaries = True
-
-                    if lastbuffer != None:
-                        l = len(lastbuffer)
-                        chunk = lastbuffer[lastoffset:]
-                        chunk_offset = file_offset - len(chunk)
-                        chunk = chunk + buffer[:boundary]
-                        lastbuffer = None
-                    else:
-                        chunk = buffer[lastoffset:boundary]
-                        chunk_offset = file_offset + lastoffset
-
-                    h = hashes.new(lexicon.HASH_SHA512)
-                    h.update(chunk)
-
-                    self.preserveChunk(logical_file_map, chunk, chunk_offset, h, check_bytes)
-
-                    lastoffset = boundary
-
-                if not foundBoundaries:
-                    if lastbuffer != None:
-                        lastbuffer = lastbuffer + buffer
-                    else:
-                        lastbuffer = buffer
-                else:
-                    lastbuffer = buffer
-                file_offset += toread
-
-
-            if lastbuffer != None and lastoffset < len(lastbuffer):
-                chunk = lastbuffer[lastoffset:]
-                chunk_offset = file_offset - len(chunk)
-                h = hashes.new(lexicon.HASH_SHA512)
-                h.update(chunk)
-                self.preserveChunk(logical_file_map, chunk, chunk_offset, h, check_bytes)
-
-        logical_file_map.Close()
-
-        self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
-        self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard.Image))
-        self.resolver.Add(self.urn, logical_file_id, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
-        return logical_file_id
+        return None
 
     def writeLogicalStreamHashBased(self, filename, readstream, length, check_bytes=False):
         logical_file_id = None
