@@ -1,5 +1,5 @@
 future == 0.17.1
-aff4-snappy == 0.5.1
+python-snappy
 rdflib[sparql] == 4.2.2
 intervaltree
 pyyaml == 5.1
