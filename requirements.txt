@@ -1,7 +1,7 @@
 future == 0.17.1
 aff4-snappy == 0.5.1
 rdflib[sparql] == 4.2.2
-intervaltree == 2.1.0
+intervaltree
 pyyaml == 5.1
 tzlocal == 2.1
 html5lib == 1.0.1
