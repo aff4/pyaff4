@@ -1,4 +1,4 @@
-future == 0.17.1
+future == 0.18.3
 aff4-snappy == 0.5.1
 rdflib[sparql] == 4.2.2
 intervaltree == 2.1.0
