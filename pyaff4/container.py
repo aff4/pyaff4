@@ -141,7 +141,7 @@ class Container(object):
         return Container.openURN(rdfvalue.URN.FromFileName(filename))
 
     @staticmethod
-    def createURN(resolver, container_urn, encryption=False):
+    def createURN(resolver, container_urn, encryption=False, zip_based=False):
         """Public method to create a new writable locical AFF4 container."""
 
         resolver.Set(lexicon.transient_graph, container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
@@ -151,7 +151,11 @@ class Container(object):
             with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
                 volume_urn = zip_file.urn
                 with resolver.AFF4FactoryOpen(zip_file.backing_store_urn) as backing_store:
-                    return WritableHashBasedImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
+                    if not zip_based:
+                        return WritableHashBasedImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
+                    else:
+                        return WritableLogicalImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
+
         else:
             version = Version(1, 2, "pyaff4")
             with zip.ZipFile.NewZipFile(resolver, version, container_urn) as zip_file:
@@ -393,14 +397,14 @@ class WritableLogicalImageContainer(Container):
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
         return writer
 
-    def writeLogicalStream(self, filename, readstream, length):
+    def writeLogicalStream(self, filename, readstream, length, allow_large_zipsegments=False):
         image_urn = None
         if self.isAFF4Collision(filename):
             image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
         else:
             image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
 
-        if length > self.maxSegmentResidentSize:
+        if length > self.maxSegmentResidentSize and not allow_large_zipsegments:
             self.writeCompressedBlockStream(image_urn, filename, readstream)
             self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE),
                               rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
