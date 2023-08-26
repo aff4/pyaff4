@@ -132,8 +132,8 @@ class ZipFileHeader(struct_parser.CreateStruct(
         uint16_t lastmodtime;
         uint16_t lastmoddate;
         uint32_t crc32;
-        int32_t compress_size;
-        int32_t file_size;
+        uint32_t compress_size;
+        uint32_t file_size;
         uint16_t file_name_length;
         uint16_t extra_field_len = 0;
         """)):
