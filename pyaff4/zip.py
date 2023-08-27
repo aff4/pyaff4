@@ -25,6 +25,7 @@ import io
 import zlib
 import struct
 import traceback
+import os
 
 from pyaff4 import aff4
 from pyaff4 import aff4_file
@@ -310,25 +311,29 @@ class ZipInfo(object):
         if USE_UNICODE:
             header.flags = header.flags | (1 << 11)
 
+        # Always calculate and reserve the zip64 header size
+        # Alternatively, as the size of the file is not passed on first header creation
+        # a file larger than 4GB would triggers creation of the header only after file has been written and would get
+        # the first bytes overwritten creating a corrupted container.
+        # Only set header to 0xFFFFFFFF if really needed to look into extra header.
+
         extra_header_64 = Zip64FileHeaderExtensibleField()
         if self.file_size > ZIP32_MAX_SIZE:
             header.file_size = 0xFFFFFFFF
-            extra_header_64.Set("file_size", self.file_size)
+        extra_header_64.Set("file_size", self.file_size)
 
         if self.compress_size > ZIP32_MAX_SIZE:
             header.compress_size = 0xFFFFFFFF
-            extra_header_64.Set("compress_size", self.compress_size)
+        extra_header_64.Set("compress_size", self.compress_size)
 
-        # Only write the extra header if we have to.
-        if not extra_header_64.empty():
-            header.extra_field_len = extra_header_64.sizeof()
+        # Write the extra header in any case
+        header.extra_field_len = extra_header_64.sizeof()
 
         backing_store.SeekWrite(self.file_header_offset)
         backing_store.Write(header.Pack())
         backing_store.write(encodedFilename)
 
-        if not extra_header_64.empty():
-            backing_store.Write(extra_header_64.Pack())
+        backing_store.Write(extra_header_64.Pack())
 
     def WriteCDFileHeader(self, backing_store):
         encodedFilename = self.filename

@@ -141,7 +141,7 @@ class Container(object):
         return Container.openURN(rdfvalue.URN.FromFileName(filename))
 
     @staticmethod
-    def createURN(resolver, container_urn, encryption=False, zip_based=False):
+    def createURN(resolver, container_urn, encryption=False, zip_based=False, compression_method=zip.ZIP_DEFLATE):
         """Public method to create a new writable locical AFF4 container."""
 
         resolver.Set(lexicon.transient_graph, container_urn, lexicon.AFF4_STREAM_WRITE_MODE, rdfvalue.XSDString("truncate"))
@@ -154,7 +154,7 @@ class Container(object):
                     if not zip_based:
                         return WritableHashBasedImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
                     else:
-                        return WritableLogicalImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
+                        return WritableLogicalImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard, compression_method=compression_method)
 
         else:
             version = Version(1, 2, "pyaff4")
@@ -330,8 +330,12 @@ class WritableLogicalImageContainer(Container):
     maxSegmentResidentSize = 1 * 1024 * 1024
     #maxSegmentResidentSize = 1
 
-    def __init__(self, backing_store, zip_file, version, volumeURN, resolver, lex):
+    compression_method = None
+
+    def __init__(self, backing_store, zip_file, version, volumeURN, resolver, lex, compression_method=zip.ZIP_DEFLATE):
         super(WritableLogicalImageContainer, self).__init__(backing_store, zip_file, version, volumeURN, resolver, lex)
+
+        self.compression_method = compression_method
 
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             container_description_urn = self.urn.Append("container.description")
@@ -361,7 +365,10 @@ class WritableLogicalImageContainer(Container):
     def writeZipStream(self, image_urn, filename, readstream):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(image_urn) as streamed:
-                streamed.compression_method = zip.ZIP_DEFLATE
+                if self.compression_method is not None and self.compression_method == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
+                    streamed.compression_method = zip.ZIP_STORED
+                else:
+                    streamed.compression_method = zip.ZIP_DEFLATE
                 streamed.WriteStream(readstream)
 
     # create a file like object for writing a logical image as a new compressed block stream
