@@ -362,14 +362,14 @@ class WritableLogicalImageContainer(Container):
             stream.WriteStream(readstream)
 
         # write the logical stream as a zip segment using the Stream API
-    def writeZipStream(self, image_urn, filename, readstream):
+    def writeZipStream(self, image_urn, filename, readstream, progress=None):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(image_urn) as streamed:
                 if self.compression_method is not None and self.compression_method == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
                     streamed.compression_method = zip.ZIP_STORED
                 else:
                     streamed.compression_method = zip.ZIP_DEFLATE
-                streamed.WriteStream(readstream)
+                streamed.WriteStream(readstream, progress=progress)
 
     # create a file like object for writing a logical image as a new compressed block stream
     def newCompressedBlockStream(self, image_urn, filename):
@@ -404,7 +404,7 @@ class WritableLogicalImageContainer(Container):
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(filename))
         return writer
 
-    def writeLogicalStream(self, filename, readstream, length, allow_large_zipsegments=False):
+    def writeLogicalStream(self, filename, readstream, length, allow_large_zipsegments=False, progress=None):
         image_urn = None
         if self.isAFF4Collision(filename):
             image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
@@ -416,7 +416,7 @@ class WritableLogicalImageContainer(Container):
             self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE),
                               rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
         else:
-            self.writeZipStream(image_urn, filename, readstream)
+            self.writeZipStream(image_urn, filename, readstream, progress=progress)
             self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE))
 
         self.resolver.Add(self.urn, image_urn, rdfvalue.URN(lexicon.AFF4_TYPE), rdfvalue.URN(lexicon.standard11.FileImage))
