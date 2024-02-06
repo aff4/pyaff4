@@ -6,6 +6,7 @@ pyyaml
 tzlocal == 2.1
 html5lib == 1.0.1
 python-dateutil == 2.8.0
+pybindgen
 fastchunking == 0.0.3
 hexdump
 pynacl
