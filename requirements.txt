@@ -2,7 +2,7 @@ future == 0.17.1
 aff4-snappy == 0.5.1
 rdflib[sparql] == 4.2.2
 intervaltree == 2.1.0
-pyyaml == 5.4
+pyyaml == 5.10
 tzlocal == 2.1
 html5lib == 1.0.1
 python-dateutil == 2.8.0
