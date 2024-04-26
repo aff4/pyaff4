@@ -502,7 +502,6 @@ class AFF4Image(aff4.AFF4Stream):
             print(corrected_urn)
             bevy_urn = rdfvalue.URN().UnSerializeFromString(corrected_urn)
             # bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn) # This is unused anyway apparently
-            print("AXIOOOOOM")
         else:
             bevy_urn = self.urn.Append("%08d" % bevy_id)
             bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
