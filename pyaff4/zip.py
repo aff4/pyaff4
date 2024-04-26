@@ -575,7 +575,8 @@ class BasicZipFile(aff4.AFF4Volume):
         except:
             self.version = Version(0,0, "pyaff4")
 
-    def parse_cd(self, backing_store_urn):
+    def parse_cd(self, backing_store_urn, urn: str = None):
+        # We can pass the urn as parameter, this allows correct opening of images not having the urn in CD comment
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
             # Find the End of Central Directory Record - We read about 4k of
             # data and scan for the header from the end, just in case there is
@@ -618,6 +619,8 @@ class BasicZipFile(aff4.AFF4Volume):
             # URN and then create a new ZipFile volume. After parsing the
             # central directory we discover our URN and therefore we can delete
             # the old, randomly selected URN.
+            if not urn_string and urn:
+              urn_string = urn
             if urn_string and self.urn != urn_string and self.version != basic_zip :
                 self.resolver.DeleteSubject(self.urn)
                 self.urn.Set(utils.SmartUnicode(urn_string))
@@ -866,8 +869,6 @@ class BasicZipFile(aff4.AFF4Volume):
 
         return self.resolver.CachePut(result)
 
-
-
     def LoadFromURN(self):
         self.backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph,
             self.urn, lexicon.AFF4_STORED)
@@ -880,7 +881,16 @@ class BasicZipFile(aff4.AFF4Volume):
             raise IOError("Unable to load backing urn.")
 
         try:
+            # Possibly inefficient method, but easiest to implement
+            # Create a copy of transient store, parse zip and read container.description to discover urn
+            # Reread the ZIP with urn as parameter to ensure the transient store has objects with correct URNs.
+            # Necessary for containers missing the URN in CD comment.
+            ## Backup Transient Store
+            transient_store = copy.deepcopy(self.resolver.transient_store)
             self.parse_cd(self.backing_store_urn)
+            # Restore Transient Store
+            self.resolver.transient_store = transient_store
+            self.parse_cd(self.backing_store_urn, urn=self.resolver.loadZipURN(self))
             self.resolver.loadMetadata(self)
         except IOError:
             # If we can not parse a CD from the zip file, this is fine, we just
