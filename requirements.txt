@@ -1,4 +1,4 @@
-future == 0.17.1
+future == 1.0.0
 aff4-snappy @ git+https://github.com/aff4/aff4-snappy@88aba3a3fe4b3f9c20bcfeb5b4c1935c801760bb  # Use source version of aff4-snappy to be able to build on ARM64 (https://github.com/aff4/aff4-snappy/pull/2)
 rdflib[sparql] == 4.2.2
 intervaltree
