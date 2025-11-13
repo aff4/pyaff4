@@ -535,6 +535,11 @@ class MemoryDataStore(object):
 
         return result
 
+    def loadZipURN(self, zip):
+        with zip.OpenZipSegment("container.description") as fd:
+            urn = streams.ReadAll(fd).strip(b'\n')
+            return urn
+
     def loadMetadata(self, zip):
         # Load the turtle metadata.
         #if zip.urn not in self.loadedVolumes:

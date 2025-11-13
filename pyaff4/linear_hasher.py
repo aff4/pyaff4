@@ -22,6 +22,7 @@ from pyaff4 import data_store
 from pyaff4 import hashes
 from pyaff4 import lexicon
 from pyaff4 import zip
+from pyaff4 import aff4
 
 
 class LinearHasher(object):
@@ -144,13 +145,13 @@ class LinearHasher2:
         self.delegate = None
         self.resolver = resolver
 
-    def hash(self, image):
+    def hash(self, image, progress=None):
 
         storedHashes = list(self.resolver.QuerySubjectPredicate(image.container.urn, image.urn, lexicon.standard.hash))
         with self.resolver.AFF4FactoryOpen(image.urn, version=image.container.version) as stream:
             datatypes = [h.datatype for h in storedHashes]
             stream2 = StreamHasher(stream, datatypes)
-            self.readall2(stream2)
+            self.readall2(stream2, progress=progress)
             for storedHash in storedHashes:
                 dt = storedHash.datatype
                 shortHashAlgoName = storedHash.shortName()
@@ -162,10 +163,15 @@ class LinearHasher2:
                     self.listener.onInvalidHash(shortHashAlgoName, storedHashHexDigest, calculatedHashHexDigest, image.urn)
 
 
-    def readall2(self, stream):
+    def readall2(self, stream, progress=None):
+        total_read = 0
+        if progress is None:
+            progress = aff4.EMPTY_PROGRESS
         while True:
             toRead = 32 * 1024
             data = stream.read(toRead)
+            total_read += len(data)
+            progress.Report(total_read)
             if data == None or len(data) == 0:
                 # EOF
                 return
