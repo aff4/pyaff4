@@ -25,6 +25,7 @@ import io
 import zlib
 import struct
 import traceback
+import os
 
 from pyaff4 import aff4
 from pyaff4 import aff4_file
@@ -132,8 +133,8 @@ class ZipFileHeader(struct_parser.CreateStruct(
         uint16_t lastmodtime;
         uint16_t lastmoddate;
         uint32_t crc32;
-        int32_t compress_size;
-        int32_t file_size;
+        uint32_t compress_size;
+        uint32_t file_size;
         uint16_t file_name_length;
         uint16_t extra_field_len = 0;
         """)):
@@ -169,7 +170,9 @@ class Zip64FileHeaderExtensibleField(object):
 
     def Pack(self):
         # Size of extra less the header.
-        #self.Set("data_size", self.sizeof() - 4)
+        # Data size needs to be set for a zip64 extra field to be compliant with zip specification.
+        self.Set("data_size", self.sizeof() - 4)
+        # Don't think the value set below is used anywhere, might be removable.
         self.data_size = self.sizeof()
         return struct.pack(self.format_string(),
                            *[v for t, _, v in self.fields if v is not None])
@@ -310,25 +313,28 @@ class ZipInfo(object):
         if USE_UNICODE:
             header.flags = header.flags | (1 << 11)
 
+        # For local header force usage of ZIP64 even when not needed as we do not know the file size, nor what it would
+        # compress to, before writing the header the first time
+        # (similar to how zip works in command line when compressing from stdin)
+        # Always calculate and reserve the zip64 header size
+        # Alternatively, as the size of the file is not passed on first header creation
+        # a file larger than 4GB would triggers creation of the header only after file has been written and would get
+        # the first bytes overwritten creating a corrupted container.
         extra_header_64 = Zip64FileHeaderExtensibleField()
-        if self.file_size > ZIP32_MAX_SIZE:
-            header.file_size = 0xFFFFFFFF
-            extra_header_64.Set("file_size", self.file_size)
 
-        if self.compress_size > ZIP32_MAX_SIZE:
-            header.compress_size = 0xFFFFFFFF
-            extra_header_64.Set("compress_size", self.compress_size)
+        header.file_size = 0xFFFFFFFF
+        extra_header_64.Set("file_size", self.file_size)
 
-        # Only write the extra header if we have to.
-        if not extra_header_64.empty():
-            header.extra_field_len = extra_header_64.sizeof()
+        header.compress_size = 0xFFFFFFFF
+        extra_header_64.Set("compress_size", self.compress_size)
+
+        header.extra_field_len = extra_header_64.sizeof()
 
         backing_store.SeekWrite(self.file_header_offset)
         backing_store.Write(header.Pack())
         backing_store.write(encodedFilename)
 
-        if not extra_header_64.empty():
-            backing_store.Write(extra_header_64.Pack())
+        backing_store.Write(extra_header_64.Pack())
 
     def WriteCDFileHeader(self, backing_store):
         encodedFilename = self.filename
@@ -569,7 +575,8 @@ class BasicZipFile(aff4.AFF4Volume):
         except:
             self.version = Version(0,0, "pyaff4")
 
-    def parse_cd(self, backing_store_urn):
+    def parse_cd(self, backing_store_urn, urn: str = None):
+        # We can pass the urn as parameter, this allows correct opening of images not having the urn in CD comment
         with self.resolver.AFF4FactoryOpen(backing_store_urn) as backing_store:
             # Find the End of Central Directory Record - We read about 4k of
             # data and scan for the header from the end, just in case there is
@@ -612,6 +619,8 @@ class BasicZipFile(aff4.AFF4Volume):
             # URN and then create a new ZipFile volume. After parsing the
             # central directory we discover our URN and therefore we can delete
             # the old, randomly selected URN.
+            if not urn_string and urn:
+              urn_string = urn
             if urn_string and self.urn != urn_string and self.version != basic_zip :
                 self.resolver.DeleteSubject(self.urn)
                 self.urn.Set(utils.SmartUnicode(urn_string))
@@ -860,8 +869,6 @@ class BasicZipFile(aff4.AFF4Volume):
 
         return self.resolver.CachePut(result)
 
-
-
     def LoadFromURN(self):
         self.backing_store_urn = self.resolver.GetUnique(lexicon.transient_graph,
             self.urn, lexicon.AFF4_STORED)
@@ -874,7 +881,16 @@ class BasicZipFile(aff4.AFF4Volume):
             raise IOError("Unable to load backing urn.")
 
         try:
+            # Possibly inefficient method, but easiest to implement
+            # Create a copy of transient store, parse zip and read container.description to discover urn
+            # Reread the ZIP with urn as parameter to ensure the transient store has objects with correct URNs.
+            # Necessary for containers missing the URN in CD comment.
+            ## Backup Transient Store
+            transient_store = copy.deepcopy(self.resolver.transient_store)
             self.parse_cd(self.backing_store_urn)
+            # Restore Transient Store
+            self.resolver.transient_store = transient_store
+            self.parse_cd(self.backing_store_urn, urn=self.resolver.loadZipURN(self))
             self.resolver.loadMetadata(self)
         except IOError:
             # If we can not parse a CD from the zip file, this is fine, we just

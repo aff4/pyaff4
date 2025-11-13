@@ -15,6 +15,7 @@
 """This module implements the standard AFF4 Image."""
 from __future__ import division
 from __future__ import unicode_literals
+
 from builtins import range
 from builtins import str
 from past.utils import old_div
@@ -23,6 +24,7 @@ import binascii
 import logging
 import lz4.block
 import struct
+import urllib
 
 from expiringdict import ExpiringDict
 
@@ -491,8 +493,18 @@ class AFF4Image(aff4.AFF4Stream):
             return result
 
     def reloadBevy(self, bevy_id):
-        bevy_urn = self.urn.Append("%08d" % bevy_id)
-        bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
+        if "AXIOMProcess" in self.version.tool:
+            # Axiom does strange stuff with paths and URNs, we need to fix the URN for reading bevys
+            volume_urn = '/'.join(self.urn.SerializeToString().split('/')[0:3])
+            original_filename = self.resolver.Get(volume_urn, self.urn, rdfvalue.URN(lexicon.standard11.pathName))[0]
+            original_filename_escaped = urllib.parse.quote(str(original_filename).encode(), safe='/\\')
+            corrected_urn = f"{volume_urn}/{original_filename_escaped}\\{'%08d' % bevy_id}".encode()
+            print(corrected_urn)
+            bevy_urn = rdfvalue.URN().UnSerializeFromString(corrected_urn)
+            # bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn) # This is unused anyway apparently
+        else:
+            bevy_urn = self.urn.Append("%08d" % bevy_id)
+            bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
         if LOGGER.isEnabledFor(logging.INFO):
             LOGGER.info("Reload Bevy %s", bevy_urn)
         chunks = []
