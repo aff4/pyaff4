@@ -181,6 +181,14 @@ def verify(file, password):
             printVolumeInfo(file, childVolume)
             printCaseInfo(childVolume)
             resolver = childVolume.resolver
+
+            metadata_verified, metadata_hashes = resolver.verify_container_metadata_integrity(volume.zip_file)
+            print("\tContainer Metadata:")
+            if not metadata_verified:
+                print("\t\tContainer Metadata Verification Failed")
+            for hash in metadata_hashes:
+                print(f"\t\t-{hash['hash_type'].upper()} - {'VERIFIED' if hash['verified'] else 'FAILED'} | Stored: {hash['stored_hash']} - Calculated {hash['calculated_hash']}")
+
             hasher = linear_hasher.LinearHasher2(resolver, LinearVerificationListener())
             for image in childVolume.images():
                 print("\t%s <%s>" % (image.name(), trimVolume(childVolume.urn, image.urn)))
@@ -189,6 +197,13 @@ def verify(file, password):
             printVolumeInfo(file, volume)
             printCaseInfo(volume)
             resolver = volume.resolver
+
+            metadata_verified, metadata_hashes = resolver.verify_container_metadata_integrity(volume.zip_file)
+            print("\tContainer Metadata:")
+            if not metadata_verified:
+                print("\t\tContainer Metadata Verification Failed")
+            for hash in metadata_hashes:
+                print(f"\t\t- {hash['hash_type'].upper()} - {'VERIFIED' if hash['verified'] else 'FAILED'} | Stored: {hash['stored_hash']} - Calculated {hash['calculated_hash']}")
 
             if type(volume) == container.PhysicalImageContainer:
                 image = volume.image

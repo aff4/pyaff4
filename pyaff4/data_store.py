@@ -31,6 +31,8 @@ import subprocess
 import sys
 import types
 import binascii
+import hashlib
+import json
 
 from rdflib import URIRef
 from itertools import chain
@@ -490,6 +492,7 @@ class MemoryDataStore(object):
                             break
                     turtle_segment.Flush()
                 turtle_segment.Close()
+        self.write_metadata_hashes(zipcontainer)
 
     def _DumpToTurtle(self, volumeurn, verbose=False):
         g = rdflib.Graph()
@@ -546,6 +549,55 @@ class MemoryDataStore(object):
         with zip.OpenZipSegment("information.turtle") as fd:
             self.LoadFromTurtle(fd, zip.urn)
             self.loadedVolumes.append(zip.urn)
+
+    def write_metadata_hashes(self, zipcontainer):
+        with zipcontainer.OpenZipSegment("information.turtle") as fd:
+            data = fd.read()
+            hashes = {
+                "md5": hashlib.md5(data).hexdigest(),
+                "sha1": hashlib.sha1(data).hexdigest(),
+                "sha256": hashlib.sha256(data).hexdigest()
+            }
+            with zipcontainer.CreateZipSegment(u"container.hashes") as container_hashes_segment:
+                container_hashes_segment.compression_method = ZIP_DEFLATE
+                container_hashes_segment.write(utils.SmartStr(json.dumps(hashes)))
+                container_hashes_segment.Flush()
+                container_hashes_segment.Close()
+
+    def read_metadata_hashes(self, zipcontainer):
+        containerHashesARN = escaping.urn_from_member_name(u"container.hashes", zipcontainer.urn, zipcontainer.version)
+        if zipcontainer.ContainsMember(containerHashesARN):
+            with zipcontainer.OpenZipSegment("container.hashes") as fd:
+                data = fd.read()
+                hashes = json.loads(data)
+                return hashes
+        else:
+            # No container.hashes found, return empty hashlist.
+            return {}
+        
+    def verify_container_metadata_integrity(self, zipcontainer):
+        stored_hashes = self.read_metadata_hashes(zipcontainer)
+        hashes = []
+        failed = False
+        with zipcontainer.OpenZipSegment("information.turtle") as fd:
+            data = fd.read()
+            for hash_type, stored_hash in stored_hashes.items():
+                calculated_hash = ""
+                if hash_type == "md5":
+                    calculated_hash = hashlib.md5(data).hexdigest()
+                elif hash_type == "sha1":
+                    calculated_hash = hashlib.sha1(data).hexdigest()
+                elif hash_type == "sha256":
+                    calculated_hash = hashlib.sha256(data).hexdigest()
+                verified = stored_hash == calculated_hash 
+                hashes.append({
+                    'hash_type': hash_type,
+                    'stored_hash': stored_hash,
+                    'calculated_hash': calculated_hash,
+                    'verified': verified
+                })
+                failed = failed if failed else verified == False
+        return not failed, hashes
 
     def LoadFromTurtle(self, stream, volume_arn):
         data = streams.ReadAll(stream)
