@@ -31,6 +31,7 @@ import subprocess
 import sys
 import types
 import binascii
+import errno
 
 from rdflib import URIRef
 from itertools import chain

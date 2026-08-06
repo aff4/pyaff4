@@ -53,7 +53,7 @@ class PasswordWrappedKeyBag:
         salt = Random.get_random_bytes(saltSize)
         vek = Random.get_random_bytes(keysize)
         #print("VEK: " + str(binascii.hexlify(vek)))
-        kek = digest.pbkdf2_hmac("sha256", password, salt, iterations, keysize);
+        kek = digest.pbkdf2_hmac("sha256", password, salt, iterations, keysize)
         wrapped_key = aes_wrap_key(kek, vek)
         #print("WrappedKey: " + str(binascii.hexlify(wrapped_key)))
         return PasswordWrappedKeyBag(salt, iterations, keysize, wrapped_key)
@@ -68,7 +68,7 @@ class PasswordWrappedKeyBag:
             return PasswordWrappedKeyBag(salt._value, iterations._value, keySizeInBytes._value, wk._value)
 
     def unwrap_key(self, password):
-        kek = digest.pbkdf2_hmac("sha256", password, self.salt, self.iterations, self.keySizeBytes);
+        kek = digest.pbkdf2_hmac("sha256", password, self.salt, self.iterations, self.keySizeBytes)
         vek = aes_unwrap_key(kek, self.wrappedKey)
         #print("VEK: " + str(binascii.hexlify(vek)))
         return vek

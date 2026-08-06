@@ -16,8 +16,7 @@ import os
 import platform
 from pyaff4 import lexicon, rdfvalue
 import tzlocal
-import pytz
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.parser import parse
 import traceback
 
@@ -31,8 +30,8 @@ class FSMetadata(object):
         self.urn = urn
 
     def store(self, resolver):
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.size), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.name), rdfvalue.XSDInteger(self.name))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
+        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.pathName), rdfvalue.XSDString(self.name))
 
     @staticmethod
     def createFromTarInfo(filename, tarinfo):
@@ -42,7 +41,7 @@ class FSMetadata(object):
         accessed = datetime.fromtimestamp(int(tarinfo.pax_headers["atime"]), local_tz)
         recordChanged = datetime.fromtimestamp(int(tarinfo.pax_headers["ctime"]), local_tz)
         # addedDate  ?? todo
-        return UnixMetadata(filename, filename, size, lastWritten, accessed, recordChanged)
+        return ClassicUnixMetadata(filename, filename, size, lastWritten, accessed, recordChanged)
 
     @staticmethod
     def createFromSFTPAttr(filename, attr):
@@ -52,7 +51,7 @@ class FSMetadata(object):
         accessed = datetime.fromtimestamp(attr.st_atime, local_tz)
         #recordChanged = datetime.fromtimestamp(attr.st_ctime, local_tz)
         # addedDate  ?? todo
-        return UnixMetadata(filename, filename, size, lastWritten, accessed, 0)
+        return ClassicUnixMetadata(filename, filename, size, lastWritten, accessed, 0)
 
     @staticmethod
     def create(filename):
@@ -147,7 +146,7 @@ def resetTimestampsNone(destFile, lastWritten, lastAccessed, recordChanged, birt
     pass
 
 resetTimestamps = resetTimestampsNone
-epoch = datetime(1970, 1, 1, tzinfo=pytz.utc)
+epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 p = platform.system()
 if p == "Darwin" or p == "Linux":

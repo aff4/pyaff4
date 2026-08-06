@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 
 from builtins import range
 from builtins import str
+
 from past.utils import old_div
 from builtins import object
 import binascii
@@ -25,18 +26,26 @@ import logging
 import lz4.block
 import struct
 import urllib
-
-from expiringdict import ExpiringDict
-
-from CryptoPlus.Cipher import python_AES
-import snappy
 import zlib
+from expiringdict import ExpiringDict
 
 from pyaff4 import aff4
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import hashes, zip
+
+
+try:
+    import snappy
+except ImportError:
+    from types import SimpleNamespace
+    def snappy_not_installed(*args, **kwargs):
+        raise RuntimeError("Use of snappy compression requires python-snappy package to be installed")
+    snappy = SimpleNamespace(
+        compress=snappy_not_installed,
+        decompress=snappy_not_installed,
+    )
 
 
 LOGGER = logging.getLogger("pyaff4")
@@ -494,7 +503,7 @@ class AFF4Image(aff4.AFF4Stream):
             return result
 
     def reloadBevy(self, bevy_id):
-        if "AXIOMProcess" in self.version.tool:
+        if self.version and "AXIOMProcess" in self.version.tool:
             # Axiom does strange stuff with paths and URNs, we need to fix the URN for reading bevys
             volume_urn = '/'.join(self.urn.SerializeToString().split('/')[0:3])
             original_filename = self.resolver.Get(volume_urn, self.urn, rdfvalue.URN(lexicon.standard11.pathName))[0]

@@ -313,7 +313,7 @@ class RandomImageStream(AFF4SImage):
                 bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
                 #if self.bevy_is_loaded_from_disk:
                 if LOGGER.isEnabledFor(logging.INFO):
-                    ("Removing bevy member %s", bevy_urn)
+                    LOGGER.info("Removing bevy member %s", bevy_urn)
                 volume.RemoveMember(bevy_urn)
                 if LOGGER.isEnabledFor(logging.INFO):
                     LOGGER.info("Removing bevy member %s", bevy_index_urn)

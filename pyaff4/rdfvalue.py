@@ -184,6 +184,76 @@ class XSDInteger(RDFValue):
         return hash(self.SerializeToString())
 
 
+@functools.total_ordering
+class XSDFloat(RDFValue):
+    datatype = rdflib.XSD.float
+
+    def SerializeToString(self):
+        return utils.SmartStr(self.value)
+
+    def UnSerializeFromString(self, string):
+        self.Set(float(string))
+
+    def Set(self, data):
+        self.value = float(data)
+
+    def __eq__(self, other):
+        if isinstance(other, XSDFloat):
+            return self.value == other.value
+        return self.value == other
+
+    def __float__(self):
+        return self.value
+
+    def __int__(self):
+        return int(self.value)
+
+    def __long__(self):
+        return int(self.value)
+
+    def __cmp__(self, o):
+        return self.value - o.value
+
+    def __add__(self, o):
+        return self.value + o
+
+    def __lt__(self, o):
+        return self.value < o
+
+    def __str__(self):
+        return str(self.value)
+
+    def __hash__(self):
+        return hash(self.SerializeToString())
+
+
+class XSDBoolean(RDFValue):
+    datatype = rdflib.XSD.boolean
+
+    def SerializeToString(self):
+        return utils.SmartStr(self.value)
+
+    def UnSerializeFromString(self, string):
+        self.Set(bool(string))
+
+    def Set(self, data):
+        self.value = bool(data)
+
+    def __eq__(self, other):
+        if isinstance(other, XSDBoolean):
+            return self.value == other.value
+        return self.value == other
+
+    def __bool__(self):
+        return self.value
+
+    def __str__(self):
+        return str(self.value)
+
+    def __hash__(self):
+        return hash(self.SerializeToString())
+
+
 class RDFHash(XSDString):
     # value is the hex encoded digest.
 
@@ -287,8 +357,11 @@ class URN(RDFValue):
         return utils.SmartUnicode(urllib.parse.urlunparse(components))
 
     def UnSerializeFromString(self, string):
-        utils.AssertStr(string)
-        self.Set(utils.SmartUnicode(string))
+        if isinstance(string, str):
+            self.Set(string)
+        else:
+            utils.AssertStr(string)
+            self.Set(utils.SmartUnicode(string))
         return self
 
     def Set(self, data):
@@ -390,18 +463,15 @@ def AssertURN(urn):
         raise TypeError("Expecting a URN.")
 
 
-def AssertURN(urn):
-    if not isinstance(urn, URN):
-        raise TypeError("Expecting a URN.")
-
-
 registry.RDF_TYPE_MAP.update({
     rdflib.XSD.hexBinary: RDFBytes,
     rdflib.XSD.string: XSDString,
     rdflib.XSD.integer: XSDInteger,
     rdflib.XSD.int: XSDInteger,
     rdflib.XSD.long: XSDInteger,
-    rdflib.XSD.datetime: XSDDateTime,
+    rdflib.XSD.float: XSDFloat,
+    rdflib.XSD.boolean: XSDBoolean,
+    rdflib.XSD.dateTime: XSDDateTime,
     rdflib.URIRef("http://aff4.org/Schema#SHA512"): SHA512Hash,
     rdflib.URIRef("http://aff4.org/Schema#SHA256"): SHA256Hash,
     rdflib.URIRef("http://aff4.org/Schema#SHA1"): SHA1Hash,

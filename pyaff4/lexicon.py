@@ -86,9 +86,6 @@ AFF4_FILE_TYPE = (AFF4_NAMESPACE + "file")
 # paths. This volatile attribute is used to control the filename mapping.
 AFF4_FILE_NAME = (AFF4_VOLATILE_NAMESPACE + "filename")
 
-# The original filename the stream had.
-AFF4_STREAM_ORIGINAL_FILENAME = (AFF4_NAMESPACE + "original_filename")
-
 # ZipFileSegment
 AFF4_ZIP_SEGMENT_TYPE = (AFF4_NAMESPACE + "zip_segment")
 

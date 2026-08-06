@@ -35,7 +35,18 @@ from pyaff4 import utils
 import yaml
 import uuid
 import base64
-import fastchunking
+
+
+try:
+    import fastchunking
+except ImportError:
+    from types import SimpleNamespace
+    def fastchunking_not_installed(*args, **kwargs):
+        raise RuntimeError("Use of Rabin-Karp hash-based logical stream requires fastchunking package to be installed")
+    fastchunking = SimpleNamespace(
+        RabinKarpCDC=fastchunking_not_installed,
+    )
+
 
 class Image(object):
     def __init__(self, image, resolver, dataStream):
@@ -365,7 +376,7 @@ class WritableLogicalImageContainer(Container):
     def writeZipStream(self, image_urn, filename, readstream, progress=None):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(image_urn) as streamed:
-                if self.compression_method is not None and self.compression_method == lexicon.AFF4_IMAGE_COMPRESSION_STORED:
+                if self.compression_method is not None and self.compression_method == zip.ZIP_STORED:
                     streamed.compression_method = zip.ZIP_STORED
                 else:
                     streamed.compression_method = zip.ZIP_DEFLATE

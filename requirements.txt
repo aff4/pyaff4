@@ -1,13 +1,11 @@
-future == 1.0.0
-aff4-snappy @ git+https://github.com/aff4/aff4-snappy@88aba3a3fe4b3f9c20bcfeb5b4c1935c801760bb  # Use source version of aff4-snappy to be able to build on ARM64 (https://github.com/aff4/aff4-snappy/pull/2)
-rdflib[sparql] == 4.2.2
+future>=1.0.0
+rdflib[sparql]==4.2.2
 intervaltree
 pyyaml
-tzlocal == 2.1
-html5lib == 1.0.1
-python-dateutil == 2.8.0
+tzlocal>=2.1
+html5lib>=1.0.1
+python-dateutil>=2.8.0
 pybindgen
-fastchunking == 0.0.3
 hexdump
 pynacl
 pycryptodome
@@ -17,3 +15,8 @@ passlib
 cryptography
 expiringdict
 lz4
+
+# Optional dependencies
+#python-snappy          # required for snappy compression
+#fastchunking>=0.0.3    # required for Rabin-Karp hash-based logical stream
+#google-cloud-storage   # required to use GCS as a storage backend

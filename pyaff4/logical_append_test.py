@@ -158,8 +158,8 @@ class LogicalAppendTest(unittest.TestCase):
             # os.unlink(containerName)
 
     def testCreateAndAppendSinglePathImage(self):
+        containerName = tempfile.gettempdir() + u"/test-append.aff4"
         try:
-            containerName = tempfile.gettempdir() + u"/test-append.aff4"
             pathA = u"/a.txt"
             pathB = u"/b.txt"
 

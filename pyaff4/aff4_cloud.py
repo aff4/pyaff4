@@ -28,13 +28,24 @@ import threading
 import os
 
 
-from gcloud import storage
 from pyaff4 import aff4_directory
 from pyaff4 import aff4_file
 from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
+
+
+try:
+    from google.cloud import storage
+except ImportError:
+    from types import SimpleNamespace
+    def gcs_not_installed(*args, **kwargs):
+        raise RuntimeError("Use of GCS requires google-cloud-storage package to be installed")
+    storage = SimpleNamespace(
+        Client=gcs_not_installed,
+    )
+
 
 
 # Lexicon specific to cloud storage.
@@ -47,7 +58,7 @@ AFF4_GCS_STREAM_LOCATION = (GOOGLE_NAMESPACE + "cloud_storage_url")
 GCE_CLIENT = {}
 
 def get_client():
-    thread_id = threading.currentThread().ident
+    thread_id = threading.current_thread().ident
     cred_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if cred_file is None:
         raise RuntimeError(

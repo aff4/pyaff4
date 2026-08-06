@@ -34,7 +34,6 @@ stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
 preStdLinear = os.path.join(referenceImagesPath, u"AFF4PreStd/Base-Linear.af4")
 preStdAllocated = os.path.join(referenceImagesPath, u"AFF4PreStd",
                                u"Base-Allocated.af4")
-stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
 stdAllocated = os.path.join(referenceImagesPath, u"AFF4Std",
                             u"Base-Allocated.aff4")
 stdLinearAllHashes = os.path.join(referenceImagesPath,

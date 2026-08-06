@@ -23,8 +23,6 @@ from pyaff4 import rdfvalue
 from pyaff4 import container
 from pyaff4 import plugins
 
-from nose.tools import nottest
-
 class AFF4DirectoryTest(unittest.TestCase):
     root_path = tempfile.gettempdir() + "/aff4_directory/"
     segment_name = "Foobar.txt"
@@ -50,8 +48,7 @@ class AFF4DirectoryTest(unittest.TestCase):
                         member.urn, lexicon.AFF4_STREAM_ORIGINAL_FILENAME,
                         rdfvalue.XSDString(self.root_path + self.segment_name))
 
-    @nottest
-    def testCreateMember(self):
+    def _testCreateMember(self):
         version = container.Version(1, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
             root_urn = rdfvalue.URN.NewURNFromFilename(self.root_path)

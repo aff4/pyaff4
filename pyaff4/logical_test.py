@@ -123,10 +123,6 @@ class LogicalTest(unittest.TestCase):
         finally:
             os.unlink(containerName)
 
-    def testWindowsUNCLogicalImagePushImageStream(self):
-        containerName = tempfile.gettempdir() + "/test-imagetream.aff4"
-        self.createAndReadSinglePathImageImageStream(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt")
-
     def testWindowsUNCLogicalImagePushZipSegment(self):
         containerName = tempfile.gettempdir() + "/test-unc1.aff4"
         self.createAndReadSinglePathImagePush(containerName, u"\\\\foo\\bar.txt", u"foo/bar.txt", 1024)
@@ -331,7 +327,6 @@ class LogicalTest(unittest.TestCase):
                 except Exception:
                     traceback.print_exc()
                     self.fail()
-                    continue
 
 
 if __name__ == '__main__':

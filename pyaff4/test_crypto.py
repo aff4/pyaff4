@@ -69,7 +69,7 @@ class CryptoTest(unittest.TestCase):
         kb = keybag.PasswordWrappedKeyBag.load(g)
 
         key = "password"
-        kek = digest.pbkdf2_hmac("sha256", key, kb.salt, kb.iterations, kb.keySizeBytes);
+        kek = digest.pbkdf2_hmac("sha256", key, kb.salt, kb.iterations, kb.keySizeBytes)
         self.assertEquals(target_kek, kek)
         vek = aes_unwrap_key(kek, kb.wrappedKey)
         self.assertEquals(target_vek, vek)
@@ -95,7 +95,7 @@ class CryptoTest(unittest.TestCase):
         kb = keybag.PasswordWrappedKeyBag.load(g)
 
         key = "password"
-        kek = digest.pbkdf2_hmac("sha256", key, kb.salt, kb.iterations, kb.keySizeBytes);
+        kek = digest.pbkdf2_hmac("sha256", key, kb.salt, kb.iterations, kb.keySizeBytes)
         vek = aes_unwrap_key(kek, kb.wrappedKey)
 
         key1 = vek[0:16]
@@ -120,7 +120,7 @@ class CryptoTest(unittest.TestCase):
         #print(len(hhh))
         #print(binascii.hexlify(hhh))
 
-        kek = digest.pbkdf2_hmac("sha256", key, salt, iterations, keysize);
+        kek = digest.pbkdf2_hmac("sha256", key, salt, iterations, keysize)
         print(binascii.hexlify(kek))
 
         #h = pbkdf2_sha256.encrypt(key, rounds=iterations, salt_size=saltSize)

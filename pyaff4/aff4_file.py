@@ -63,7 +63,7 @@ class FileBackedObject(aff4.AFF4Stream):
             if LOGGER.isEnabledFor(logging.INFO):
                 LOGGER.info("Creating intermediate directories %s", path)
 
-            if os.isdir(path):
+            if os.path.isdir(path):
                 continue
 
             # Directory does not exist - Try to make it.

@@ -35,12 +35,6 @@ class AFF4ImageTest(unittest.TestCase):
     filename_urn = rdfvalue.URN.FromFileName(filename)
     image_name = "image.dd"
 
-    def setUp(self):
-        try:
-            os.unlink(self.filename)
-        except (IOError, OSError):
-            pass
-
     def tearDown(self):
         try:
             os.unlink(self.filename)
@@ -48,6 +42,11 @@ class AFF4ImageTest(unittest.TestCase):
             pass
 
     def setUp(self):
+        try:
+            os.unlink(self.filename)
+        except (IOError, OSError):
+            pass
+
         version = container.Version(0, 1, "pyaff4")
         with data_store.MemoryDataStore() as resolver:
             resolver.Set(lexicon.transient_graph, self.filename_urn, lexicon.AFF4_STREAM_WRITE_MODE,
