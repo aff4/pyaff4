@@ -23,9 +23,8 @@ from past.utils import old_div
 from builtins import object
 import binascii
 import logging
-import struct
 import math
-from CryptoPlus.Cipher import python_AES
+from Crypto.Cipher import AES
 
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
@@ -412,7 +411,6 @@ class AFF4EncryptedStream(RandomImageStream):
         self.vek = vek
         self.key1 = vek[0:16]
         self.key2 = vek[16:]
-        self.cipher = python_AES.new((self.key1, self.key2), python_AES.MODE_XTS)
         if self.size > 0:
             self.doLoadInitialBevy()
 
@@ -458,12 +456,13 @@ class AFF4EncryptedStream(RandomImageStream):
             with volume.CreateMember(bevy_urn) as bevy:
                 for chunkIdx in range(0,len(self.bevy)):
                     chunk_address = self.bevy_number * self.chunks_per_segment + chunkIdx
-                    tweak = struct.pack("<Q", chunk_address)
 
                     if self.DEBUG:
                         encryptedBevys.append(self.bevy[chunkIdx])
                     else:
-                        encryptedBevys.append(self.cipher.encrypt(self.bevy[chunkIdx], tweak))
+                        cipher = AES.new(self.key1 + self.key2, AES.MODE_XTS,
+                                         data_unit_seq_number=chunk_address)
+                        encryptedBevys.append(cipher.encrypt(self.bevy[chunkIdx]))
                 buf = b"".join(encryptedBevys)
                 bevy.Write(buf)
                 if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
@@ -493,10 +492,10 @@ class AFF4EncryptedStream(RandomImageStream):
             return cbuffer
 
         unit_number = chunk_id
-        tweak = struct.pack("<Q", unit_number)
 
-        cipher = python_AES.new((self.key1,self.key2), python_AES.MODE_XTS)
-        plaintext = cipher.decrypt(cbuffer, tweak)
+        cipher = AES.new(self.key1 + self.key2, AES.MODE_XTS,
+                         data_unit_seq_number=unit_number)
+        plaintext = cipher.decrypt(cbuffer)
 
         return plaintext
 
