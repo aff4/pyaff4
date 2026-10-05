@@ -460,6 +460,9 @@ def main(argv):
                         help='ingest a zip file into a hash based image')
     parser.add_argument('-e', "--password", nargs=1, action="store",
                         help='provide a password for encryption. This causes an encrypted container to be used.')
+    parser.add_argument('--file-list', metavar='FILE',
+                        help='read source paths from FILE (one per line) instead of command-line arguments; '
+                             'avoids ARG_MAX limits when adding large numbers of files')
     parser.add_argument('aff4container', help='the pathname of the AFF4 container')
     parser.add_argument('srcFiles', nargs="*", help='source files and folders to add as logical image')
 
@@ -472,7 +475,15 @@ def main(argv):
 
     if args.create_logical == True:
         dest = args.aff4container
-        addPathNames(dest, args.srcFiles, args.recursive, args.append, args.hash, args.password)
+        if args.file_list:
+            if not os.path.exists(args.file_list):
+                print("ERROR: --file-list path not found: %s" % args.file_list, file=sys.stderr)
+                sys.exit(1)
+            with open(args.file_list, "r") as fh:
+                pathnames = [p.rstrip("\n") for p in fh if p.strip()]
+        else:
+            pathnames = args.srcFiles
+        addPathNames(dest, pathnames, args.recursive, args.append, args.hash, args.password)
     elif  args.meta == True:
         dest = args.aff4container
         meta(dest, args.password)
