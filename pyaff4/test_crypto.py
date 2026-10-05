@@ -7,12 +7,10 @@ import unittest
 import binascii
 from pyaff4.aes_keywrap import aes_wrap_key, aes_unwrap_key
 from passlib.crypto import digest
-from CryptoPlus.Cipher import python_AES
-from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256, SHA1
 from Crypto.Signature import pss
-import codecs
 import rdflib
 from pyaff4 import keybag
 
@@ -81,10 +79,8 @@ class CryptoTest(unittest.TestCase):
         key1 = vek[0:16]
         key2 = vek[16:]
 
-        tweak = codecs.decode('00', 'hex')
-
-        cipher = python_AES.new((key1,key2), python_AES.MODE_XTS)
-        ciphertext = cipher.encrypt(plaintext, tweak)
+        cipher = AES.new(key1 + key2, AES.MODE_XTS, data_unit_seq_number=0)
+        ciphertext = cipher.encrypt(plaintext)
 
         self.assertEqual(target_ciphertext, ciphertext)
 
@@ -100,10 +96,8 @@ class CryptoTest(unittest.TestCase):
 
         key1 = vek[0:16]
         key2 = vek[16:]
-        tweak = codecs.decode('00', 'hex')
-
-        cipher = python_AES.new((key1, key2), python_AES.MODE_XTS)
-        text = cipher.decrypt(target_ciphertext, tweak)
+        cipher = AES.new(key1 + key2, AES.MODE_XTS, data_unit_seq_number=0)
+        text = cipher.decrypt(target_ciphertext)
 
         self.assertEqual(src[0:len(src)], text[0:len(src)])
 
@@ -141,10 +135,8 @@ class CryptoTest(unittest.TestCase):
         key2 = vek[16:]
         #cip = dict_xts_aes['cip%i' % i].decode('hex')
         #n = dict_xts_aes['n%i' % i].decode('hex')
-        tweak = codecs.decode('00', 'hex')
-        print(len(tweak))
-        cipher = python_AES.new((key1,key2), python_AES.MODE_XTS)
-        ciphertext = cipher.encrypt(plaintext, tweak)
+        cipher = AES.new(key1 + key2, AES.MODE_XTS, data_unit_seq_number=0)
+        ciphertext = cipher.encrypt(plaintext)
 
         print(len(ciphertext))
         print(binascii.hexlify(ciphertext))
