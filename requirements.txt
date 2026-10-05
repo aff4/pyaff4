@@ -9,14 +9,14 @@ pybindgen
 hexdump
 pynacl
 pycryptodome
-pycryptoplus
 aes-keywrap
 passlib
 cryptography
 expiringdict
 lz4
 
+python-snappy
+
 # Optional dependencies
-#python-snappy          # required for snappy compression
 #fastchunking>=0.0.3    # required for Rabin-Karp hash-based logical stream
 #google-cloud-storage   # required to use GCS as a storage backend
