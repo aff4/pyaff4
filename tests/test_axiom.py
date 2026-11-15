@@ -56,6 +56,9 @@ class AxiomBevyNamesTest(unittest.TestCase):
             target.comment = source.comment
             for member in source.infolist():
                 name, data = member.filename, source.read(member)
+                if name.startswith("information.hdt"):
+                    # AXIOM writes no HDT, and readers would prefer it to the rewritten turtle.
+                    continue
                 if name.startswith(PYAFF4_BEVY_PREFIX):
                     name = AXIOM_BEVY_PREFIX + name[len(PYAFF4_BEVY_PREFIX) :]
                 elif name == "version.txt":
