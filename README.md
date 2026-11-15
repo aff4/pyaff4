@@ -67,6 +67,27 @@ while the test file "hdt-ng-utf8.hdt" demonstrates the proposed new UTF-8 capabl
 
 Literal text is stored raw, as hdt-java and hdt-cpp store it: the characters between a literal's quotes are stored as they are, without N-Triples escapes, and a reader finds the end of the text at the last `"`.
 
+## Porting from v0.x
+
+pyaff4 2.x needs Python 3.12 or later. While 2.x is in pre-release, install it
+with `pip install --pre pyaff4`; without `--pre`, pip installs 0.x. The
+command-line tool is the `aff4` entry point. Code written against 0.x needs
+these changes:
+
+| 0.x | 2.x |
+|---|---|
+| `rdfvalue.XSDString`, `XSDInteger`, `XSDDateTime`, … | `rdflib.Literal(value, datatype=XSD.…)` |
+| `rdfvalue.URN("aff4://…")` | `rdfvalue.ARN("aff4://…")`, an `rdflib.URIRef`. `URN()` takes no arguments; use `URN.FromFileName(path)` for files |
+| Lexicon constants are strings, wrapped in `rdfvalue.URN(...)` | Lexicon constants are `URIRef`s; pass them directly |
+| `hashes.newImmutableHash(hexdigest, hash_type)` | `rdflib.Literal(hexdigest, datatype=hash_type)` |
+| `pyaff4.utils` (`SmartUnicode`, `SmartStr`, …) | Removed; use `str()` and `bytes` |
+| `Container.createURN` returns a hash-based container unless `zip_based=True` | It returns a logical container; pass `hashbased=True` for a hash-based one |
+| `createURN(compression_method=…)` and `writeLogicalStream(…, allow_large_zipsegments=True)` | `createURN(zipstream_compression_method=…, always_write_zipstreams=True)`, set once per container |
+| Metadata in `information.turtle` only | Containers also hold `information.hdt` and its `.opidx` index, which readers prefer; encrypted containers keep Turtle only |
+| The local header of a zip member has a Zip64 field only when needed | It always has one, so each member is 20 bytes larger than 0.x wrote it |
+| Google Cloud Storage backend (`aff4_cloud`), `aes_keywrap` module | Removed; key wrapping uses `cryptography`'s `aes_key_wrap` |
+| `fastchunking` for hash-based containers; `snappy` optional | `fastcdc`; `python-snappy` is a required dependency |
+
 ## Development
 
 `uv sync` installs pyaff4 editable and compiles the HDT kernels. The tests also
