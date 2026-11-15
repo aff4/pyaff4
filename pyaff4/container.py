@@ -138,8 +138,19 @@ class Container:
         return Container.openURN(rdfvalue.URN.FromFileName(filename))
 
     @staticmethod
-    def createURN(resolver, container_urn, encryption=False, hashbased=False):
-        """Public method to create a new writable locical AFF4 container."""
+    def createURN(resolver, container_urn, encryption=False, hashbased=False,
+                  zipstream_compression_method=zip.ZIP_DEFLATE, always_write_zipstreams=False):
+        """Public method to create a new writable locical AFF4 container.
+
+        zipstream_compression_method and always_write_zipstreams configure the
+        WritableLogicalImageContainer returned when neither encryption nor hashbased is set.
+        """
+        zipstream_compression_method = zip_compression_method(zipstream_compression_method)
+        if (encryption or hashbased) and (
+                zipstream_compression_method != zip.ZIP_DEFLATE or always_write_zipstreams):
+            raise ValueError(
+                "zipstream_compression_method and always_write_zipstreams only apply to logical "
+                "containers, not with encryption or hashbased")
 
         if encryption == False:
             version = Version(1, 1, "pyaff4")
@@ -151,7 +162,11 @@ class Container:
                         from pyaff4 import dedup_container
                         return dedup_container.WritableHashBasedImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
                     else:
-                        return WritableLogicalImageContainer(backing_store, zip_file, version, volume_urn, resolver, lexicon.standard)
+                        return WritableLogicalImageContainer(
+                            backing_store, zip_file, version, volume_urn, resolver,
+                            lexicon.standard,
+                            zipstream_compression_method=zipstream_compression_method,
+                            always_write_zipstreams=always_write_zipstreams)
         else:
             version = Version(1, 2, "pyaff4")
             with zip.ZipFile.NewZipFile(resolver, version, container_urn, appendmode="truncate") as zip_file:
@@ -333,15 +348,40 @@ class PreStdLogicalImageContainer(LogicalImageContainer):
     def __enter__(self):
         return self
 
+def zip_compression_method(method):
+    """The zip compression method for a zipstream_compression_method setting.
+
+    Accepts the AFF4 lexicon's stored compression as a synonym for zip.ZIP_STORED, as
+    ZipFileSegment.setCompressionMethod does.
+    """
+    if method in (zip.ZIP_STORED, lexicon.AFF4_IMAGE_COMPRESSION_STORED):
+        return zip.ZIP_STORED
+    if method == zip.ZIP_DEFLATE:
+        return zip.ZIP_DEFLATE
+    raise ValueError(
+        "zipstream_compression_method must be zip.ZIP_DEFLATE, zip.ZIP_STORED or "
+        f"lexicon.AFF4_IMAGE_COMPRESSION_STORED, not {method!r}")
+
+
 class WritableLogicalImageContainer(Container):
 
     # logical images geater than this size are stored in ImageStreams
     # smaller ones in Zip Segments
     maxSegmentResidentSize = 1 * 1024 * 1024
-    #maxSegmentResidentSize = 1
 
-    def __init__(self, backing_store, zip_file, version, volumeURN, resolver, lex):
+    # How logical images written as zip streams are compressed: zip.ZIP_DEFLATE or zip.ZIP_STORED.
+    # The constructor also accepts lexicon.AFF4_IMAGE_COMPRESSION_STORED for zip.ZIP_STORED.
+    zipstream_compression_method = zip.ZIP_DEFLATE
+    # Write every logical image as a zip stream, whatever its size, so that zip tools can extract
+    # the files directly.
+    always_write_zipstreams = False
+
+    def __init__(self, backing_store, zip_file, version, volumeURN, resolver, lex,
+                 zipstream_compression_method=zip.ZIP_DEFLATE, always_write_zipstreams=False):
+        zipstream_compression_method = zip_compression_method(zipstream_compression_method)
         super().__init__(backing_store, zip_file, version, volumeURN, resolver, lex)
+        self.zipstream_compression_method = zipstream_compression_method
+        self.always_write_zipstreams = always_write_zipstreams
 
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             container_description_urn = self.urn.Append("container.description")
@@ -372,7 +412,7 @@ class WritableLogicalImageContainer(Container):
     def writeZipStream(self, image_urn, filename, readstream, progress=None):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(image_urn) as streamed:
-                streamed.compression_method = zip.ZIP_DEFLATE
+                streamed.compression_method = self.zipstream_compression_method
                 streamed.WriteStream(readstream, progress=progress)
 
     # create a file like object for writing a logical image as a new compressed block stream
@@ -386,7 +426,7 @@ class WritableLogicalImageContainer(Container):
     def newZipStream(self, image_urn, filename):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             writer = volume.CreateMember(image_urn)
-            writer.compression_method = zip.ZIP_DEFLATE
+            writer.compression_method = self.zipstream_compression_method
             return writer
 
     # create a file like object for writing a logical image
@@ -398,7 +438,7 @@ class WritableLogicalImageContainer(Container):
             image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
 
         writer = None
-        if length > self.maxSegmentResidentSize:
+        if length > self.maxSegmentResidentSize and not self.always_write_zipstreams:
             writer = self.newCompressedBlockStream(image_urn, filename)
         else:
             writer = self.newZipStream(image_urn, filename)
@@ -416,7 +456,7 @@ class WritableLogicalImageContainer(Container):
         else:
             image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
 
-        if length > self.maxSegmentResidentSize:
+        if length > self.maxSegmentResidentSize and not self.always_write_zipstreams:
             self.writeCompressedBlockStream(image_urn, filename, readstream, progress=progress)
             self.resolver.Add(self.urn, image_urn, lexicon.AFF4_TYPE,
                               lexicon.AFF4_IMAGE_TYPE)
