@@ -5,42 +5,80 @@ the storage of digital evidence and data.
 
 It was originally designed and published in [1] and has since been standardised
 as the AFF4 Standard v1.0, which is available at
-https://github.com/aff4/Standard. This project is a work in progress
-implementation, providing two library implementations, C/C++ and Python.
+https://github.com/aff4/Standard.
 
-## What is currently supported.
-
-The focus of this implementation is reading physical images conforming with the
-AFF4 Standard v1.0, and for the ongoing development of an AFF4 based logical
-image standard.
+The focus of this implementation is:
+1. Standards compliance with AFF4 Standard v1.0 (for physical images)
+2. Ongoing development of the AFF4-L Standard v1.0 (for logical images)
 
 Canonical images for the v1.0 physical image specification are provided in the
 AFF4 Reference Images github project at https://github.com/aff4/ReferenceImages
 
+## What is currently supported.
+
 1. Reading, writing & appending to ZipFile style volumes.
 2. Reading striped ZipFile volumes.
 2. Reading & writing AFF4 ImageStreams using the deflate or snappy compressor.
-3. Reading RDF metadata using Turtle (and to some degree YAML).
+3. Reading RDF metadata using Turtle and HDT (see below).
 4. Verification of linear and block hashed images.
-5. Reading & writing logical images (*new*) .
-6. Reading & writing deduplicated logical images (*new*).
-7. Encrypted AFF4 logical volumes (*new*).
+5. Reading & writing logical images.
+6. Reading & writing deduplicated logical images.
+7. Encrypted AFF4 logical volumes.
 
-## What is not yet supported:
+## RDF metadata and HDT
 
-The write support in the libraries is currently broken and being worked on.
-Other aspects of the AFF4 that have not yet been implemented in this codebase
-include:
+AFF4 metadata is RDF. Containers always store it as Turtle and optionally as
+[Header Dictionary Triples](https://www.rdfhdt.org/) (`information.hdt`), a compressed, queryable binary form which supports fast
+opening of large containers. 
 
-1. Persistent data store (resolver).
-2. HTTP backed streams.
-3. Support for signed statements or Bill of Materials.
-4. Directory based volumes.
+- Nothing is unpacked: the dictionary, bitmaps and packed sequences of the HDT strucure are read in
+  place. An optional `.opidx` sidecar (as the Java tools write, and as a
+  container may hold as `information.hdt.opidx`) saves building the object
+  index.
+- Wheels are `cp312-abi3` for Linux (manylinux2014, x86_64 and aarch64),
+  macOS 11+ (x86_64 and arm64) and Windows (x86_64 and arm64). Other platforms
+  get the `py312-none-any` wheel, which runs the HDT kernels interpreted and is
+  about 100× slower on HDT queries.
 
-## Notice
+pyaff4 bundles two packages for HDT:
 
-This is not an official Google product (experimental or otherwise), it is just
-code that happens to be owned by Google and Schatz Forensic.
+- `rdflib_hdt_ng`: a read-only `rdflib.Store` over HDT bytes, and
+  `graph_to_hdt` to write an rdflib graph as HDT.
+- `pyhdt2_cython`: the HDT reader and writer behind it, in Python and NumPy
+  with the hot loops compiled by Cython.
+
+### UTF-8 extended HDT format
+HDT v1 relies on NULL terminators for determining the end of strings (and hence length), which fails for valid UTF-8 strings containing the Unicode NUL code point.
+
+This implementation reads and writes HDT serializations which include the full range of UTF-8, by defining a new DictionarySection type. pyaff4 writes every dictionary section in this type, and reads it alongside the standard type 2. hdt-cpp 1.3.3 and hdt-java 2.1.2 cannot read type 8, so they cannot read the HDT files pyaff4 writes.
+With reference section 4 of "HDT Binary Format" (2015) [1], the newly defined PlainFrontCodingUtf8 = 8 dictionary section reuses the design of the existing PlainFrontCoding DictionarySection, instead employing a length-prepended string encoding, per the following structure:
+
+```
+<Buffer of Blocks>
+ <VByte size of following string in bytes>
+ <First String of Block>
+ <VByte count of Common prefix characters> <VByte size of following string in bytes> <Suffix String>
+ … as many times as necessary to fit "BlockSize" strings.
+<CRC32 of Buffer of Blocks>
+```
+
+The included test file "hdtv1-failing-utf8.hdt" contains two triples constructed from such strings which demonstrate the limitation,
+while the test file "hdt-ng-utf8.hdt" demonstrates the proposed new UTF-8 capable variant of format.
+
+Literal text is stored raw, as hdt-java and hdt-cpp store it: the characters between a literal's quotes are stored as they are, without N-Triples escapes, and a reader finds the end of the text at the last `"`.
+
+## Development
+
+`uv sync` installs pyaff4 editable and compiles the HDT kernels. The tests also
+read the AFF4 reference images from the `reference_images` submodule: clone with
+`--recurse-submodules`, or run `git submodule update --init`.
+
+```bash
+just test             # all tests, then the HDT engine's tests with interpreted kernels
+just build            # sdist and a wheel for this host
+just release-build    # cross-build, audit and install-test every release wheel (Linux)
+python cicd/lint_kernels.py   # no CPython API calls in the compiled hot loops
+```
 
 ## References
 

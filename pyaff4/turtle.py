@@ -6,10 +6,10 @@ def toDirectivesAndTripes(text):
     in_directives = True
     for line in text.splitlines():
         if in_directives:
-            if line.startswith("@"):
+            if line.startswith(u"@"):
                 directives.append(line)
                 continue
-            elif line == "":
+            elif line == u"":
                 in_directives = False
         else:
             triples.append(line)

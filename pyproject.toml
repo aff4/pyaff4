@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=80,<90", "cython>=3.1,<4"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyaff4"
+description = "Advanced Forensic Format Version 4 (AFF4) Python module."
+keywords = ["AFF4", "forensic"]
+readme = "README.md"
+authors = [
+    { name = "Michael Cohen", email = "scudette@gmail.com" },
+    { name = "Bradley Schatz", email = "blschatz@apple.com" },
+]
+version = "2.0.0a20"
+requires-python = ">=3.12"
+# Cython is a runtime dependency: the HDT kernels (pyhdt2_cython._kernels) are Cython pure-Python
+# mode, and the interpreted fallback (py312-none-any wheel) imports `cython` for its type
+# declarations.
+dependencies = [
+    "python-snappy",
+    "rdflib>=7.1.4,<8",
+    "numpy>=2.0",
+    "crc32c>=2.7",
+    "cython>=3.1",
+    "intervaltree == 3.1.0",
+    "pyyaml >= 6.0.1",
+    "tzlocal",
+    "pytz",
+    "html5lib == 1.1",
+    "python-dateutil == 2.8.2",
+    "fastcdc == 1.7.0",
+    "hexdump",
+    "pynacl",
+    "pycryptodome",
+    "passlib",
+    "cryptography == 47.0.0",
+    "expiringdict",
+    "lz4",
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[project.optional-dependencies]
+cloud = ["google-api-python-client"]
+
+[project.scripts]
+aff4 = "pyaff4.cli:main"
+pyhdtcli = "pyhdt2_cython.cli:main"
+
+[project.urls]
+Homepage = "https://www.aff4.org/"
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "ty",
+    "pip-audit",
+]
+
+[tool.setuptools]
+packages = ["pyaff4", "pyaff4.cli", "rdflib_hdt_ng", "pyhdt2_cython"]
+
+# The Cython-generated C source is a build intermediate; wheels carry the compiled kernels.
+[tool.setuptools.exclude-package-data]
+pyhdt2_cython = ["*.c"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Benchmark data holds copied release builds of other packages, not this package's source.
+extend-exclude = ["benchmarks/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ty.rules]
+unresolved-import = "error"
+
+# Overrides a machine-wide uv.toml that names another default index, so uv.lock stays on PyPI.
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true

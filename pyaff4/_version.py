@@ -1,103 +1,42 @@
+"""Backwards-compatibility shim for legacy versioneer-style callers.
 
-# Machine Generated - do not edit!
+Pre-2.0 pyaff4 shipped a versioneer-generated `_version.py` that
+exposed `raw_versions()` / `get_versions()` returning a dict of
+git-derived version metadata. The uv_build migration removed
+versioneer; the version is now sourced from pyproject.toml via
+`importlib.metadata`. This module preserves the legacy function
+shape so downstream consumers (e.g. mac-apt's LogLibraryVersions
+hook calling `pyaff4._version.raw_versions()['version']`) continue
+to work without code changes.
+"""
 
-# This file is produced when the main "version.py update" command is run. That
-# command copies this file to all sub-packages which contain
-# setup.py. Configuration is maintain in version.yaml at the project's top
-# level.
+from __future__ import annotations
 
-def get_versions():
-    return tag_version_data(raw_versions(), """version.yaml""")
+from importlib.metadata import version
 
-def raw_versions():
-    return json.loads("""
-{
-    "post": "0",
-    "rc": "0",
-    "version": "0.32"
-}
-""")
-
-import json
-import os
-import subprocess
-
-try:
-    # We are looking for the git repo which contains this file.
-    MY_DIR = os.path.dirname(os.path.abspath(__file__))
-except:
-    MY_DIR = None
-
-def is_tree_dirty():
-    try:
-        return bool(subprocess.check_output(
-            ["git", "diff", "--name-only"], stderr=subprocess.PIPE,
-            cwd=MY_DIR,
-        ).splitlines())
-    except (OSError, subprocess.CalledProcessError):
-        return False
-
-def get_version_file_path(version_file="version.yaml"):
-    try:
-        return os.path.join(subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"], stderr=subprocess.PIPE,
-            cwd=MY_DIR,
-        ).decode("utf-8").strip(), version_file)
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-def number_of_commit_since(version_file="version.yaml"):
-    """Returns the number of commits since version.yaml was changed."""
-    try:
-        last_commit_to_touch_version_file = subprocess.check_output(
-            ["git", "log", "--no-merges", "-n", "1", "--pretty=format:%H",
-             version_file], cwd=MY_DIR, stderr=subprocess.PIPE,
-        ).strip()
-
-        all_commits = subprocess.check_output(
-            ["git", "log", "--no-merges", "-n", "1000", "--pretty=format:%H"],
-            stderr=subprocess.PIPE, cwd=MY_DIR,
-        ).splitlines()
-        return all_commits.index(last_commit_to_touch_version_file)
-    except (OSError, subprocess.CalledProcessError, ValueError):
-        return None
+__version__: str = version("pyaff4")
 
 
-def get_current_git_hash():
-    try:
-        return subprocess.check_output(
-            ["git", "log", "--no-merges", "-n", "1", "--pretty=format:%H"],
-            stderr=subprocess.PIPE, cwd=MY_DIR,
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
+def raw_versions() -> dict[str, object]:
+    """Return version metadata under legacy keys.
 
-def tag_version_data(version_data, version_path="version.yaml"):
-    current_hash = get_current_git_hash()
-    # Not in a git repository.
-    if current_hash is None:
-        version_data["error"] = "Not in a git repository."
+    The original versioneer dict carried git-derived fields (full SHA,
+    dirty flag, pep440 string). Releases now ship from clean git tags
+    with pyproject.toml as the single source of truth, so only the
+    `version` key carries meaningful information; the others are
+    populated with the same value (for `pep440`-indexing callers) or
+    benign defaults.
+    """
+    return {
+        "version": __version__,
+        "pep440": __version__,
+        "version-pep440": __version__,
+        "full-revisionid": "",
+        "dirty": False,
+        "error": None,
+    }
 
-    else:
-        version_data["revisionid"] = current_hash
-        version_data["dirty"] = is_tree_dirty()
-        version_data["dev"] = number_of_commit_since(
-            get_version_file_path(version_path))
 
-    # Format the version according to pep440:
-    pep440 = version_data["version"]
-    if int(version_data.get("post", 0)) > 0:
-        pep440 += ".post" + version_data["post"]
-
-    elif int(version_data.get("rc", 0)) > 0:
-        pep440 += ".rc" + version_data["rc"]
-
-    if version_data.get("dev", 0):
-        # A Development release comes _before_ the main release.
-        last = version_data["version"].rsplit(".", 1)
-        version_data["version"] = "%s.%s" % (last[0], int(last[1]) + 1)
-        pep440 = version_data["version"] + ".dev" + str(version_data["dev"])
-
-    version_data["pep440"] = pep440
-
-    return version_data
+def get_versions() -> dict[str, object]:
+    """Versioneer-compatible alias for `raw_versions`."""
+    return raw_versions()

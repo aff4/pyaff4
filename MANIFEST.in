@@ -1,6 +1,3 @@
-include README.txt
-
-recursive-include pyaff4 *
-
-recursive-exclude * *.pyc
-exclude .gitignore
+# The tests need test_images and tests/hdt_fixtures, which the sdist does not
+# carry; setuptools would otherwise add tests/test*.py alone.
+prune tests

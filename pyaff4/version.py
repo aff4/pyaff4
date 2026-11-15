@@ -1,4 +1,11 @@
-class Version(object):
+#
+# Copyright © 2026 Apple Inc.
+#
+# Licensed under Apache License v2.0
+# SPDX-License-Identifier: Apache-2.0
+#
+
+class Version:
     def __init__(self, major, minor, tool):
         self.major = major
         self.minor = minor
@@ -39,6 +46,16 @@ class Version(object):
 
     def __str__(self):
         return u"major=%d\nminor=%d\ntool=%s\n" % (self.major, self.minor, self.tool)
+
+def parseProperties(propertiesText):
+    res = {}
+    for line in propertiesText.split("\n"):
+        try:
+            (prop, value) = line.split("=")
+            res[prop] = value
+        except ValueError:
+            pass
+    return res
 
 basic_zip = Version(0, 0, "pyaff4")
 aff4v10 = Version(1, 0, "pyaff4")

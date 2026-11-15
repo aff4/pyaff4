@@ -1,7 +1,5 @@
-from __future__ import division
-from __future__ import absolute_import
-from __future__ import unicode_literals
 # Copyright 2016,2017 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -15,10 +13,7 @@ from __future__ import unicode_literals
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from builtins import str
-from past.utils import old_div
 from pyaff4 import aff4
-from pyaff4 import utils
 import sys
 import binascii
 import math
@@ -26,8 +21,8 @@ import math
 class RepeatedStream(aff4.AFF4Stream):
 
     def __init__(self, resolver=None, urn=None, symbol=b"\x00"):
-        super(RepeatedStream, self).__init__(
-            resolver=resolver, urn=urn)
+        super().__init__(
+            resolver, urn, None)
         self.symbol = symbol
 
     def Read(self, length):
@@ -67,8 +62,8 @@ class RepeatedStream(aff4.AFF4Stream):
 class RepeatedStringStream(aff4.AFF4Stream):
 
     def __init__(self, resolver=None, urn=None, repeated_string=None):
-        super(RepeatedStringStream, self).__init__(
-            resolver=resolver, urn=urn)
+        super().__init__(
+            resolver, urn, None)
 
         self.tile = repeated_string
         self.tilesize = len(self.tile)

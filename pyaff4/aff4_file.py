@@ -1,4 +1,5 @@
 # Copyright 2015 Google Inc. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -13,10 +14,6 @@
 # the License.
 
 """An implementation of AFF4 file backed objects."""
-from __future__ import unicode_literals
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
 
 import logging
 import os
@@ -27,7 +24,6 @@ from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
-from pyaff4 import utils
 
 BUFF_SIZE = 64 * 1024
 
@@ -37,15 +33,17 @@ LOGGER = logging.getLogger("pyaff4")
 
 class FileBackedObject(aff4.AFF4Stream):
     def __init__(self,  *args, **kwargs):
-        super(FileBackedObject, self).__init__( *args, **kwargs)
+        super().__init__( *args, **kwargs)
+        self.mode = kwargs.get('appendmode', None)
 
     def _GetFilename(self):
         filename = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_FILE_NAME)
         if filename:
-            return filename
+            return str(filename)
 
         # Only file:// URNs are supported.
-        if self.urn.Scheme() == "file":
+        (components, original_filename) = rdfvalue.Parse(self.urn.toPython())
+        if components.scheme == "file":
             return self.urn.ToFilename()
 
     @staticmethod
@@ -82,28 +80,22 @@ class FileBackedObject(aff4.AFF4Stream):
         if not filename:
             raise IOError("Unable to find storage for %s" % self.urn)
 
-        filename = str(filename)
-
         directory_components = os.sep.split(filename)
         directory_components.pop(-1)
 
-        mode = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE)
-        if mode == "truncate":
-            flags = "w+b"
-            #self.resolver.Set(lexicon.transient_graph, self.urn, lexicon.AFF4_STREAM_WRITE_MODE,
-            #                 rdfvalue.XSDString("append"))
-            self.properties.writable = True
-            self._CreateIntermediateDirectories(directory_components)
-
-        elif mode == "append":
-            flags = "a+b"
-            self.properties.writable = True
-            self._CreateIntermediateDirectories(directory_components)
-
-        elif mode == "random":
-            flags = "r+b"
-            self.properties.writable = True
-            self._CreateIntermediateDirectories(directory_components)
+        if self.mode is not None:
+            if self.mode == "truncate":
+                flags = "w+b"
+                self.properties.writable = True
+                self._CreateIntermediateDirectories(directory_components)
+            elif self.mode == "append":
+                flags = "a+b"
+                self.properties.writable = True
+                self._CreateIntermediateDirectories(directory_components)
+            elif self.mode == "random":
+                flags = "r+b"
+                self.properties.writable = True
+                self._CreateIntermediateDirectories(directory_components)
 
         if LOGGER.isEnabledFor(logging.INFO):
             LOGGER.info("Opening file %s", filename)
@@ -128,7 +120,7 @@ class FileBackedObject(aff4.AFF4Stream):
         while True:
             toRead = 32 * 1024
             data = self.Read(toRead)
-            if data == None or len(data) == 0:
+            if data is None or len(data) == 0:
                 # EOF
                 return res
             else:
@@ -160,7 +152,7 @@ class FileBackedObject(aff4.AFF4Stream):
             if self.fd.tell() != self.writeptr:
                 self.fd.seek(self.writeptr)
 
-        self.fd.write(utils.SmartStr(data))
+        self.fd.write(data)
         # self.fd.flush()
 
         #self.size = len(data)
@@ -172,7 +164,7 @@ class FileBackedObject(aff4.AFF4Stream):
     def Flush(self):
         if self.IsDirty():
             self.fd.flush()
-        super(FileBackedObject, self).Flush()
+        super().Flush()
 
     def Prepare(self):
         self.readptr = 0
@@ -198,12 +190,12 @@ class FileBackedObject(aff4.AFF4Stream):
 def GenericFileHandler(resolver, urn, *args, **kwargs):
     if os.path.isdir(urn.ToFilename()):
         directory_handler = registry.AFF4_TYPE_MAP[lexicon.AFF4_DIRECTORY_TYPE]
-        result = directory_handler(resolver)
+        result = directory_handler(resolver, urn, *args, **kwargs)
         resolver.Set(result.urn, lexicon.AFF4_STORED, urn)
 
         return result
 
-    return FileBackedObject(resolver, urn)
+    return FileBackedObject(resolver, urn, *args, **kwargs)
 
 registry.AFF4_TYPE_MAP["file"] = GenericFileHandler
 registry.AFF4_TYPE_MAP[lexicon.AFF4_FILE_TYPE] = FileBackedObject
@@ -212,6 +204,6 @@ registry.AFF4_TYPE_MAP[lexicon.AFF4_FILE_TYPE] = FileBackedObject
 class AFF4MemoryStream(FileBackedObject):
 
     def __init__(self, *args, **kwargs):
-        super(AFF4MemoryStream, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.fd = io.BytesIO()
         self.properties.writable = True

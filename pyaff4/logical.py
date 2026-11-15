@@ -1,4 +1,5 @@
 # Copyright 2016-2018 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -15,6 +16,7 @@
 import os
 import platform
 from pyaff4 import lexicon, rdfvalue
+from rdflib import Literal, XSD
 import tzlocal
 import pytz
 from datetime import datetime
@@ -24,7 +26,7 @@ import traceback
 if platform.system() == "Linux":
     from pyaff4 import statx
 
-class FSMetadata(object):
+class FSMetadata:
     def __init__(self, urn, name, length):
         self.name = name
         self.length = length
@@ -89,39 +91,39 @@ class FSMetadata(object):
 
 class ClassicUnixMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
-        super(ClassicUnixMetadata, self).__init__(urn, name, size)
+        super().__init__(urn, name, size)
         self.lastWritten = lastWritten
         self.lastAccessed = lastAccessed
         self.recordChanged = recordChanged
 
 
     def store(self, resolver):
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.recordChanged), rdfvalue.XSDDateTime(self.recordChanged))
+        resolver.Set(self.urn, self.urn, lexicon.AFF4_STREAM_SIZE, Literal(self.length, datatype=XSD.integer))
+        resolver.Set(self.urn, self.urn, lexicon.standard11.lastWritten, Literal(self.lastWritten, datatype=XSD.dateTime))
+        resolver.Set(self.urn, self.urn, lexicon.standard11.lastAccessed, Literal(self.lastAccessed, datatype=XSD.dateTime))
+        resolver.Set(self.urn, self.urn, lexicon.standard11.recordChanged, Literal(self.recordChanged, datatype=XSD.dateTime))
 
 class ModernUnixMetadata(ClassicUnixMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
-        super(ModernUnixMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged)
+        super().__init__(urn, name, size, lastWritten, lastAccessed, recordChanged)
         self.birthTime = birthTime
 
     def store(self, resolver):
-        super(ModernUnixMetadata, self).store(resolver)
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
+        super().store(resolver)
+        resolver.Set(self.urn, self.urn, lexicon.standard11.birthTime, Literal(self.birthTime, datatype=XSD.dateTime))
 
 class LinuxFSMetadata(ModernUnixMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
-        super(LinuxFSMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
+        super().__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
 
 
 class MacOSFSMetadata(ModernUnixMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime):
-        super(MacOSFSMetadata, self).__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
+        super().__init__(urn, name, size, lastWritten, lastAccessed, recordChanged, birthTime)
 
 class WindowsFSMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, birthTime):
-        super(WindowsFSMetadata, self).__init__(urn, name, size)
+        super().__init__(urn, name, size)
         self.lastWritten = lastWritten
         self.lastAccessed = lastAccessed
         self.birthTime = birthTime
@@ -133,7 +135,9 @@ class WindowsFSMetadata(FSMetadata):
         resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
 
 def resetTimestampsPosix(destFile, lastWritten, lastAccessed, recordChanged, birthTime):
-    if lastWritten == None or lastAccessed == None:
+    if lastWritten is None or lastAccessed is None:
+        return
+    if lastWritten.value is None or lastAccessed.value is None:
         return
     try:
         lw = parse(lastWritten.value)

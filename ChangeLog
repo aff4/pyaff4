@@ -1,3 +1,11 @@
+--v.037
++ HDT support for RDF infomodel
++ Use rdflib as datastore, rather than parallel RDF store
++ Upgrade to recent rdflib
+--v0.36
++ Remove python2 backwards compatibility
++ Refactor out hash-based logical imaging to separate class
++ Make fastchunking dependency optional - only needed for hash-based logical imaging
 --v0.33
 + Fix performance regressions.
 + Make logging more efficient.

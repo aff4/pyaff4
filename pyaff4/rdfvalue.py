@@ -1,4 +1,5 @@
 # Copyright 2014 Google Inc. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -12,222 +13,131 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-"""RDF Values are responsible for serialization."""
-from __future__ import unicode_literals
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
-from builtins import object
-import functools
 import urllib.parse
 import urllib.request, urllib.parse, urllib.error
 
 import os
-import binascii
 import posixpath
-import rdflib
 
-from pyaff4 import registry
-from pyaff4 import utils
+import rdflib
+from rdflib import URIRef
+
+
+from typing import (
+    Any,
+)
 
 # pylint: disable=protected-access
 
+def parse_components(value: URIRef):
+    components = urllib.parse.urlparse(value)
 
-class Memoize(object):
-    def __call__(self, f):
-        f.memo_pad = {}
+    # dont normalise path for http URI's
+    if components.scheme and not components.scheme == "http":
+        normalized_path = posixpath.normpath(components.path)
+        if normalized_path == ".":
+            normalized_path = ""
 
-        @functools.wraps(f)
-        def Wrapped(self, *args):
-            key = tuple(args)
-            if len(f.memo_pad) > 100:
-                f.memo_pad.clear()
+        components = components._replace(path=normalized_path)
+    if not components.scheme:
+        # For file:// URNs, we need to parse them from a filename.
+        components = components._replace(
+            netloc="",
+            path=urllib.request.pathname2url(value),
+            scheme="file")
 
-            if key not in f.memo_pad:
-                f.memo_pad[key] = f(self, *args)
+    return components
 
-            return f.memo_pad[key]
+class ARN(URIRef):
+    def __eq__(self, other: Any) -> bool:
+        """
+        We might be comparing an ARN in code, with a URIRef that has been parsed from turtle
+        Make sure they are equal
+        """
 
-        return Wrapped
-
-
-class RDFValue(object):
-    datatype = ""
-
-    def __init__(self, initializer=None):
-        self.Set(initializer)
-
-    def GetRaptorTerm(self):
-        return rdflib.Literal(self.SerializeToString(),
-                              datatype=self.datatype)
-
-    def SerializeToString(self):
-        """Serializes to a sequence of bytes."""
-        return ""
-
-    def UnSerializeFromString(self, string):
-        """Unserializes from bytes."""
-        raise NotImplementedError
-
-    def Set(self, string):
-        raise NotImplementedError
-
-    def __bytes__(self):
-        return self.SerializeToString()
-
-    def __eq__(self, other):
-        return utils.SmartStr(self) == utils.SmartStr(other)
-
-    def __req__(self, other):
-        return utils.SmartStr(self) == utils.SmartStr(other)
-
-    def __hash__(self):
-        return hash(self.SerializeToString())
-
-    def __str__(self):
-        return self.SerializeToString()
-
-
-class RDFBytes(RDFValue):
-    value = b""
-    datatype = rdflib.XSD.hexBinary
-
-    def SerializeToString(self):
-        try:
-            return binascii.hexlify(self.value)
-        except:
-            pass
-
-    def UnSerializeFromString(self, string):
-        self.Set(binascii.unhexlify(string))
-
-    def Set(self, data):
-        if type(data) == type(b''):
-            self.value = data
+        if type(self) is type(other):
+            return str(self) == str(other)
+        elif type(other) is URIRef:
+            return str(self) == str(other)
         else:
-            self.value = data._value
-
-    def __eq__(self, other):
-        if isinstance(other, RDFBytes):
-            return self.value == other.value
-
-
-class XSDString(RDFValue):
-    """A unicode string."""
-    datatype = rdflib.XSD.string
-
-    def SerializeToString(self):
-        return utils.SmartStr(self.value)
-
-    def UnSerializeFromString(self, string):
-        self.Set(utils.SmartUnicode(string))
-
-    def Set(self, data):
-        self.value = utils.SmartUnicode(data)
-
-    def __str__(self):
-        return self.value
-
-class XSDDateTime(RDFValue):
-    """A unicode string."""
-    datatype = rdflib.XSD.dateTime
-
-    def SerializeToString(self):
-        return utils.SmartStr(self.value)
-
-    def UnSerializeFromString(self, string):
-        self.Set(rdflib.Literal(self.value, datatype=rdflib.XSD.dateTime))
-
-    def Set(self, data):
-        self.value = rdflib.Literal(data)
-
-    def __str__(self):
-        return self.value
-
-@functools.total_ordering
-class XSDInteger(RDFValue):
-    datatype = rdflib.XSD.integer
-
-    def SerializeToString(self):
-        return utils.SmartStr(self.value)
-
-    def UnSerializeFromString(self, string):
-        self.Set(int(string))
-
-    def Set(self, data):
-        self.value = int(data)
-
-    def __eq__(self, other):
-        if isinstance(other, XSDInteger):
-            return self.value == other.value
-        return self.value == other
-
-    def __int__(self):
-        return self.value
-
-    def __long__(self):
-        return int(self.value)
-
-    def __cmp__(self, o):
-        return self.value - o.value
-
-    def __add__(self, o):
-        return self.value + o
-
-    def __lt__(self, o):
-        return self.value < o
-
-    def __str__(self):
-        return str(self.value)
+            return False
 
     def __hash__(self):
-        return hash(self.SerializeToString())
+        return super().__hash__()
+
+    def Append(self, component, quote=True):
+        (components, original_filename) = Parse(self.toPython())
+        if quote:
+            component = urllib.parse.quote(component)
+
+        if components.scheme.startswith("http"):
+            new_path = posixpath.normpath(posixpath.join(
+                "/", components.path, component))
+            components = components._replace(path=new_path)
+            return URIRef(urllib.parse.urlunparse(components))
+        elif components.scheme == "aff4":
+            if components.path != u"":
+                new_path = posixpath.normpath(posixpath.join(
+                    "/", components.path, component))
+            else:
+                new_path = posixpath.normpath(component)
+                new_path = "/" + new_path
+
+            components = components._replace(path=new_path)
+
+            # we dont rely on the basic urllib as our IRI scheme is not a regular URL scheme
+            return ARN(u"%s://%s%s" % (components.scheme, components.hostname, components.path))
+        elif components.scheme == "file" or components.scheme == "zip" :
+            new_path = posixpath.normpath(posixpath.join(
+                "/", components.path, component))
+            components = components._replace(path=new_path)
+            return FileRef(u"%s://%s" % (components.scheme, components.path))
+        else:
+            raise Exception("Not implemented")
+
+    def RelativePath(self, urn):
+        urn_value = urn.toPython()
+        self_value = self.toPython()
+        if urn_value.startswith(self_value):
+            return urn_value[len(self_value):]
+
+class FileRef(URIRef):
+    def ToFilename(self):
+        # For file: urls we exactly reverse the conversion applied in
+        # FromFileName.
+        value = self.toPython()
+        if value.startswith("file:"):
+            res = urllib.request.url2pathname(value[5:])
+            if res.startswith("///"):
+                res = res[2:]
+            return res
+
+        (components, original_filename) = Parse(value)
+        if components.scheme == "file":
+            return components.path
+
+def Parse(value):
+    components = urllib.parse.urlparse(value)
+    original_filename = None
+    # dont normalise path for http URI's
+    if components.scheme and not components.scheme == "http":
+        normalized_path = posixpath.normpath(components.path)
+        if normalized_path == ".":
+            normalized_path = ""
+
+        components = components._replace(path=normalized_path)
+    if not components.scheme:
+        # For file:// URNs, we need to parse them from a filename.
+        components = components._replace(
+            netloc="",
+            path=urllib.request.pathname2url(value),
+            scheme="file")
+        original_filename = value
+
+    return (components, original_filename)
 
 
-class RDFHash(XSDString):
-    # value is the hex encoded digest.
-
-    def __eq__(self, other):
-        if isinstance(other, RDFHash):
-            if self.datatype == other.datatype:
-                return self.value == other.value
-        return utils.SmartStr(self.value) == utils.SmartStr(other)
-
-    def __ne__(self, other):
-        return not self == other
-
-    def digest(self):
-        return binascii.unhexlify(self.value)
-
-    def shortName(self):
-        return self.datatype[len("http://aff4.org/Schema#"):]
-
-class SHA512Hash(RDFHash):
-    datatype = rdflib.URIRef("http://aff4.org/Schema#SHA512")
-
-
-class SHA256Hash(RDFHash):
-    datatype = rdflib.URIRef("http://aff4.org/Schema#SHA256")
-
-
-class SHA1Hash(RDFHash):
-    datatype = rdflib.URIRef("http://aff4.org/Schema#SHA1")
-
-
-class Blake2bHash(RDFHash):
-    datatype = rdflib.URIRef("http://aff4.org/Schema#Blake2b")
-
-
-class MD5Hash(RDFHash):
-    datatype = rdflib.URIRef("http://aff4.org/Schema#MD5")
-
-
-class SHA512BlockMapHash(RDFHash):
-    datatype = rdflib.URIRef("http://aff4.org/Schema#blockMapHashSHA512")
-
-
-
-class URN(RDFValue):
+class URN():
     """Represent a URN.
 
     According to RFC1738 URLs must be encoded in ASCII. Therefore the
@@ -235,11 +145,6 @@ class URN(RDFValue):
     from other forms (e.g. filenames, we assume UTF8 encoding if the
     filename is a unicode string.
     """
-
-    # The encoded URN as a unicode string.
-    value = None
-
-    original_filename = None
 
     @classmethod
     def FromFileName(cls, filename):
@@ -258,9 +163,10 @@ class URN(RDFValue):
             # some kind of relative path
             filename = os.getcwd() + "/" + filename
 
-        result = cls("file://%s" % urllib.request.pathname2url(filename))
-        result.original_filename = filename
-        return result
+        #result = cls("file://%s" % urllib.request.pathname2url(filename))
+        #result.original_filename = filename
+        #return result
+        return FileRef("file://%s" % urllib.request.pathname2url(filename))
 
     @classmethod
     def NewURNFromFilename(cls, filename):
@@ -275,142 +181,30 @@ class URN(RDFValue):
                 res = res[2:]
             return res
 
-        components = self.Parse()
+        (components, original_filename) = self.Parse()
         if components.scheme == "file":
             return components.path
 
-    def GetRaptorTerm(self):
-        return rdflib.URIRef(self.value)
-
-    def SerializeToString(self):
-        components = self.Parse()
-        return utils.SmartUnicode(urllib.parse.urlunparse(components))
-
-    def UnSerializeFromString(self, string):
-        utils.AssertStr(string)
-        self.Set(utils.SmartUnicode(string))
-        return self
-
-    def Set(self, data):
-        if data is None:
-            return
-
-        elif isinstance(data, URN):
-            self.value = data.value
-        else:
-            utils.AssertUnicode(data)
-            self.value = data
-
-    def Parse(self):
-        return self._Parse(self.value)
-
-    # URL parsing seems to be slow in Python so we cache it as much as possible.
-    @Memoize()
-    def _Parse(self, value):
-        components = urllib.parse.urlparse(value)
-
-        # dont normalise path for http URI's
-        if components.scheme and not components.scheme == "http":
-            normalized_path = posixpath.normpath(components.path)
-            if normalized_path == ".":
-                normalized_path = ""
-
-            components = components._replace(path=normalized_path)
-        if not components.scheme:
-            # For file:// URNs, we need to parse them from a filename.
-            components = components._replace(
-                netloc="",
-                path=urllib.request.pathname2url(value),
-                scheme="file")
-            self.original_filename = value
-
-        return components
-
-    def Scheme(self):
-        components = self.Parse()
-        return components.scheme
-
-    def Append(self, component, quote=True):
-        components = self.Parse()
-        if quote:
-            component = urllib.parse.quote(component)
-
-        if components.scheme.startswith("http"):
-            new_path = posixpath.normpath(posixpath.join(
-                "/", components.path, component))
-            components = components._replace(path=new_path)
-            return URN(urllib.parse.urlunparse(components))
-        elif components.scheme == "aff4":
-            if components.path != u"":
-                new_path = posixpath.normpath(posixpath.join(
-                    "/", components.path, component))
-            else:
-                new_path = posixpath.normpath(component)
-                new_path = "/" + new_path
-
-            components = components._replace(path=new_path)
-
-            # we dont rely on the basic urllib as our IRI scheme is not a regular URL scheme
-            return URN(u"%s://%s%s" % (components.scheme, components.hostname, components.path))
-        elif components.scheme == "file":
-            new_path = posixpath.normpath(posixpath.join(
-                    "/", components.path, component))
-            components = components._replace(path=new_path)
-            return URN(u"%s://%s" % (components.scheme, components.path))
-        else:
-            raise Exception("Not implemented")
-
-    def RelativePath(self, urn):
-        urn_value = str(urn)
-        if urn_value.startswith(self.value):
-            return urn_value[len(self.value):]
-
-    def __str__(self):
-        return self.value
-
-    def __lt__(self, other):
-        return self.value < utils.SmartUnicode(other)
-
-    def __repr__(self):
-        return "<%s>" % self.value
-
-    def __eq__(self, other):
-        #return utils.SmartStr(self) == utils.SmartStr(other)
-        return utils.SmartUnicode(self.value) == utils.SmartUnicode(other)
-
-    def __hash__(self):
-        return hash(self.value)
-
-    def __ne__(self, other):
-        #return utils.SmartStr(self) == utils.SmartStr(other)
-        return utils.SmartUnicode(self.value) != utils.SmartUnicode(other)
 
 def AssertURN(urn):
-    if not isinstance(urn, URN):
-        raise TypeError("Expecting a URN.")
+    if not isinstance(urn, URIRef):
+        raise TypeError("Expecting a URIRef.")
 
+# Custom RDF datatypes. See https://skeptric.com/rdflib-add-types/ for a good introduction.
+# The following coerces our hashes to a string as the value
+AFF4_HASH_TYPES = [ "http://aff4.org/Schema#SHA512",
+    "http://aff4.org/Schema#SHA256",
+    "http://aff4.org/Schema#SHA1",
+    "http://aff4.org/Schema#MD5",
+    "http://aff4.org/Schema#Blake2b",
+    "http://aff4.org/Schema#blockMapHashSHA512",
+    "http://afflib.org/2009/aff4#SHA512",
+    "http://afflib.org/2009/aff4#SHA256",
+    "http://afflib.org/2009/aff4#SHA1",
+    "http://afflib.org/2009/aff4#MD5",
+    "http://afflib.org/2009/aff4#blockMapHashSHA512" ]
 
-def AssertURN(urn):
-    if not isinstance(urn, URN):
-        raise TypeError("Expecting a URN.")
-
-
-registry.RDF_TYPE_MAP.update({
-    rdflib.XSD.hexBinary: RDFBytes,
-    rdflib.XSD.string: XSDString,
-    rdflib.XSD.integer: XSDInteger,
-    rdflib.XSD.int: XSDInteger,
-    rdflib.XSD.long: XSDInteger,
-    rdflib.XSD.datetime: XSDDateTime,
-    rdflib.URIRef("http://aff4.org/Schema#SHA512"): SHA512Hash,
-    rdflib.URIRef("http://aff4.org/Schema#SHA256"): SHA256Hash,
-    rdflib.URIRef("http://aff4.org/Schema#SHA1"): SHA1Hash,
-    rdflib.URIRef("http://aff4.org/Schema#MD5"): MD5Hash,
-    rdflib.URIRef("http://aff4.org/Schema#Blake2b"): Blake2bHash,
-    rdflib.URIRef("http://aff4.org/Schema#blockMapHashSHA512"): SHA512BlockMapHash,
-    rdflib.URIRef("http://afflib.org/2009/aff4#SHA512"): SHA512Hash,
-    rdflib.URIRef("http://afflib.org/2009/aff4#SHA256"): SHA256Hash,
-    rdflib.URIRef("http://afflib.org/2009/aff4#SHA1"): SHA1Hash,
-    rdflib.URIRef("http://afflib.org/2009/aff4#MD5"): MD5Hash,
-    rdflib.URIRef("http://afflib.org/2009/aff4#blockMapHashSHA512"): SHA512BlockMapHash
-})
+for hash in AFF4_HASH_TYPES:
+    rdflib.term.bind(datatype=rdflib.URIRef(hash),
+                     pythontype=str,
+                     datatype_specific=True)

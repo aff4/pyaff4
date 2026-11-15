@@ -1,0 +1,103 @@
+@prefix :      <aff4://685e15cc-d0fb-4dbc-ba47-48117fc77044> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix aff4:  <http://aff4.org/Schema#> .
+
+<aff4://c21070c3-6d57-4f3b-9276-f83b6bfed5ae>
+        a                    aff4:CaseNotes ;
+        aff4:caseNumber      "Case ID: 1SR Canonical" ;
+        aff4:evidenceNumber  "Drive 1" ;
+        aff4:examiner        "Administrator" ;
+        aff4:notes           "This is another appended case note" ;
+        aff4:stored          : ;
+        aff4:target          <aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb> ;
+        aff4:timestamp       "2016-12-07T03:40:14.127Z"^^xsd:dateTime .
+
+<aff4://c1a6ab35-d46a-4c37-9bfe-0b3e4f0f1ca3>
+        a                     aff4:CaseDetails ;
+        aff4:caseDescription  "Canonical Image Generation Test Case" ;
+        aff4:caseName         "Canonical Image Generation" ;
+        aff4:examiner         "Administrator" ;
+        aff4:stored           : ;
+        aff4:target           <aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb> .
+
+<aff4://c215ba20-5648-4209-a793-1f918c723610>
+        a                          aff4:ImageStream ;
+        aff4:chunkSize             "32768"^^xsd:int ;
+        aff4:chunksInSegment       "2048"^^xsd:int ;
+        aff4:compressionMethod     <http://code.google.com/p/snappy/> ;
+        aff4:hash                  "fbac22cca549310bc5df03b7560afcf490995fbb"^^aff4:SHA1 , "d5825dc1152a42958c8219ff11ed01a3"^^aff4:MD5 ;
+        aff4:imageStreamHash       "7c909ad458a90ca083cf2d10848fb3aaee7d9ac008605f85aef1ac2db8249973ac7b6716f3250edb80219ff628d6fb4873c33c59de0a3e6c7657e234e7ba0db3"^^aff4:SHA512 ;
+        aff4:imageStreamIndexHash  "c663bc90d996d2c9699e00dc1ea2c55b3724f1eaca2b92119bb7c764aad222eed321cb00ee67899c027f6837a3bd8f789a96adb6e9df51629b3cac0b6f9f0722"^^aff4:SHA512 ;
+        aff4:size                  "3964928"^^xsd:long ;
+        aff4:stored                : ;
+        aff4:target                <aff4://fcbfdce7-4488-4677-abf6-08bc931e195b> ;
+        aff4:version               "1"^^xsd:int .
+
+<aff4://db69295f-70c3-4e82-9530-a39507f1447b>
+        a                aff4:TimeStamps ;
+        aff4:endTime     "2016-12-07T03:40:09.28Z"^^xsd:dateTime ;
+        aff4:operation   "CAPTURE" ;
+        aff4:startTime   "2016-12-07T03:40:09.131Z"^^xsd:dateTime ;
+        aff4:stored      : ;
+        aff4:target      <aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb> ;
+        aff4:timeSource  "SINK" .
+
+:       a                  aff4:ZipVolume ;
+        aff4:contains      <aff4://c1a6ab35-d46a-4c37-9bfe-0b3e4f0f1ca3> , <aff4://c215ba20-5648-4209-a793-1f918c723610> , <aff4://c21070c3-6d57-4f3b-9276-f83b6bfed5ae> , <aff4://db69295f-70c3-4e82-9530-a39507f1447b> , <aff4://427e2078-b010-462b-ba7c-f286b390ba94> , <aff4://fcbfdce7-4488-4677-abf6-08bc931e195b> , <aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb> ;
+        aff4:creationTime  "2016-12-07T03:40:09.126Z"^^xsd:dateTime ;
+        aff4:interface     aff4:Volume ;
+        aff4:stored        "Base-Linear.aff4" .
+
+<aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb>
+        a                            aff4:ContiguousImage , aff4:DiskImage , aff4:Image ;
+        aff4:acquisitionCompletionState
+                "Completed Normally" ;
+        aff4:blockSize               "512"^^xsd:int ;
+        aff4:dataStream              <aff4://fcbfdce7-4488-4677-abf6-08bc931e195b> ;
+        aff4:diskDeviceName          "/dev/sdz" ;
+        aff4:diskDeviceRole          "0"^^xsd:int ;
+        aff4:diskDeviceType          "Disk" ;
+        aff4:diskFirmware            "1.02a" ;
+        aff4:diskInterfaceType       "ATA" ;
+        aff4:diskMake                "Seagate" ;
+        aff4:diskModel               "ST-506" ;
+        aff4:diskNumberOfPartitions  "1"^^xsd:int ;
+        aff4:diskPartitionTableType  "MBR" ;
+        aff4:diskSerial              "SGAT5060001234" ;
+        aff4:hash                    "c339331791f2018c50247cae1307ea8b0ce1166fac8747c5f4438c364b3d6c56793405afec7eec366205073ed9f7e7801556587c87181d83afe356bc9244ccf2"^^aff4:blockMapHashSHA512 ;
+        aff4:sectorCount             "524288"^^xsd:long ;
+        aff4:size                    "268435456"^^xsd:long ;
+        aff4:stored                  : .
+
+<aff4://c215ba20-5648-4209-a793-1f918c723610/blockhash.md5>
+        a          aff4:BlockHashes ;
+        aff4:hash  "9062f1c9f48438a6875a60b7e1323151e8ff583c8531ca7806d6c29b7d961ceddba8783e8e4c49ff37702304cdf1dc4c7a9b8f67c73af07fc14422c0be9ae20d"^^aff4:SHA512 .
+
+<aff4://c215ba20-5648-4209-a793-1f918c723610/blockhash.sha1>
+        a          aff4:BlockHashes ;
+        aff4:hash  "5f487386e32230f282174d197c40a6de4b8d039449a90cf0b720aeb9d213cf337b92a6f0547c5150dd5d1dfcc817e6d5018a2383efec7b6df38015235c9be9e1"^^aff4:SHA512 .
+
+<aff4://fcbfdce7-4488-4677-abf6-08bc931e195b>
+        a                         aff4:Map ;
+        aff4:blockMapHash         "c339331791f2018c50247cae1307ea8b0ce1166fac8747c5f4438c364b3d6c56793405afec7eec366205073ed9f7e7801556587c87181d83afe356bc9244ccf2"^^aff4:SHA512 ;
+        aff4:dependentStream      <aff4://c215ba20-5648-4209-a793-1f918c723610> ;
+        aff4:mapGapDefaultStream  aff4:Zero ;
+        aff4:mapHash              "7acc88edc1a89a97ac170e140a8dd26ba1caf51b8ac35e4136ca1de57af4e54182009b57124773da717f405a0a5f77c2bf366ab8cb3a3d7882053066b92cd303"^^aff4:SHA512 ;
+        aff4:mapIdxHash           "cc85c72d925186d58a072c1542ba18a6d8b6d7008a1b9adc3bac85841fad3dbfc2c71797029902847e0b4b9bc944ec6c5e3ae7f4e3d115144ef0db978e127a76"^^aff4:SHA512 ;
+        aff4:mapPathHash          "ce1b4e71d96f17817a7f0f4077851aee8ccc4b624a1043c45b76b7fa567d12578c6ea491cd3cce50b20cbb0136db809e56ba43fa3c963c26aac31074e3310f1a"^^aff4:SHA512 ;
+        aff4:mapPointHash         "2add12a4a27e3167f5c03b0ee364dc6762d705b64963981b3dc5081d16ee1c70d7898b8f4eeb14d70a511755ae86e31321cd598db02e659af030c56fbf924b22"^^aff4:SHA512 ;
+        aff4:size                 "268435456"^^xsd:long ;
+        aff4:stored               : ;
+        aff4:target               <aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb> .
+
+<aff4://427e2078-b010-462b-ba7c-f286b390ba94>
+        a                    aff4:CaseNotes ;
+        aff4:caseNumber      "Case ID: 1SR Canonical" ;
+        aff4:evidenceNumber  "Drive 1" ;
+        aff4:examiner        "Administrator" ;
+        aff4:notes           "This is an appended case note" ;
+        aff4:stored          : ;
+        aff4:target          <aff4://cf853d0b-5589-4c7c-8358-2ca1572b87eb> ;
+        aff4:timestamp       "2016-12-07T03:40:09.127Z"^^xsd:dateTime .
+

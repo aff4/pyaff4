@@ -2,6 +2,7 @@
 #
 # Copyright 2014 Google Inc. All rights reserved.
 # Copyright 2018 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -15,18 +16,14 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from __future__ import unicode_literals
-from future import standard_library
-standard_library.install_aliases()
-from builtins import chr
 import os
 import re
 import shutil
 import string
 import urllib.parse
 import pyaff4
-from pyaff4 import rdfvalue
-from pyaff4 import utils
+from pyaff4.rdfvalue import ARN, Parse
+
 
 
 PRINTABLES = set(string.printable)
@@ -37,7 +34,7 @@ PRINTABLES_NO_SLASH = PRINTABLES.copy()
 PRINTABLES_NO_SLASH.discard('/')
 
 FORBIDDEN = set()
-for c in "<>\^`{|}":
+for c in "<>\\^`{|}":
     FORBIDDEN.add(c)
 
 # convert a file path to an ARN fragment
@@ -87,13 +84,14 @@ def arnPathFragment_from_path(pathName):
         # relative path or windows drive path
         return "/" + "".join(escaped_path)
 
-def member_name_for_urn(member_urn, version, base_urn=None, slash_ok=True, use_unicode=False):
+def member_name_for_urn(member_urn: ARN, version, base_urn=None, slash_ok=True, use_unicode=False):
     filename = base_urn.RelativePath(member_urn)
     # The member is not related to the base URN, just concatenate them together.
 
     if filename is None:
+        (components, original_filename) = Parse(base_urn.toPython())
         filename = os.path.join(
-            base_urn.Parse().path, member_urn.SerializeToString())
+            components.path, member_urn.toPython())
 
     if filename.startswith("/"):
         # non-unc based path
@@ -130,14 +128,8 @@ def member_name_for_urn(member_urn, version, base_urn=None, slash_ok=True, use_u
     else:
         raise Exception("Illegal version")
 
-#def member_name_for_urn(arn, version, base_urn):
-#    a = utils.SmartUnicode(arn)
-#    b = utils.SmartUnicode(base_urn)
-#    return a[len(b):]
-
 def urn_from_member_name(member, base_urn, version):
     """Returns a URN object from a zip file's member name."""
-    member = utils.SmartUnicode(member)
 
     if version != pyaff4.version.basic_zip:
         if version.isLessThanOrEqual(1, 0):
@@ -150,12 +142,12 @@ def urn_from_member_name(member, base_urn, version):
 
     # This is an absolute URN.
     if urllib.parse.urlparse(member).scheme == "aff4":
-        result = member
+        result = ARN(member)
     else:
         # Relative member becomes relative to the volume's URN.
         result = base_urn.Append(member, quote=False)
 
-    return rdfvalue.URN(result)
+    return result
 
 def member_name_for_file_iri(arn):
     return arn[len("file://"):]

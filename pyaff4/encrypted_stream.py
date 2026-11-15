@@ -1,4 +1,5 @@
 # Copyright 2019 Schatz Forensic Pty Ltd All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -15,17 +16,11 @@
 # Author: Bradley L Schatz bradley@evimetry.com
 
 """This module implements the standard AFF4 Image."""
-from __future__ import division
-from __future__ import unicode_literals
-from builtins import range
-from builtins import str
-from past.utils import old_div
-from builtins import object
-import binascii
 import logging
 import struct
 import math
-from CryptoPlus.Cipher import python_AES
+from pyaff4 import aes_xts
+from rdflib import Literal, XSD
 
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
@@ -38,6 +33,9 @@ LOGGER = logging.getLogger("pyaff4")
 DEBUG = False
 
 class RandomImageStream(AFF4SImage):
+    # Write merges into the stored chunk at writeptr, so reloaded images can be rewritten.
+    rewritable = True
+
     def FlushChunk(self, chunk):
         if len(chunk) == 0:
             return
@@ -133,7 +131,6 @@ class RandomImageStream(AFF4SImage):
         targetLCA = self.writeptr // self.chunk_size
 
         #if self.IsFull():
-        #    self._FlushBevy()
 
         if self.currentLCA != targetLCA:
             if self.currentLCA > targetLCA:
@@ -277,7 +274,7 @@ class RandomImageStream(AFF4SImage):
         self.currentLCA = 0
         self.maxBevyIdx = 0
         self.bevy_is_loaded_from_disk = False
-        super(RandomImageStream, self).LoadFromURN()
+        super().LoadFromURN()
         if self.size > 0:
             self.loadInitialBevy()
             self.maxBevyIdx = math.ceil(self.size / (self.chunk_size*self.chunks_per_segment)) -1
@@ -300,41 +297,38 @@ class RandomImageStream(AFF4SImage):
         if not self.bevy:
             return
 
-        volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-        if not volume_urn:
+        volume = self.parent
+        if volume is None:
             raise IOError("Unable to find storage for urn %s" % self.urn)
-        
+
         if self.bevy_number > self.maxBevyIdx:
             self.maxBevyIdx = self.bevy_number
         if len(self.bevy) > self.bevy_length or self.bevy_size_has_changed:
-            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-            with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
-                bevy_urn = self.urn.Append("%08d" % self.bevy_number)
-                bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
-                #if self.bevy_is_loaded_from_disk:
-                if LOGGER.isEnabledFor(logging.INFO):
-                    ("Removing bevy member %s", bevy_urn)
-                volume.RemoveMember(bevy_urn)
-                if LOGGER.isEnabledFor(logging.INFO):
-                    LOGGER.info("Removing bevy member %s", bevy_index_urn)
-                volume.RemoveMember(bevy_index_urn)
+            bevy_urn = self.urn.Append("%08d" % self.bevy_number)
+            bevy_index_urn = rdfvalue.ARN("%s.index" % bevy_urn)
+            #if self.bevy_is_loaded_from_disk:
+            if LOGGER.isEnabledFor(logging.INFO):
+                ("Removing bevy member %s", bevy_urn)
+            volume.RemoveMember(bevy_urn)
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Removing bevy member %s", bevy_index_urn)
+            volume.RemoveMember(bevy_index_urn)
 
         bevy_urn = self.urn.Append("%08d" % self.bevy_number)
-        with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
-            self._write_bevy_index(volume, bevy_urn, self.bevy_index, flush=True)
+        self._write_bevy_index(volume, bevy_urn, self.bevy_index, flush=True)
 
-            with volume.CreateMember(bevy_urn) as bevy:
-                content = b"".join(self.bevy)
-                if LOGGER.isEnabledFor(logging.INFO):
-                    LOGGER.info("Writing Bevy Content len=%x", len(content))
-                bevy.Write(content)
-                if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
-                    # no need to rewrite the bevy as the zip header is still good
-                    # and the blocks have been rewritten in-place
-                    bevy._dirty = False
+        with volume.CreateMember(bevy_urn) as bevy:
+            content = b"".join(self.bevy)
+            if LOGGER.isEnabledFor(logging.INFO):
+                LOGGER.info("Writing Bevy Content len=%x", len(content))
+            bevy.Write(content)
+            if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
+                # no need to rewrite the bevy as the zip header is still good
+                # and the blocks have been rewritten in-place
+                bevy._dirty = False
 
-            # We dont need to hold these in memory any more.
-            self.resolver.Close(bevy)
+        # We dont need to hold these in memory any more.
+        self.resolver.Close(bevy)
 
         # In Python it is more efficient to keep a list of chunks and then join
         # them at the end in one operation.
@@ -389,11 +383,11 @@ class AFF4EncryptedStream(RandomImageStream):
     DEBUG = False
     compression = lexicon.AFF4_IMAGE_COMPRESSION_STORED
     def LoadFromURN(self):
-        super(AFF4EncryptedStream, self).LoadFromURN()
+        super().LoadFromURN()
         volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
         storedChunksize = self.resolver.GetUnique(volume_urn, self.urn, self.lexicon.chunkSize)
 
-        if storedChunksize == None:
+        if storedChunksize is None:
             # initializing so setup the proper (non-debug chunksize)
             self.chunk_size = 512
             self.DEBUG = False
@@ -412,7 +406,7 @@ class AFF4EncryptedStream(RandomImageStream):
         self.vek = vek
         self.key1 = vek[0:16]
         self.key2 = vek[16:]
-        self.cipher = python_AES.new((self.key1, self.key2), python_AES.MODE_XTS)
+        self.cipher = aes_xts.new((self.key1, self.key2))
         if self.size > 0:
             self.doLoadInitialBevy()
 
@@ -421,7 +415,7 @@ class AFF4EncryptedStream(RandomImageStream):
         pass
 
     def Flush(self):
-        super(AFF4EncryptedStream, self).Flush()
+        super().Flush()
 
     def _FlushBevy(self):
         # Bevy is empty nothing to do.
@@ -431,17 +425,16 @@ class AFF4EncryptedStream(RandomImageStream):
         if self.bevy_number > self.maxBevyIdx:
             self.maxBevyIdx = self.bevy_number
 
-        volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-        if not volume_urn:
+        volume = self.parent
+        if volume is None:
             raise IOError("Unable to find storage for urn %s" % self.urn)
 
         if len(self.bevy) > self.bevy_length or self.bevy_size_has_changed:
-            with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
-                bevy_urn = self.urn.Append("%08d" % self.bevy_number)
-                bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
-                #if self.bevy_is_loaded_from_disk:
-                volume.RemoveMember(bevy_urn)
-                volume.RemoveMember(bevy_index_urn)
+            bevy_urn = self.urn.Append("%08d" % self.bevy_number)
+            bevy_index_urn = rdfvalue.ARN("%s.index" % bevy_urn)
+            #if self.bevy_is_loaded_from_disk:
+            volume.RemoveMember(bevy_urn)
+            volume.RemoveMember(bevy_index_urn)
 
         lastChunkIdx = len(self.bevy)-1
         lastChunk = self.bevy[lastChunkIdx]
@@ -451,28 +444,27 @@ class AFF4EncryptedStream(RandomImageStream):
             self.bevy_index[lastChunkIdx] = (bevy_offset, self.chunk_size)
 
         bevy_urn = self.urn.Append("%08d" % self.bevy_number)
-        with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
-            self._write_bevy_index(volume, bevy_urn, self.bevy_index, flush=True)
-            encryptedBevys = []
+        self._write_bevy_index(volume, bevy_urn, self.bevy_index, flush=True)
+        encryptedBevys = []
 
-            with volume.CreateMember(bevy_urn) as bevy:
-                for chunkIdx in range(0,len(self.bevy)):
-                    chunk_address = self.bevy_number * self.chunks_per_segment + chunkIdx
-                    tweak = struct.pack("<Q", chunk_address)
+        with volume.CreateMember(bevy_urn) as bevy:
+            for chunkIdx in range(0,len(self.bevy)):
+                chunk_address = self.bevy_number * self.chunks_per_segment + chunkIdx
+                tweak = struct.pack("<Q", chunk_address)
 
-                    if self.DEBUG:
-                        encryptedBevys.append(self.bevy[chunkIdx])
-                    else:
-                        encryptedBevys.append(self.cipher.encrypt(self.bevy[chunkIdx], tweak))
-                buf = b"".join(encryptedBevys)
-                bevy.Write(buf)
-                if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
-                    # no need to rewrite the bevy as the zip header is still good
-                    # and the blocks have been rewritten in-place
-                    bevy._dirty = False
+                if self.DEBUG:
+                    encryptedBevys.append(self.bevy[chunkIdx])
+                else:
+                    encryptedBevys.append(self.cipher.encrypt(self.bevy[chunkIdx], tweak))
+            buf = b"".join(encryptedBevys)
+            bevy.Write(buf)
+            if self.bevy_is_loaded_from_disk and not self.bevy_size_has_changed:
+                # no need to rewrite the bevy as the zip header is still good
+                # and the blocks have been rewritten in-place
+                bevy._dirty = False
 
-            # We dont need to hold these in memory any more.
-            self.resolver.Close(bevy)
+        # We dont need to hold these in memory any more.
+        self.resolver.Close(bevy)
 
         # In Python it is more efficient to keep a list of chunks and then join
         # them at the end in one operation.
@@ -495,29 +487,29 @@ class AFF4EncryptedStream(RandomImageStream):
         unit_number = chunk_id
         tweak = struct.pack("<Q", unit_number)
 
-        cipher = python_AES.new((self.key1,self.key2), python_AES.MODE_XTS)
+        cipher = aes_xts.new((self.key1, self.key2))
         plaintext = cipher.decrypt(cbuffer, tweak)
 
         return plaintext
 
     def _write_metadata(self):
-        volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        volume_urn = self.parent.urn
         self.resolver.Add(volume_urn, self.urn, lexicon.AFF4_TYPE,
-                          rdfvalue.URN(lexicon.AFF4_ENCRYPTEDSTREAM_TYPE))
+                          lexicon.AFF4_ENCRYPTEDSTREAM_TYPE)
 
         self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_IMAGE_CHUNK_SIZE,
-                          rdfvalue.XSDInteger(self.chunk_size))
+                          Literal(self.chunk_size, datatype=XSD.integer))
 
         self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_IMAGE_CHUNKS_PER_SEGMENT,
-                          rdfvalue.XSDInteger(self.chunks_per_segment))
+                          Literal(self.chunks_per_segment, datatype=XSD.integer))
 
         self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_STREAM_SIZE,
-                          rdfvalue.XSDInteger(self.Size()))
+                          Literal(self.Size(), datatype=XSD.long))
 
 
         for kb in self.keybags:
             self.resolver.Add(volume_urn, self.urn, lexicon.AFF4_KEYBAG,
-                              rdfvalue.URN(kb.ID))
+                              kb.ID)
             kb.write(self.resolver, volume_urn)
 
 registry.AFF4_TYPE_MAP[lexicon.AFF4_ENCRYPTEDSTREAM_TYPE] = AFF4EncryptedStream

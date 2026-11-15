@@ -1,65 +1,39 @@
-# Copyright 2014 Google Inc. All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not
-# use this file except in compliance with the License.  You may obtain a copy of
-# the License at
+# Copyright © 2026 Apple Inc.
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# Licensed under Apache License v2.0
+# SPDX-License-Identifier: Apache-2.0
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-# License for the specific language governing permissions and limitations under
-# the License.
 
-"""This module installs the pyaff4 library."""
+"""Compile the Cython kernels against the stable ABI (abi3, CPython 3.12+).
 
-from setuptools import setup
-from setuptools.command.test import test as TestCommand
+Used for source installs (sdist, editable). Release wheels are cross-built with zig by
+cicd/cross_build.py and packaged by cicd/build_wheels.py.
+"""
 
-try:
-    with open('README.md') as file:
-        long_description = file.read()
-except IOError:
-    long_description = (
-        'Advanced Forensic Format Version 4 (AFF4) Python module.')
+import platform
 
-ENV = {"__file__": __file__}
-exec(open("pyaff4/_version.py").read(), ENV)
-VERSION = ENV["get_versions"]()
+from Cython.Build import cythonize
+from setuptools import Extension, setup
 
-with open('requirements.txt') as f:
-    requirements = f.read().splitlines()
-
-class NoseTestCommand(TestCommand):
-    def finalize_options(self):
-        TestCommand.finalize_options(self)
-        self.test_args = []
-        self.test_suite = True
-
-    def run_tests(self):
-        # Run nose ensuring that argv simulates running nosetests directly
-        import nose
-        nose.run_exit(argv=['nosetests'])
-
-
-commands = {}
-commands["test"] = NoseTestCommand
+LIMITED_API = "0x030C0000"
+# Cython's own utility code (__Pyx__PyUnicode_EqualsUCS4) has a branch clang proves unreachable on
+# CPython 3.12; the kernels themselves compile without this warning.
+WARNING_FLAGS = ["-Wno-unreachable-code"]
+CPU_FLAGS = ["-mpopcnt"] if platform.machine() in ("x86_64", "AMD64") else []
 
 setup(
-    name='pyaff4',
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    version=VERSION["pep440"],
-    cmdclass=commands,
-    description='Advanced Forensic Format Version 4 (AFF4) Python module.',
-    author='Michael Cohen, Bradley Schatz',
-    author_email='scudette@gmail.com, bradley@evimetry.com',
-    url='https://www.aff4.org/',
-    packages=['pyaff4'],
-    package_dir={"pyaff4": "pyaff4"},
-    install_requires=requirements,
-    extras_require=dict(
-        cloud="google-api-python-client"
-    )
+    ext_modules=cythonize(
+        [
+            Extension(
+                "pyhdt2_cython._kernels",
+                ["pyhdt2_cython/_kernels.py"],
+                extra_compile_args=["-O3", *CPU_FLAGS, *WARNING_FLAGS],
+                define_macros=[("Py_LIMITED_API", LIMITED_API)],
+                py_limited_api=True,
+            )
+        ],
+        compiler_directives={"language_level": 3},
+    ),
+    options={"bdist_wheel": {"py_limited_api": "cp312"}},
 )

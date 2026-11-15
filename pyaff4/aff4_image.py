@@ -1,4 +1,5 @@
 # Copyright 2014 Google Inc. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -13,12 +14,6 @@
 # the License.
 
 """This module implements the standard AFF4 Image."""
-from __future__ import division
-from __future__ import unicode_literals
-from builtins import range
-from builtins import str
-from past.utils import old_div
-from builtins import object
 import binascii
 import logging
 import lz4.block
@@ -26,21 +21,22 @@ import struct
 
 from expiringdict import ExpiringDict
 
-from CryptoPlus.Cipher import python_AES
 import snappy
 import zlib
+
+from rdflib import Literal, XSD
 
 from pyaff4 import aff4
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
 from pyaff4 import hashes, zip
-
+from pyaff4.rdfvalue import ARN
 
 LOGGER = logging.getLogger("pyaff4")
 DEBUG = False
 
-class _CompressorStream(object):
+class _CompressorStream:
     """A stream which chunks up another stream.
 
     Each read() operation will return a compressed chunk.
@@ -88,6 +84,7 @@ class _CompressorStream(object):
         else:
             # On final chunks that aren't compressed, pad if they are less than chunk_size
             # so that at decompression we won't try to decompress an already decompressed chunk.
+            chunkLen = len(chunk)
             if chunkLen < self.owner.chunk_size:
                 padding = self.owner.chunk_size - chunkLen
                 chunk += b"\x00" * padding
@@ -97,6 +94,11 @@ class _CompressorStream(object):
 
 
 class AFF4Image(aff4.AFF4Stream):
+    # Whether stored chunks can be rewritten once the image is reloaded from a container.
+    rewritable = False
+
+    def __init__(self,  *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def setCompressionMethod(self, method):
         if method in [zip.ZIP_STORED, lexicon.AFF4_IMAGE_COMPRESSION_STORED, lexicon.AFF4_IMAGE_COMPRESSION_NONE]:
@@ -107,32 +109,55 @@ class AFF4Image(aff4.AFF4Stream):
         else:
             raise RuntimeError("Bad compression parameter")
 
+    def __exit__(self, exc_type, exc_value, traceback):
+        # The AFF4Image is flushed on its final close (via cache flush), not on
+        # every with-exit. AFF4Map.Write opens this stream via
+        # AFF4FactoryOpen for each write, and a Flush here would pad the
+        # partial chunk and split subsequent writes across separate bevy
+        # chunks.
+        super().__exit__(exc_type, exc_value, traceback)
+
+        if exc_value is not None:
+            return False
+
     @staticmethod
-    def NewAFF4Image(resolver, image_urn, volume_urn, type=lexicon.AFF4_IMAGE_TYPE):
-        with resolver.AFF4FactoryOpen(volume_urn) as volume:
-            # Inform the volume that we have a new image stream contained within
-            # it.
-            volume.children.add(image_urn)
+    def NewAFF4Image(resolver, member_container, image_urn, volume_urn, type=lexicon.AFF4_IMAGE_TYPE):
 
-            resolver.Add(volume_urn, image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
-                type))
+        volume = member_container
+        # Inform the volume that we have a new image stream contained within
+        # it.
+        volume.children.add(image_urn)
 
-            resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
-                         rdfvalue.URN(volume_urn))
+        # Persist the type so reopened containers can dispatch to the right
+        # handler via AFF4FactoryOpen.
+        resolver.Add(volume_urn, image_urn, lexicon.AFF4_TYPE, type)
 
-            res = resolver.AFF4FactoryOpen(image_urn)
-            res.properties.writable = True
-            return res
+        handler = registry.AFF4_TYPE_MAP.get(type, AFF4SImage)
+        res = handler(resolver, image_urn, member_container)
+        res.LoadFromURN()
+        resolver.ObjectCache.Put(res, True)
+
+        res.properties.writable = True
+        return res
 
     def LoadFromURN(self):
-        volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+        # rename the below to image_urn
+        volume_urn = self.urn
         #if not volume_urn:
         #    raise IOError("Unable to find storage for urn %s" % self.urn)
 
-        appendMode = self.resolver.GetUnique(lexicon.transient_graph,
-                                                         self.urn , lexicon.AFF4_STREAM_WRITE_MODE)
-        if appendMode != None and str(appendMode) in ["truncate", "append", "random" ]:
-            self.properties.writable = True
+        # appendMode = self.resolver.GetUnique(lexicon.transient_graph,
+        # Walk up parent.parent.parent to reach the file-backed store, but
+        # tolerate nested-volume layouts (e.g. an inner zip backed by an
+        # AFF4EncryptedStream) where the outer-most parent isn't a
+        # FileBackedObject and has no 'mode' attribute.
+        appendMode = None
+        ancestor = getattr(self.parent, 'parent', None)
+        while ancestor is not None:
+            if hasattr(ancestor, 'mode'):
+                appendMode = ancestor.mode
+                break
+            ancestor = getattr(ancestor, 'parent', None)
 
         self.lexicon = self.resolver.lexicon
 
@@ -144,6 +169,13 @@ class AFF4Image(aff4.AFF4Stream):
 
         sz = self.resolver.GetUnique(volume_urn, self.urn, self.lexicon.streamSize) or 0
         self.size = int(sz)
+
+        # Writes to an image with stored data are only safe if the class can rewrite stored
+        # chunks (RandomImageStream). Otherwise Write starts a new bevy 0 that replaces the
+        # stored one, so such an image stays read-only even in a writable container.
+        if (appendMode is not None and str(appendMode) in ["truncate", "append", "random"]
+                and (self.rewritable or self.size == 0)):
+            self.properties.writable = True
 
         self.compression = (self.resolver.GetUnique(volume_urn,
             self.urn, self.lexicon.compressionMethod) or
@@ -184,23 +216,30 @@ class AFF4Image(aff4.AFF4Stream):
         if flush:
             self.resolver.Close(bevy_index_segment)
 
-    def Length(self):
+    def Size(self):
         return self.size
+
+    def _check_writable(self):
+        if not self.properties.writable:
+            raise OSError(
+                f"Attempt to write to read only image {self.urn}: an image with stored data can "
+                "only be written to in the session that creates it"
+            )
 
     def WriteStream(self, source_stream, progress=None):
         """Copy data from a source stream into this stream."""
+        self._check_writable()
         if progress is None:
             if DEBUG:
                 progress = aff4.DEFAULT_PROGRESS
             else:
                 progress = aff4.EMPTY_PROGRESS
 
-        volume_urn = self.resolver.GetUnique(None, self.urn, lexicon.AFF4_STORED)
-        if not volume_urn:
-            raise IOError("Unable to find storage for urn %s" %
-                          self.urn)
+        # if not volume_urn:
+        #     raise IOError("Unable to find storage for urn %s" %
 
-        with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
+        volume = self.parent
+        if True:
             # Write a bevy at a time.
             while 1:
                 stream = _CompressorStream(self, source_stream)
@@ -229,6 +268,7 @@ class AFF4Image(aff4.AFF4Stream):
 
     def Write(self, data):
         #hexdump(data)
+        self._check_writable()
         self.MarkDirty()
         self.buffer += data
         idx = 0
@@ -275,27 +315,23 @@ class AFF4Image(aff4.AFF4Stream):
             self.bevy.append(chunk)
             self.bevy_length += self.chunk_size
 
-        #self.bevy_index.append((bevy_offset, len(compressed_chunk)))
-        #self.bevy.append(compressed_chunk)
-        #self.bevy_length += len(compressed_chunk)
         self.chunk_count_in_bevy += 1
 
-        #self.buffer = chunk[self.chunk_size:]
         if self.chunk_count_in_bevy >= self.chunks_per_segment:
             self._FlushBevy()
 
 
     def _FlushBevy(self):
-        volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-        if not volume_urn:
-            raise IOError("Unable to find storage for urn %s" % self.urn)
+        #if not volume_urn:
+        #    raise IOError("Unable to find storage for urn %s" % self.urn)
 
         # Bevy is empty nothing to do.
         if not self.bevy:
             return
 
         bevy_urn = self.urn.Append("%08d" % self.bevy_number)
-        with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
+        volume = self.parent
+        if True:
             self._write_bevy_index(volume, bevy_urn, self.bevy_index, flush=True)
 
             with volume.CreateMember(bevy_urn) as bevy:
@@ -313,22 +349,21 @@ class AFF4Image(aff4.AFF4Stream):
         self.bevy_length = 0
 
     def _write_metadata(self):
-        volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-        self.resolver.Add(volume_urn, self.urn, lexicon.AFF4_TYPE,
-                          rdfvalue.URN(lexicon.AFF4_IMAGE_TYPE))
+        volume_urn = self.parent.urn
+        self.resolver.Add(volume_urn, self.urn, lexicon.AFF4_TYPE,lexicon.AFF4_IMAGE_TYPE)
 
         self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_IMAGE_CHUNK_SIZE,
-                          rdfvalue.XSDInteger(self.chunk_size))
+                          Literal(self.chunk_size, datatype=XSD.integer))
 
         self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_IMAGE_CHUNKS_PER_SEGMENT,
-                          rdfvalue.XSDInteger(self.chunks_per_segment))
+                          Literal(self.chunks_per_segment, datatype=XSD.integer))
 
         self.resolver.Set(volume_urn, self.urn, lexicon.AFF4_STREAM_SIZE,
-                          rdfvalue.XSDInteger(self.Size()))
+                          Literal(self.Size(), datatype=XSD.long))
 
         self.resolver.Set(volume_urn,
             self.urn, lexicon.AFF4_IMAGE_COMPRESSION,
-            rdfvalue.URN(self.compression))
+            self.compression)
 
     def FlushBuffers(self):
         if self.IsDirty():
@@ -369,29 +404,32 @@ class AFF4Image(aff4.AFF4Stream):
 
             self._write_metadata()
 
-        return super(AFF4Image, self).Flush()
+        return super().Flush()
 
     def Abort(self):
         if self.IsDirty():
             # for standard image streams, the current bevy hasnt been flushed.
-            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            volume = self.parent
+            # make sure that the zip file is marked as dirty so the CD gets
+            # written when the volume flushes.
+            volume._dirty = True
+            zip_file = getattr(volume, 'parent', None)
+            if zip_file is not None:
+                zip_file._dirty = True
 
-            with self.resolver.AFF4FactoryOpen(volume_urn, version=self.version) as volume:
-                # make sure that the zip file is marked as dirty
-                volume._dirty = True
+            # create a set of the bevy related objects
+            bevvys_to_remove = []
+            for i in range(0, self.bevy_number+1):
+                seg_arn = self.urn.Append("%08d" % i)
+                idx_arn = self.urn.Append("%08d.index" % i)
+                bevvys_to_remove.append(seg_arn)
+                bevvys_to_remove.append(idx_arn)
 
-                # create a set of the bevy related objects
-                bevvys_to_remove = []
-                for i in range(0, self.bevy_number+1):
-                    seg_arn = self.urn.Append("%08d" % i)
-                    idx_arn = self.urn.Append("%08d.index" % i)
-                    bevvys_to_remove.append(seg_arn)
-                    bevvys_to_remove.append(idx_arn)
-
-                volume.RemoveMembers(bevvys_to_remove)
-                volume.children.remove(self.urn)
+            volume.RemoveMembers(bevvys_to_remove)
+            volume.children.remove(self.urn)
 
             self.resolver.DeleteSubject(self.urn)
+            self._dirty = False
             self._dirty = False
 
     def Close(self):
@@ -440,7 +478,7 @@ class AFF4Image(aff4.AFF4Stream):
         while True:
             toRead = 32 * 1024
             data = self.Read(toRead)
-            if data == None or len(data) == 0:
+            if data is None or len(data) == 0:
                 # EOF
                 return res
             else:
@@ -492,7 +530,7 @@ class AFF4Image(aff4.AFF4Stream):
 
     def reloadBevy(self, bevy_id):
         bevy_urn = self.urn.Append("%08d" % bevy_id)
-        bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
+        bevy_index_urn = ARN("%s.index" % bevy_urn)
         if LOGGER.isEnabledFor(logging.INFO):
             LOGGER.info("Reload Bevy %s", bevy_urn)
         chunks = []
@@ -533,7 +571,7 @@ class AFF4Image(aff4.AFF4Stream):
             bevy_id = chunk_id // self.chunks_per_segment
 
             r = self.cache.get(chunk_id)
-            if r != None:
+            if r is not None:
                 result += r
                 chunks_to_read -= 1
                 chunk_id += 1
@@ -570,7 +608,7 @@ class AFF4Image(aff4.AFF4Stream):
             bevy_id = chunk_id // self.chunks_per_segment
 
             r = self.cache.get(chunk_id)
-            if r != None:
+            if r is not None:
                 result += r
                 chunks_to_read -= 1
                 chunk_id += 1
@@ -601,13 +639,13 @@ class AFF4Image(aff4.AFF4Stream):
                     chunks_read += 1
                     continue
 
-            bevy_id = old_div(chunk_id, self.chunks_per_segment)
+            bevy_id = chunk_id // self.chunks_per_segment
             bevy_urn = self.urn.Append("%08d" % bevy_id)
 
             with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
                 while chunks_to_read > 0:
                     r = self.cache.get(chunk_id)
-                    if r != None:
+                    if r is not None:
                         result += r
                         chunks_to_read -= 1
                         chunk_id += 1
@@ -625,7 +663,7 @@ class AFF4Image(aff4.AFF4Stream):
                     chunks_read += 1
 
                     # This bevy is exhausted, get the next one.
-                    if bevy_id < old_div(chunk_id, self.chunks_per_segment):
+                    if bevy_id < (chunk_id // self.chunks_per_segment):
                         break
 
         return chunks_read, result
@@ -695,7 +733,7 @@ class AFF4PreSImage(AFF4Image):
             bevy_id, hashes.toShortAlgoName(hash_datatype)))
 
     def readBlockHash(self, chunk_id, hash_datatype):
-        bevy_id = old_div(chunk_id, self.chunks_per_segment)
+        bevy_id = chunk_id // self.chunks_per_segment
         bevy_blockHash_urn = self._get_block_hash_urn(
             bevy_id, hash_datatype)
         blockLength = hashes.length(hash_datatype)
@@ -707,8 +745,7 @@ class AFF4PreSImage(AFF4Image):
             bevy_blockHashes.SeekRead(idx)
             hash_value = bevy_blockHashes.Read(blockLength)
 
-            return hashes.newImmutableHash(
-                binascii.hexlify(hash_value), hash_datatype)
+            return Literal(binascii.hexlify(hash_value).decode("utf-8"), datatype=hash_datatype)
 
 
 class AFF4SImage(AFF4PreSImage):
@@ -718,7 +755,7 @@ class AFF4SImage(AFF4PreSImage):
 
     def _write_bevy_index(self, volume, bevy_urn, bevy_index, flush=False):
         """Write the index segment for the specified bevy_urn."""
-        bevy_index_urn = rdfvalue.URN("%s.index" % bevy_urn)
+        bevy_index_urn = ARN("%s.index" % bevy_urn)
         if LOGGER.isEnabledFor(logging.INFO):
             LOGGER.info("Writing Bevy Index %s entries=%x", bevy_index_urn, len(bevy_index))
 
@@ -731,12 +768,11 @@ class AFF4SImage(AFF4PreSImage):
                 # no need to flush the bevy
                 bevy_index_segment._dirty = False
             if flush:
-                #self.resolver.Close(bevy_index_segment)
                 bevy_index_segment.FlushAndClose()
 
 
     def _parse_bevy_index(self, bevy):
-        bevy_index_urn = rdfvalue.URN("%s.index" % bevy.urn)
+        bevy_index_urn = ARN("%s.index" % bevy.urn)
         with self.resolver.AFF4FactoryOpen(bevy_index_urn) as bevy_index:
             bevy_index_data = bevy_index.Read(bevy_index.Size())
             number_of_entries = bevy_index.Size() // struct.calcsize("QI")

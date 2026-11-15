@@ -1,4 +1,5 @@
 # Copyright 2019 Schatz Forensic Pty Ltd All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -14,19 +15,11 @@
 #
 # Author: Bradley L Schatz bradley@evimetry.com
 
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-from builtins import next
-from builtins import str
-from builtins import object
-import binascii, rdflib, os
+import binascii, rdflib
 from passlib.crypto import digest
-from pyaff4.aes_keywrap import aes_wrap_key, aes_unwrap_key
-from pyaff4.utils import SmartStr
-from pyaff4 import aff4, lexicon, rdfvalue
-from rdflib import URIRef
+from cryptography.hazmat.primitives.keywrap import InvalidUnwrap, aes_key_unwrap, aes_key_wrap
+from pyaff4 import aff4, lexicon
+from rdflib import Literal, XSD
 from rdflib.namespace import RDF
 from Crypto import Random
 from Crypto.Cipher import PKCS1_OAEP
@@ -34,7 +27,6 @@ from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256, SHA1
 from Crypto.Signature import pss
 from cryptography import x509
-from cryptography.hazmat.backends import default_backend
 
 keysize = 0x20  # in bytes
 iterations = 147256
@@ -54,7 +46,7 @@ class PasswordWrappedKeyBag:
         vek = Random.get_random_bytes(keysize)
         #print("VEK: " + str(binascii.hexlify(vek)))
         kek = digest.pbkdf2_hmac("sha256", password, salt, iterations, keysize);
-        wrapped_key = aes_wrap_key(kek, vek)
+        wrapped_key = aes_key_wrap(kek, vek)
         #print("WrappedKey: " + str(binascii.hexlify(wrapped_key)))
         return PasswordWrappedKeyBag(salt, iterations, keysize, wrapped_key)
 
@@ -69,16 +61,22 @@ class PasswordWrappedKeyBag:
 
     def unwrap_key(self, password):
         kek = digest.pbkdf2_hmac("sha256", password, self.salt, self.iterations, self.keySizeBytes);
-        vek = aes_unwrap_key(kek, self.wrappedKey)
+        try:
+            vek = aes_key_unwrap(kek, self.wrappedKey)
+        except InvalidUnwrap as e:
+            raise ValueError(
+                f"cannot unwrap key bag {self.ID}: RFC 3394 integrity check failed "
+                "(wrong password?)"
+            ) from e
         #print("VEK: " + str(binascii.hexlify(vek)))
         return vek
 
     def write(self, resolver, volumeARN):
-        resolver.Add(volumeARN, self.ID, lexicon.AFF4_TYPE, rdfvalue.URN(lexicon.AFF4_PASSWORD_WRAPPED_KEYBAG))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_KEYSIZEBYTES, rdfvalue.XSDInteger(self.keySizeBytes))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_ITERATIONS, rdfvalue.XSDInteger(self.iterations))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_WRAPPEDKEY, rdfvalue.RDFBytes(self.wrappedKey))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_SALT, rdfvalue.RDFBytes(self.salt))
+        resolver.Add(volumeARN, self.ID, lexicon.AFF4_TYPE, lexicon.AFF4_PASSWORD_WRAPPED_KEYBAG)
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_KEYSIZEBYTES, Literal(self.keySizeBytes, datatype=XSD.integer))
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_ITERATIONS, Literal(self.iterations, datatype=XSD.integer))
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_WRAPPEDKEY, Literal(binascii.hexlify(self.wrappedKey), datatype=XSD.hexBinary))
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_SALT, Literal(binascii.hexlify(self.salt), datatype=XSD.hexBinary))
 
     @staticmethod
     def loadFromResolver(resolver, volumeARN, keyBagARN):
@@ -87,7 +85,7 @@ class PasswordWrappedKeyBag:
         keySizeInBytes = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.keySizeInBytes)
         wrappedKey = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.wrappedKey)
         #print("WrappedKey: " + str(binascii.hexlify(wrappedKey.value)))
-        return PasswordWrappedKeyBag(salt.value, iterations.value, keySizeInBytes.value, wrappedKey.value)
+        return PasswordWrappedKeyBag(salt.toPython(), iterations.toPython(), keySizeInBytes.toPython(), wrappedKey.toPython())
 
 class CertEncryptedKeyBag:
     def __init__(self, subjectName, serialNumber, keySizeBytes, wrappedKey):
@@ -101,14 +99,11 @@ class CertEncryptedKeyBag:
     @staticmethod
     def create(vek, keySizeBytes, certificatePath):
         #print("VEK: " + str(binascii.hexlify(vek)))
-        publicKeyPem = open(certificatePath).read()
+        with open(certificatePath) as f:
+            publicKeyPem = f.read()
         publicKey = RSA.importKey(publicKeyPem)
-        # Convert from PEM to DER
 
-        lines = publicKeyPem.replace(" ", '').split()
-        publicKeyDer = binascii.a2b_base64(''.join(lines[1:-1]))
-
-        cert = x509.load_pem_x509_certificate(SmartStr(publicKeyPem), default_backend())
+        cert = x509.load_pem_x509_certificate(publicKeyPem.encode("utf-8"))
         subjectName = cert.subject.rfc4514_string()
         serial = cert.serial_number
 
@@ -120,18 +115,19 @@ class CertEncryptedKeyBag:
 
 
     def unwrap_key(self, privateKey):
-        key = RSA.importKey(open(privateKey).read())
+        with open(privateKey) as f:
+            key = RSA.importKey(f.read())
         cipher = PKCS1_OAEP.new(key=key, hashAlgo=SHA256, mgfunc=lambda x, y: pss.MGF1(x, y, SHA1))
         vek = cipher.decrypt(self.wrappedKey)
         #print("VEK: " + str(binascii.hexlify(vek)))
         return vek
 
     def write(self, resolver, volumeARN):
-        resolver.Add(volumeARN, self.ID, lexicon.AFF4_TYPE, rdfvalue.URN(lexicon.AFF4_CERT_ENCRYPTED_KEYBAG))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_KEYSIZEBYTES, rdfvalue.XSDInteger(self.keySizeBytes))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_SERIALNUMBER, rdfvalue.XSDInteger(self.serialNumber))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_WRAPPEDKEY, rdfvalue.RDFBytes(self.wrappedKey))
-        resolver.Set(volumeARN, self.ID, lexicon.AFF4_SUBJECTNAME, rdfvalue.XSDString(self.subjectName))
+        resolver.Add(volumeARN, self.ID, lexicon.AFF4_TYPE, lexicon.AFF4_CERT_ENCRYPTED_KEYBAG)
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_KEYSIZEBYTES, Literal(self.keySizeBytes, datatype=XSD.integer))
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_SERIALNUMBER, Literal(self.serialNumber, datatype=XSD.integer))
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_WRAPPEDKEY, Literal(binascii.hexlify(self.wrappedKey), datatype=XSD.hexBinary))
+        resolver.Set(volumeARN, self.ID, lexicon.AFF4_SUBJECTNAME, Literal(self.subjectName))
 
 
     @staticmethod
@@ -141,4 +137,4 @@ class CertEncryptedKeyBag:
         keySizeInBytes = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.keySizeInBytes)
         wrappedKey = resolver.GetUnique(volumeARN, keyBagARN, lexicon.standard11.wrappedKey)
         #print("WrappedKey: " + str(binascii.hexlify(wrappedKey.value)))
-        return CertEncryptedKeyBag(subjectName.value, serial.value, keySizeInBytes.value, wrappedKey.value)
+        return CertEncryptedKeyBag(subjectName.toPython(), serial.toPython(), keySizeInBytes.toPython(), wrappedKey.toPython())

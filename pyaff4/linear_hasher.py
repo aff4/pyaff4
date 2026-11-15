@@ -1,6 +1,5 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
 # Copyright 2016,2017 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -14,8 +13,10 @@ from __future__ import unicode_literals
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from builtins import object
 import io
+
+from rdflib import Literal
+
 from pyaff4 import block_hasher
 from pyaff4 import container
 from pyaff4 import data_store
@@ -24,46 +25,64 @@ from pyaff4 import lexicon
 from pyaff4 import zip
 
 
-class LinearHasher(object):
+class LinearHasher:
     def __init__(self, listener=None):
-        if listener == None:
+        if listener is None:
             self.listener = block_hasher.ValidationListener()
         else:
             self.listener = listener
         self.delegate = None
 
     def hash(self, urn, mapURI, hashDataType):
-        (version, lex) = container.Container.identifyURN(urn)
-        resolver = data_store.MemoryDataStore(lex)
+        resolver = data_store.MemoryDataStore(lexicon.standard)
 
-        with zip.ZipFile.NewZipFile(resolver, version, urn) as zip_file:
-            if lex == lexicon.standard:
-                self.delegate = InterimStdLinearHasher(resolver, lex, self.listener)
-            elif lex == lexicon.legacy:
-                self.delegate = PreStdLinearHasher(resolver, lex, self.listener)
-            elif lex == lexicon.scudette:
-                self.delegate = ScudetteLinearHasher(resolver, lex, self.listener)
-            else:
-                raise ValueError
-
-            self.delegate.volume_arn = zip_file.urn
-            return self.delegate.doHash(mapURI, hashDataType)
-
-    def hashMulti(self, urna, urnb, mapURI, hashDataType):
-        (version, lex) = container.Container.identifyURN(urna)
-        resolver = data_store.MemoryDataStore(lex)
-
-        with zip.ZipFile.NewZipFile(resolver, version, urna) as zip_filea:
-            with zip.ZipFile.NewZipFile(resolver, version, urnb) as zip_fileb:
+        # Open zip once and identify against the open instance instead of
+        # calling identifyURN first (which would open, parse, then close the
+        # zip — incurring a second load when NewZipFile reopens it below).
+        with zip.ZipFile.NewZipFile(resolver, None, urn) as zip_file:
+            (arn, version, lex) = container.Container.identifyURNFromZip(zip_file, resolver=resolver)
+            resolver.lexicon = lex
+            # The streamFactory is keyed off the lexicon so update it now
+            # that we know the actual lexicon for this container.
+            if lex == lexicon.legacy:
+                from pyaff4 import stream_factory
+                resolver.streamFactory = stream_factory.PreStdStreamFactory(resolver, lex)
+            zip_file.version = version
+            with container.ZipMemberContainer(resolver, None, zip_file, version=version) as member_container:
                 if lex == lexicon.standard:
                     self.delegate = InterimStdLinearHasher(resolver, lex, self.listener)
                 elif lex == lexicon.legacy:
                     self.delegate = PreStdLinearHasher(resolver, lex, self.listener)
+                elif lex == lexicon.scudette:
+                    self.delegate = ScudetteLinearHasher(resolver, lex, self.listener)
                 else:
                     raise ValueError
 
-                self.delegate.volume_arn = zip_filea.urn
+                self.delegate.volume_arn = member_container.urn
                 return self.delegate.doHash(mapURI, hashDataType)
+
+    def hashMulti(self, urna, urnb, mapURI, hashDataType):
+        resolver = data_store.MemoryDataStore(lexicon.standard)
+
+        with zip.ZipFile.NewZipFile(resolver, None, urna) as zip_filea:
+            (arn, version, lex) = container.Container.identifyURNFromZip(zip_filea, resolver=resolver)
+            resolver.lexicon = lex
+            if lex == lexicon.legacy:
+                from pyaff4 import stream_factory
+                resolver.streamFactory = stream_factory.PreStdStreamFactory(resolver, lex)
+            zip_filea.version = version
+            with container.ZipMemberContainer(resolver, None, zip_filea, version=version) as mca:
+                with zip.ZipFile.NewZipFile(resolver, version, urnb) as zip_fileb:
+                    with container.ZipMemberContainer(resolver, None, zip_fileb, version=version) as mcb:
+                        if lex == lexicon.standard:
+                            self.delegate = InterimStdLinearHasher(resolver, lex, self.listener)
+                        elif lex == lexicon.legacy:
+                            self.delegate = PreStdLinearHasher(resolver, lex, self.listener)
+                        else:
+                            raise ValueError
+
+                        self.delegate.volume_arn = mca.urn
+                        return self.delegate.doHash(mapURI, hashDataType)
 
     def doHash(self, mapURI, hashDataType):
         hash = hashes.new(hashDataType)
@@ -83,13 +102,14 @@ class LinearHasher(object):
                     count = count + 1
 
                 b = hash.hexdigest()
-                return hashes.newImmutableHash(b, hashDataType)
+                #return hashes.newImmutableHash(b, hashDataType)
+                return Literal(b, datatype=hashDataType)
         raise Exception("IllegalState")
 
     def doHash(self, mapURI, hashDataType):
         hash = hashes.new(hashDataType)
-        if not self.isMap(mapURI):
-            import pdb; pdb.set_trace()
+        # if not self.isMap(mapURI):
+        #     import pdb; pdb.set_trace()
 
         if self.isMap(mapURI):
             with self.resolver.AFF4FactoryOpen(mapURI) as mapStream:
@@ -104,7 +124,8 @@ class LinearHasher(object):
                     count = count + 1
 
                 b = hash.hexdigest()
-                return hashes.newImmutableHash(b, hashDataType)
+                #return hashes.newImmutableHash(b, hashDataType)
+                return Literal(b, datatype=hashDataType)
         raise Exception("IllegalState")
 
     def isMap(self, stream):
@@ -137,7 +158,7 @@ class ScudetteLinearHasher(LinearHasher):
 
 class LinearHasher2:
     def __init__(self, resolver, listener=None):
-        if listener == None:
+        if listener is None:
             self.listener = block_hasher.ValidationListener()
         else:
             self.listener = listener
@@ -153,9 +174,9 @@ class LinearHasher2:
             self.readall2(stream2)
             for storedHash in storedHashes:
                 dt = storedHash.datatype
-                shortHashAlgoName = storedHash.shortName()
+                shortHashAlgoName = hashes.shortName(dt)
                 calculatedHashHexDigest = stream2.getHash(dt).hexdigest()
-                storedHashHexDigest = storedHash.value
+                storedHashHexDigest = storedHash.toPython()
                 if storedHashHexDigest == calculatedHashHexDigest:
                     self.listener.onValidHash(shortHashAlgoName, calculatedHashHexDigest, image.urn)
                 else:
@@ -166,12 +187,12 @@ class LinearHasher2:
         while True:
             toRead = 32 * 1024
             data = stream.read(toRead)
-            if data == None or len(data) == 0:
+            if data is None or len(data) == 0:
                 # EOF
                 return
 
 
-class StreamHasher(object):
+class StreamHasher:
     def __init__(self, parent, hashDatatypes):
         self.parent = parent
         self.hashes = []
@@ -192,7 +213,7 @@ class StreamHasher(object):
     def getHash(self, dataType):
         return next(h for h in self.hashes if self.hashToType[h] == dataType)
 
-class PushHasher(object):
+class PushHasher:
     def __init__(self, hashDatatypes):
         self.hashes = []
         self.hashToType = {}

@@ -1,16 +1,13 @@
-#AFF4 Canonical Reference Images v1.0-RC1
+# pyaff4 test images
 
-The reference images provided in this project represent ground truth for the AFF4.
+Test inputs specific to pyaff4. The AFF4 Canonical Reference Images are in the
+`reference_images` submodule (https://github.com/aff4/ReferenceImages); run
+`git submodule update --init` to fetch them.
 
-AFF4Std: This folder contains the AFF4 Canonical Reference Images v1.0 (produced by Evimetry 3.0)
-
-AFF4PreStd: This folder contains reference images produced prior to the definition of the AFF4 Standard v1.0 (Evimetry 2.x)
-
-AFF4-L: This folder contains a number of files for AFF4 Logical unit testing. 
-
-For an explanation of the images see the README under the folders. 
-More detail on the standard can be found at https://github.com/aff4/Standard .
- 
-
-
-
+- `AFF4Std1a/Base-Linear.aff4`: the AFF4Std Base-Linear image with its metadata
+  also stored as `information.hdt` (HDT metadata tests).
+- `AFF4-L/streamless-image.aff4`: a logical image with no data streams.
+- `AFF4-L/paper-hash_based_disk_imaging_using_aff4.pdf` and its `.frag.1` and
+  `.frag.2` pieces: deduplication inputs.
+- `keys/certificate.pem` and `keys/key.pem`: a test-only X.509 certificate and
+  private key for certificate-wrapped keybags.

@@ -1,4 +1,5 @@
 # Copyright 2014 Google Inc. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -13,12 +14,12 @@
 # the License.
 
 """The AFF4 lexicon."""
-from __future__ import unicode_literals
 # This is the version of the AFF4 specification we support - not the library
 # version itself.
 
-from builtins import object
 import rdflib
+from rdflib import URIRef
+
 from pyaff4 import rdfvalue
 
 AFF4_VERSION = "0.2"
@@ -57,9 +58,9 @@ XSDBooleanType = (XSD_NAMESPACE + "boolean")
 
 # Attribute names for different AFF4 objects.
 # Base AFF4Object
-AFF4_TYPE = (RDF_NAMESPACE + "type")
-AFF4_STORED = (AFF4_NAMESPACE + "stored")
-AFF4_CONTAINS = (AFF4_NAMESPACE + "contains")
+AFF4_TYPE = URIRef(RDF_NAMESPACE + "type")
+AFF4_STORED = URIRef(AFF4_NAMESPACE + "stored")
+AFF4_CONTAINS = URIRef(AFF4_NAMESPACE + "contains")
 
 # Each container should have this file which contains the URN of the container.
 AFF4_CONTAINER_DESCRIPTION = "container.description"
@@ -67,70 +68,70 @@ AFF4_CONTAINER_INFO_TURTLE = "information.turtle"
 AFF4_CONTAINER_INFO_YAML = "information.yaml"
 
 # AFF4 ZipFile containers.
-AFF4_ZIP_TYPE = (AFF4_NAMESPACE + "zip_volume")
+AFF4_ZIP_TYPE = URIRef(AFF4_NAMESPACE + "zip_volume")
 
 # AFF4Stream
-AFF4_STREAM_SIZE = (AFF4_NAMESPACE + "size")
-AFF4_LEGACY_STREAM_SIZE = (AFF4_LEGACY_NAMESPACE + "size")
+AFF4_STREAM_SIZE = URIRef(AFF4_NAMESPACE + "size")
+AFF4_LEGACY_STREAM_SIZE = URIRef(AFF4_LEGACY_NAMESPACE + "size")
 
 # The original filename the stream had.
 AFF4_STREAM_ORIGINAL_FILENAME = (AFF4_NAMESPACE + "original_filename")
 
 # Can be "read", "truncate", "append"
-AFF4_STREAM_WRITE_MODE = (AFF4_VOLATILE_NAMESPACE + "writable")
+AFF4_STREAM_WRITE_MODE = URIRef(AFF4_VOLATILE_NAMESPACE + "writable")
 
 # FileBackedObjects are either marked explicitly or using the file:// scheme.
-AFF4_FILE_TYPE = (AFF4_NAMESPACE + "file")
+AFF4_FILE_TYPE = URIRef(AFF4_NAMESPACE + "file")
 
 # file:// based URNs do not always have a direct mapping to filesystem
 # paths. This volatile attribute is used to control the filename mapping.
-AFF4_FILE_NAME = (AFF4_VOLATILE_NAMESPACE + "filename")
+AFF4_FILE_NAME = URIRef(AFF4_VOLATILE_NAMESPACE + "filename")
 
 # The original filename the stream had.
-AFF4_STREAM_ORIGINAL_FILENAME = (AFF4_NAMESPACE + "original_filename")
+AFF4_STREAM_ORIGINAL_FILENAME = URIRef(AFF4_NAMESPACE + "original_filename")
 
 # ZipFileSegment
-AFF4_ZIP_SEGMENT_TYPE = (AFF4_NAMESPACE + "zip_segment")
+AFF4_ZIP_SEGMENT_TYPE = URIRef(AFF4_NAMESPACE + "zip_segment")
 
 # ZipStoredLogicalStream
-AFF4_ZIP_SEGMENT_IMAGE_TYPE = (AFF4_NAMESPACE + "ZipSegment")
-AFF4_FILEIMAGE = (AFF4_NAMESPACE + "FileImage")
+AFF4_ZIP_SEGMENT_IMAGE_TYPE = URIRef(AFF4_NAMESPACE + "ZipSegment")
+AFF4_FILEIMAGE = URIRef(AFF4_NAMESPACE + "FileImage")
 
 # AFF4 Image Stream - stores a stream using Bevies.
-AFF4_IMAGE_TYPE = (AFF4_NAMESPACE + "ImageStream")
-AFF4_LEGACY_IMAGE_TYPE = (AFF4_LEGACY_NAMESPACE + "stream")
-AFF4_SCUDETTE_IMAGE_TYPE = (AFF4_NAMESPACE + "image")
-AFF4_IMAGE_CHUNK_SIZE = (AFF4_NAMESPACE + "chunkSize")
-AFF4_LEGACY_IMAGE_CHUNK_SIZE = (AFF4_LEGACY_NAMESPACE + "chunkSize")
-AFF4_IMAGE_CHUNKS_PER_SEGMENT = (AFF4_NAMESPACE + "chunksInSegment")
-AFF4_LEGACY_IMAGE_CHUNKS_PER_SEGMENT = (AFF4_LEGACY_NAMESPACE + "chunksInSegment")
-AFF4_IMAGE_COMPRESSION = (AFF4_NAMESPACE + "compressionMethod")
-AFF4_LEGACY_IMAGE_COMPRESSION = (AFF4_LEGACY_NAMESPACE + "CompressionMethod")
-AFF4_IMAGE_COMPRESSION_ZLIB = "https://www.ietf.org/rfc/rfc1950.txt"
-AFF4_IMAGE_COMPRESSION_SNAPPY = "http://code.google.com/p/snappy/"
-AFF4_IMAGE_COMPRESSION_SNAPPY_SCUDETTE = "https://github.com/google/snappy"
-AFF4_IMAGE_COMPRESSION_LZ4 = "https://code.google.com/p/lz4/"
-AFF4_IMAGE_COMPRESSION_STORED = (AFF4_NAMESPACE + "compression/stored")
-AFF4_IMAGE_COMPRESSION_NONE = (AFF4_NAMESPACE + "NullCompressor")
-AFF4_IMAGE_AES_XTS = "https://doi.org/10.1109/IEEESTD.2008.4493450"
+AFF4_IMAGE_TYPE = URIRef(AFF4_NAMESPACE + "ImageStream")
+AFF4_LEGACY_IMAGE_TYPE = URIRef(AFF4_LEGACY_NAMESPACE + "stream")
+AFF4_SCUDETTE_IMAGE_TYPE = URIRef(AFF4_NAMESPACE + "image")
+AFF4_IMAGE_CHUNK_SIZE = URIRef(AFF4_NAMESPACE + "chunkSize")
+AFF4_LEGACY_IMAGE_CHUNK_SIZE = URIRef(AFF4_LEGACY_NAMESPACE + "chunkSize")
+AFF4_IMAGE_CHUNKS_PER_SEGMENT = URIRef(AFF4_NAMESPACE + "chunksInSegment")
+AFF4_LEGACY_IMAGE_CHUNKS_PER_SEGMENT = URIRef(AFF4_LEGACY_NAMESPACE + "chunksInSegment")
+AFF4_IMAGE_COMPRESSION = URIRef(AFF4_NAMESPACE + "compressionMethod")
+AFF4_LEGACY_IMAGE_COMPRESSION = URIRef(AFF4_LEGACY_NAMESPACE + "CompressionMethod")
+AFF4_IMAGE_COMPRESSION_ZLIB = URIRef("https://www.ietf.org/rfc/rfc1950.txt")
+AFF4_IMAGE_COMPRESSION_SNAPPY = URIRef("http://code.google.com/p/snappy/")
+AFF4_IMAGE_COMPRESSION_SNAPPY_SCUDETTE = URIRef("https://github.com/google/snappy")
+AFF4_IMAGE_COMPRESSION_LZ4 = URIRef("https://code.google.com/p/lz4/")
+AFF4_IMAGE_COMPRESSION_STORED = URIRef(AFF4_NAMESPACE + "compression/stored")
+AFF4_IMAGE_COMPRESSION_NONE = URIRef(AFF4_NAMESPACE + "NullCompressor")
+AFF4_IMAGE_AES_XTS = URIRef("https://doi.org/10.1109/IEEESTD.2008.4493450")
 
 # AFF4Map - stores a mapping from one stream to another.
-AFF4_MAP_TYPE = (AFF4_NAMESPACE + "Map")
-AFF4_LEGACY_MAP_TYPE = (AFF4_LEGACY_NAMESPACE + "map")
-AFF4_SCUDETTE_MAP_TYPE = (AFF4_NAMESPACE + "map")
+AFF4_MAP_TYPE = URIRef(AFF4_NAMESPACE + "Map")
+AFF4_LEGACY_MAP_TYPE = URIRef(AFF4_LEGACY_NAMESPACE + "map")
+AFF4_SCUDETTE_MAP_TYPE = URIRef(AFF4_NAMESPACE + "map")
 
 # Encrypted Streams
-AFF4_ENCRYPTEDSTREAM_TYPE = (AFF4_NAMESPACE + "EncryptedStream")
-AFF4_RANDOMSTREAM_TYPE = (AFF4_NAMESPACE + "RandomAccessImageStream")
-AFF4_KEYBAG = (AFF4_NAMESPACE + "keyBag")
-AFF4_WRAPPEDKEY = (AFF4_NAMESPACE + "wrappedKey")
-AFF4_SALT = (AFF4_NAMESPACE + "salt")
-AFF4_ITERATIONS = (AFF4_NAMESPACE + "iterations")
-AFF4_KEYSIZEBYTES = (AFF4_NAMESPACE + "keySizeInBytes")
-AFF4_CERT_ENCRYPTED_KEYBAG = (AFF4_NAMESPACE + "PublicKeyEncryptedKeyBag")
-AFF4_PASSWORD_WRAPPED_KEYBAG = (AFF4_NAMESPACE + "PasswordWrappedKeyBag")
-AFF4_SERIALNUMBER = (AFF4_NAMESPACE + "serialNumber")
-AFF4_SUBJECTNAME = (AFF4_NAMESPACE + "x509SubjectName")
+AFF4_ENCRYPTEDSTREAM_TYPE = URIRef(AFF4_NAMESPACE + "EncryptedStream")
+AFF4_RANDOMSTREAM_TYPE = URIRef(AFF4_NAMESPACE + "RandomAccessImageStream")
+AFF4_KEYBAG = URIRef(AFF4_NAMESPACE + "keyBag")
+AFF4_WRAPPEDKEY = URIRef(AFF4_NAMESPACE + "wrappedKey")
+AFF4_SALT = URIRef(AFF4_NAMESPACE + "salt")
+AFF4_ITERATIONS = URIRef(AFF4_NAMESPACE + "iterations")
+AFF4_KEYSIZEBYTES = URIRef(AFF4_NAMESPACE + "keySizeInBytes")
+AFF4_CERT_ENCRYPTED_KEYBAG = URIRef(AFF4_NAMESPACE + "PublicKeyEncryptedKeyBag")
+AFF4_PASSWORD_WRAPPED_KEYBAG = URIRef(AFF4_NAMESPACE + "PasswordWrappedKeyBag")
+AFF4_SERIALNUMBER = URIRef(AFF4_NAMESPACE + "serialNumber")
+AFF4_SUBJECTNAME = URIRef(AFF4_NAMESPACE + "x509SubjectName")
 
 
 # Categories describe the general type of an image.
@@ -145,7 +146,7 @@ AFF4_MEMORY_PAGEFILE_NUM = (AFF4_MEMORY_NAMESPACE + "pagefile_number")
 AFF4_DISK_RAW = (AFF4_DISK_NAMESPACE + "raw")
 AFF4_DISK_PARTITION = (AFF4_DISK_NAMESPACE + "partition")
 
-AFF4_DIRECTORY_TYPE = (AFF4_NAMESPACE + "directory")
+AFF4_DIRECTORY_TYPE = URIRef(AFF4_NAMESPACE + "directory")
 
 #The constant stream is a psuedo stream which just returns a constant.
 AFF4_CONSTANT_TYPE = (AFF4_NAMESPACE + "constant")
@@ -158,7 +159,7 @@ AFF4_CONSTANT_CHAR = (AFF4_NAMESPACE + "constant_char")
 # filesystems can not represent the URNs properly, hence we need a mapping
 # between the URN and the filename. This attribute stores the _relative_ path
 # of the filename for the member URN relative to the container's path.
-AFF4_DIRECTORY_CHILD_FILENAME = (AFF4_NAMESPACE + "directory/filename")
+AFF4_DIRECTORY_CHILD_FILENAME = URIRef(AFF4_NAMESPACE + "directory/filename")
 
 HASH_SHA512 = rdflib.URIRef("http://aff4.org/Schema#SHA512")
 HASH_SHA256 = rdflib.URIRef("http://aff4.org/Schema#SHA256")
@@ -168,97 +169,114 @@ HASH_BLAKE2B = rdflib.URIRef("http://aff4.org/Schema#Blake2b")
 
 HASH_BLOCKMAPHASH_SHA512 = rdflib.URIRef("http://aff4.org/Schema#blockMapHashSHA512")
 
-class Lexicon(object):
+class Lexicon:
     def __init__(self):
         pass
 
     def of(self, end):
-        return self.base + end
+        return URIRef(self.base + end)
 
 class StdLexicon(Lexicon):
     base = AFF4_NAMESPACE
-    map = base + "Map"
-    Image = base + "Image"
-    stored = base + "stored"
-    target = base + "target"
-    contains = base + "contains"
-    dataStream = base + "dataStream"
-    blockMapHash = base + "blockMapHash"
-    dependentStream = base + "dependentStream"
-    mapPointHash = base + "mapPointHash"
-    mapIdxHash = base + "mapIdxHash"
-    mapPathHash = base + "mapPathHash"
-    blockHashesHash = base + "blockHashesHash"
-    mapHash = base + "mapHash"
-    hash = base + "hash"
-    chunksPerSegment = base + "chunksInSegment"
-    chunkSize = base + "chunkSize"
-    streamSize = base + "size"
-    compressionMethod = base + "compressionMethod"
-    memoryPageTableEntryOffset = base + "memoryPageTableEntryOffset"
-    ntKernelBase = base + "NTKernelBase"
-    OSXKernelPhysicalOffset = base + "OSXKernelPhysicalOffset"
-    OSXKALSRSlide = base + "OSXKALSRSlide"
-    OSXDTBPhysicalOffset = base + "OSXDTBPhysicalOffset"
+    map = rdflib.URIRef(base + "Map")
+    Image = rdflib.URIRef(base + "Image")
+    stored = rdflib.URIRef(base + "stored")
+    target = rdflib.URIRef(base + "target")
+    contains = rdflib.URIRef(base + "contains")
+    dataStream = rdflib.URIRef(base + "dataStream")
+    blockMapHash = rdflib.URIRef(base + "blockMapHash")
+    dependentStream = rdflib.URIRef(base + "dependentStream")
+    mapPointHash = rdflib.URIRef(base + "mapPointHash")
+    mapIdxHash = rdflib.URIRef(base + "mapIdxHash")
+    mapPathHash = rdflib.URIRef(base + "mapPathHash")
+    blockHashesHash = rdflib.URIRef(base + "blockHashesHash")
+    mapHash = rdflib.URIRef(base + "mapHash")
+    imageStreamHash = rdflib.URIRef(base + "imageStreamHash")
+    imageStreamIndexHash = rdflib.URIRef(base + "imageStreamIndexHash")
+    hash = rdflib.URIRef(base + "hash")
+    chunksPerSegment = rdflib.URIRef(base + "chunksInSegment")
+    chunkSize = rdflib.URIRef(base + "chunkSize")
+    streamSize = rdflib.URIRef(base + "size")
+    compressionMethod = rdflib.URIRef(base + "compressionMethod")
+    memoryPageTableEntryOffset = rdflib.URIRef(base + "memoryPageTableEntryOffset")
+    ntKernelBase = rdflib.URIRef(base + "NTKernelBase")
+    OSXKernelPhysicalOffset = rdflib.URIRef(base + "OSXKernelPhysicalOffset")
+    OSXKALSRSlide = rdflib.URIRef(base + "OSXKALSRSlide")
+    OSXDTBPhysicalOffset = rdflib.URIRef(base + "OSXDTBPhysicalOffset")
+    zeroStream = rdflib.URIRef(base + "Zero")
+    unknownDataStream = rdflib.URIRef(base + "UnknownData")
+    unreadableDataStream = rdflib.URIRef(base + "UnreadableData")
 
 class Std11Lexicon(StdLexicon):
     base = AFF4_NAMESPACE
-    FileImage = base + "FileImage"
-    FolderImage = base + "Folder"
-    lastWritten = base+ "lastWritten"
-    lastAccessed = base + "lastAccessed"
-    recordChanged = base + "recordChanged"
-    birthTime = base + "birthTime"
-    pathName = base + "originalFileName"
-    collidingDataStream = base + "collidingDataStream"
-    child = base + "child"
-    LogicalAcquisitionTask = base + "LogicalAcquisitionTask"
-    filesystemRoot   = base + "filesystemRoot"
-    keyBag = AFF4_KEYBAG
-    salt = AFF4_SALT
-    iterations = AFF4_ITERATIONS
-    keySizeInBytes = AFF4_KEYSIZEBYTES
-    wrappedKey = AFF4_WRAPPEDKEY
-    EncryptedStream = AFF4_ENCRYPTEDSTREAM_TYPE
-    CertEncryptedKeyBag =  AFF4_CERT_ENCRYPTED_KEYBAG
-    PasswordWrappedKeyBag = AFF4_PASSWORD_WRAPPED_KEYBAG
-    serialNumber = AFF4_SERIALNUMBER
-    subjectName = AFF4_SUBJECTNAME
+    FileImage = rdflib.URIRef(base + "FileImage")
+    FolderImage = rdflib.URIRef(base + "Folder")
+    lastWritten = rdflib.URIRef(base+ "lastWritten")
+    lastAccessed = rdflib.URIRef(base + "lastAccessed")
+    recordChanged = rdflib.URIRef(base + "recordChanged")
+    birthTime = rdflib.URIRef(base + "birthTime")
+    pathName = rdflib.URIRef(base + "originalFileName")
+    fileName = rdflib.URIRef(base + "fileName")
+    fileMode = rdflib.URIRef(base + "fileMode")
+    symlinkTarget = rdflib.URIRef(base + "symlinkTarget")
+    collidingDataStream = rdflib.URIRef(base + "collidingDataStream")
+    child = rdflib.URIRef(base + "child")
+    LogicalAcquisitionTask = rdflib.URIRef(base + "LogicalAcquisitionTask")
+    filesystemRoot   = rdflib.URIRef(base + "filesystemRoot")
+    keyBag = rdflib.URIRef(AFF4_KEYBAG)
+    salt = rdflib.URIRef(AFF4_SALT)
+    iterations = rdflib.URIRef(AFF4_ITERATIONS)
+    keySizeInBytes = rdflib.URIRef(AFF4_KEYSIZEBYTES)
+    wrappedKey = rdflib.URIRef(AFF4_WRAPPEDKEY)
+    EncryptedStream = rdflib.URIRef(AFF4_ENCRYPTEDSTREAM_TYPE)
+    CertEncryptedKeyBag =  rdflib.URIRef(AFF4_CERT_ENCRYPTED_KEYBAG)
+    PasswordWrappedKeyBag = rdflib.URIRef(AFF4_PASSWORD_WRAPPED_KEYBAG)
+    serialNumber = rdflib.URIRef(AFF4_SERIALNUMBER)
+    subjectName = rdflib.URIRef(AFF4_SUBJECTNAME)
+
+# AFF4-L v1.1 containers written by tools other than pyaff4
+# record the file path as aff4:originalPathName rather than aff4:originalFileName
+class InterimAff4lLexicon(Std11Lexicon):
+    pathName = rdflib.URIRef(Std11Lexicon.base + "originalPathName")
 
 
 class LegacyLexicon(Lexicon):
     base = AFF4_LEGACY_NAMESPACE
-    map = base + "map"
-    stored = base + "stored"
-    Image = base + "Image"
-    blockHashesHash = base + "blockHashesHash"
-    mapPointHash = base + "mapPointHash"
-    mapIdxHash = base + "mapIdxHash"
-    mapPathHash = base + "mapPathHash"
-    mapHash = base + "mapHash"
-    hash = base + "hash"
-    chunksPerSegment = base + "chunksInSegment"
-    chunkSize = base + "chunkSize"
-    streamSize = base + "size"
-    compressionMethod = base + "CompressionMethod"
+    map = rdflib.URIRef(base + "map")
+    stored = rdflib.URIRef(base + "stored")
+    Image = rdflib.URIRef(base + "Image")
+    blockHashesHash = rdflib.URIRef(base + "blockHashesHash")
+    mapPointHash = rdflib.URIRef(base + "mapPointHash")
+    mapIdxHash = rdflib.URIRef(base + "mapIdxHash")
+    mapPathHash = rdflib.URIRef(base + "mapPathHash")
+    mapHash = rdflib.URIRef(base + "mapHash")
+    hash = rdflib.URIRef(base + "hash")
+    chunksPerSegment = rdflib.URIRef(base + "chunksInSegment")
+    chunkSize = rdflib.URIRef(base + "chunkSize")
+    streamSize = rdflib.URIRef(base + "size")
+    compressionMethod = rdflib.URIRef(base + "CompressionMethod")
+    zeroStream = rdflib.URIRef(base + "Zero")
+    ffStream = rdflib.URIRef(base + "FF")
+    unknownDataStream = rdflib.URIRef(base + "UnknownData")
 
 class ScudetteLexicon(Lexicon):
     base = AFF4_NAMESPACE
-    map = base + "map"
-    stored = base + "stored"
-    Image = base + "Image"
-    blockHashesHash = base + "blockHashesHash"
-    mapPointHash = base + "mapPointHash"
-    mapIdxHash = base + "mapIdxHash"
-    mapPathHash = base + "mapPathHash"
-    mapHash = base + "mapHash"
-    hash = base + "hash"
-    chunksPerSegment = base + "chunks_per_segment"
-    chunkSize = base + "chunk_size"
-    streamSize = base + "size"
-    compressionMethod = base + "compression"
-    category  = base + "category"
-    memoryPhysical = "http://aff4.org/Schema#memory/physical"
+    map = rdflib.URIRef(base + "map")
+    stored = rdflib.URIRef(base + "stored")
+    Image = rdflib.URIRef(base + "Image")
+    blockHashesHash = rdflib.URIRef(base + "blockHashesHash")
+    mapPointHash = rdflib.URIRef(base + "mapPointHash")
+    mapIdxHash = rdflib.URIRef(base + "mapIdxHash")
+    mapPathHash = rdflib.URIRef(base + "mapPathHash")
+    mapHash = rdflib.URIRef(base + "mapHash")
+    hash = rdflib.URIRef(base + "hash")
+    chunksPerSegment = rdflib.URIRef(base + "chunks_per_segment")
+    chunkSize = rdflib.URIRef(base + "chunk_size")
+    streamSize = rdflib.URIRef(base + "size")
+    compressionMethod = rdflib.URIRef(base + "compression")
+    category  = rdflib.URIRef(base + "category")
+    memoryPhysical = rdflib.URIRef("http://aff4.org/Schema#memory/physical")
+    zeroStream = rdflib.URIRef(base + "Zero")
 
 # early logical imaging support for pmem
 class PmemLogicalPreStd(StdLexicon):
@@ -269,6 +287,7 @@ legacy = LegacyLexicon()
 standard = StdLexicon()
 scudette = ScudetteLexicon()
 standard11 = Std11Lexicon()
+interimAff4l = InterimAff4lLexicon()
 pmemlogical = PmemLogicalPreStd()
 
 def AutoResolveAttribute(resolver, urn, attribute):
@@ -278,5 +297,5 @@ def AutoResolveAttribute(resolver, urn, attribute):
         if result is not None:
             return result
 
-transient_graph = rdfvalue.URN("http://aff4.org/Schema#transient")
-any = rdfvalue.URN("http://aff4.org/Schema#any")
+transient_graph = rdflib.URIRef("http://aff4.org/Schema#transient")
+any = rdflib.URIRef("http://aff4.org/Schema#any")

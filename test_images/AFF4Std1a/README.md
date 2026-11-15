@@ -1,0 +1,1 @@
+Base-Linear.aff4: same as AFF4 Standard 1.0 version, but with the addition of a HDT version of the information.turtle

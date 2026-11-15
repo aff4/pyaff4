@@ -12,12 +12,10 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from __future__ import division
 import os
 import ctypes
 import platform
 
-from pyaff4 import utils
 
 
 # https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/stat.h?h=v4.19#n46
@@ -107,7 +105,7 @@ SYS_STATX = SYSCALLS[platform.machine()]
 
 
 def statx(path):
-    pathname = ctypes.c_char_p(utils.SmartStr(path))
+    pathname = ctypes.c_char_p(path.encode("utf-8") if isinstance(path, str) else path)
     statxbuf = ctypes.create_string_buffer(ctypes.sizeof(Statx))
 
     lib = ctypes.CDLL(None, use_errno=True)

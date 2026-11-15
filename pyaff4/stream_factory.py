@@ -1,5 +1,5 @@
-from __future__ import unicode_literals
 # Copyright 2016,2017 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -13,21 +13,19 @@ from __future__ import unicode_literals
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from builtins import str
-from builtins import object
 from pyaff4.symbolic_streams import  *
 from pyaff4 import rdfvalue
 import re
 
-class StreamFactory(object):
+class StreamFactory:
     def __init__(self, resolver, lex):
         self.lexicon = lex
         self.resolver = resolver
         self.symbolmatcher = re.compile("[0-9A-F]{2}")
-        self.fixedSymbolics = [ self.lexicon.base + "Zero",
-                                self.lexicon.base + "UnknownData",
-                                self.lexicon.base + "UnreadableData",
-                                self.lexicon.base + "NoData"]
+        self.fixedSymbolics = [ rdfvalue.ARN(self.lexicon.base + "Zero"),
+                                rdfvalue.ARN(self.lexicon.base + "UnknownData"),
+                                rdfvalue.ARN(self.lexicon.base + "UnreadableData"),
+                                rdfvalue.ARN(self.lexicon.base + "NoData")]
 
 # TODO: Refactor the below classes to split the subname from the NS
 # then do matching only on the subnname
@@ -52,7 +50,7 @@ class PreStdStreamFactory(StreamFactory):
                 # now verify symbolic part
                 shortName = urn[len(self.lexicon.base):].upper()
 
-                if self.symbolmatcher.match(shortName) != None:
+                if self.symbolmatcher.match(shortName) is not None:
                     return True
 
             if urn.startswith(self.lexicon.base + "SymbolicStream"):
@@ -67,15 +65,15 @@ class PreStdStreamFactory(StreamFactory):
         if type(urn) == rdfvalue.URN:
             urn = str(urn)
 
-        if urn == self.lexicon.base + "Zero":
+        if urn == self.lexicon.zeroStream:
             return RepeatedStream(resolver=self.resolver, urn=urn,
                                   symbol=b"\x00")
 
-        if urn == self.lexicon.base + "FF":
+        if urn == self.lexicon.ffStream:
             return RepeatedStream(resolver=self.resolver, urn=urn,
                                   symbol=b"\xff")
 
-        if urn == self.lexicon.base + "UnknownData":
+        if urn == self.lexicon.unknownDataStream:
             return RepeatedStringStream(resolver=self.resolver, urn=urn,
                                         repeated_string=GetUnknownString())
 
@@ -104,8 +102,6 @@ class PreStdStreamFactory(StreamFactory):
 class StdStreamFactory(StreamFactory):
 
     def isSymbolicStream(self, urn):
-        if type(urn) == rdfvalue.URN:
-            urn = str(urn)
         if not urn.startswith("http://"):
             return False
         else:
@@ -118,19 +114,16 @@ class StdStreamFactory(StreamFactory):
             return False
 
     def createSymbolic(self, urn):
-        if type(urn) == rdfvalue.URN:
-            urn = str(urn)
-
-        if urn == self.lexicon.base + "Zero":
+        if urn == self.lexicon.zeroStream:
             return RepeatedStream(resolver=self.resolver, urn=urn,
                                   symbol=b"\x00")
 
-        if urn == self.lexicon.base + "UnknownData":
+        if urn == self.lexicon.unknownDataStream:
             return RepeatedStringStream(
                 resolver=self.resolver, urn=urn,
                 repeated_string=GetUnknownString())
 
-        if urn == self.lexicon.base + "UnreadableData":
+        if urn == self.lexicon.unreadableDataStream:
             return RepeatedStringStream(
                 resolver=self.resolver, urn=urn,
                 repeated_string=GetUnreadableString())

@@ -1,4 +1,5 @@
 # Copyright 2016-2018 Schatz Forensic Pty Ltd. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -11,13 +12,21 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import io
 
 def ReadAll(stream):
     res = b""
+    read = 0
+    length = 0
+    if isinstance(stream, io.BytesIO):
+        length = stream.getbuffer().nbytes
+    else:
+        length = stream.Size()
+
     while True:
-        toRead = 32 * 1024
+        toRead = length - read
         data = stream.read(toRead)
-        if data == None or len(data) == 0:
+        if data is None or len(data) == 0:
             # EOF
             return res
         else:
@@ -27,7 +36,7 @@ def WriteAll(fromstream, tostream):
     while True:
         toRead = 32 * 1024
         data = fromstream.read(toRead)
-        if data == None or len(data) == 0:
+        if data is None or len(data) == 0:
             # EOF
             return
         else:

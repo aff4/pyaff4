@@ -1,4 +1,5 @@
 # Copyright 2014 Google Inc. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -13,10 +14,6 @@
 # the License.
 
 """This module implements the standard AFF4 Image."""
-from __future__ import print_function
-from __future__ import unicode_literals
-from builtins import str
-from builtins import object
 import collections
 import intervaltree
 import logging
@@ -29,7 +26,7 @@ from pyaff4 import aff4_image
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
-from pyaff4 import utils
+from pyaff4.rdfvalue import ARN
 
 LOGGER = logging.getLogger("pyaff4")
 
@@ -105,7 +102,7 @@ class Range(collections.namedtuple(
         return self._replace(length=self.length - adjustment)
 
 
-class _MapStreamHelper(object):
+class _MapStreamHelper:
 
     def __init__(self, resolver, source, destination):
         self.resolver = resolver
@@ -177,30 +174,37 @@ class _MapStreamHelper(object):
 class AFF4Map(aff4.AFF4Stream):
 
     def __init__(self, *args, **kwargs):
-        super(AFF4Map, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.targets = []
         self.target_idx_map = {}
         self.tree = intervaltree.IntervalTree()
         self.last_target = None
         try:
             self.version = kwargs["version"]
-        except:
+        except KeyError:
             pass
 
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Flush map data into the volume before the volume's CD is written.
+        self.Flush()
+        super().__exit__(exc_type, exc_value, traceback)
+        if exc_value is not None:
+            return False
+
     @staticmethod
-    def NewAFF4Map(resolver, image_urn, volume_urn):
-        with resolver.AFF4FactoryOpen(volume_urn) as volume:
+    def NewAFF4Map(resolver, member_container, image_urn, volume_urn):
+        volume = member_container
+        if True:
             # Inform the volume that we have a new image stream contained within
             # it.
             volume.children.add(image_urn)
 
-            resolver.Set(volume_urn, image_urn, lexicon.AFF4_TYPE, rdfvalue.URN(
-                lexicon.AFF4_MAP_TYPE))
+            resolver.Add(volume_urn, image_urn, lexicon.AFF4_TYPE, lexicon.AFF4_MAP_TYPE)
 
-            resolver.Set(lexicon.transient_graph, image_urn, lexicon.AFF4_STORED,
-                         rdfvalue.URN(volume_urn))
-
-            res = resolver.AFF4FactoryOpen(image_urn)
+            #res = resolver.AFF4FactoryOpen(image_urn)
+            res = AFF4Map(resolver, image_urn, volume)
+            #res.LoadFromURN()
+            resolver.ObjectCache.Put(res, True)
             res.properties.writable = volume.properties.writable
             return res
 
@@ -215,7 +219,7 @@ class AFF4Map(aff4.AFF4Stream):
         # we just start with an empty map.
         try:
             with self.resolver.AFF4FactoryOpen(map_idx_urn) as map_idx:
-                self.targets = [rdfvalue.URN(utils.SmartUnicode(x))
+                self.targets = [ARN(x.decode("utf-8"))
                                 for x in map_idx.Read(map_idx.Size()).splitlines()]
 
             with self.resolver.AFF4FactoryOpen(map_urn) as map_stream:
@@ -258,7 +262,7 @@ class AFF4Map(aff4.AFF4Stream):
                         range.target_offset_at_map_offset(self.readptr))
 
                     buffer = target_stream.Read(length_to_read_in_target)
-                    if buffer == None:
+                    if buffer is None:
                         bytes_read = 0
                     else:
                         bytes_read = len(buffer)
@@ -350,8 +354,8 @@ class AFF4Map(aff4.AFF4Stream):
     def Flush(self):
         if self.IsDirty():
             # Get the volume we are stored on.
-            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
-            with self.resolver.AFF4FactoryOpen(volume_urn) as volume:
+            volume = self.parent
+            if True:
                 with volume.CreateMember(self.urn.Append("map")) as map_stream:
                     for interval in self.tree:
                         map_stream.Write(interval.data.Serialize())
@@ -359,7 +363,7 @@ class AFF4Map(aff4.AFF4Stream):
                 self.resolver.Close(map_stream)
                 with volume.CreateMember(self.urn.Append("idx")) as idx_stream:
                     idx_stream.Write(b"\n".join(
-                        [x.SerializeToString().encode("utf-8") for x in self.targets]))
+                        [x.toPython().encode("utf-8") for x in self.targets]))
 
                 self.resolver.Close(idx_stream)
                 #for target in self.targets:
@@ -380,7 +384,7 @@ class AFF4Map(aff4.AFF4Stream):
                 #        pass
 
 
-        return super(AFF4Map, self).Flush()
+        return super().Flush()
 
     def WriteStream(self, source, progress=None):
         data_stream_urn = self.GetBackingStream()
@@ -412,7 +416,7 @@ class AFF4Map(aff4.AFF4Stream):
 
         except IOError:
             # If the backing stream does not already exist, we make one.
-            volume_urn = self.resolver.GetUnique(lexicon.transient_graph, self.urn, lexicon.AFF4_STORED)
+            volume_urn = self.parent.urn
             compression_urn = self.resolver.GetUnique(volume_urn,
                 target, lexicon.AFF4_IMAGE_COMPRESSION)
 
@@ -428,7 +432,7 @@ class AFF4Map(aff4.AFF4Stream):
                         return member.urn
 
             with aff4_image.AFF4Image.NewAFF4Image(
-                    self.resolver, target, volume_urn) as stream:
+                    self.resolver, self.parent, target, volume_urn) as stream:
                 return stream.urn
 
     def Write(self, data):
@@ -476,7 +480,7 @@ class AFF4Map2(AFF4Map):
         # we just start with an empty map.
         try:
             with self.resolver.AFF4FactoryOpen(map_idx_urn, version=self.version) as map_idx:
-                self.targets = [rdfvalue.URN(utils.SmartUnicode(x))
+                self.targets = [ARN(x.decode("utf-8"))
                                 for x in map_idx.Read(map_idx.Size()).splitlines()]
 
             with self.resolver.AFF4FactoryOpen(map_urn, version=self.version) as map_stream:
@@ -537,18 +541,18 @@ def isByteRangeARN(urn):
         offset = int(offset, 16)
         length = int(length, 16)
         return True
-    except:
+    except ValueError:
         return False
 
 class ByteRangeARN(aff4.AFF4Stream):
 
     def __init__(self, version, resolver=None, urn=None):
-        super(ByteRangeARN, self).__init__(
-            resolver=resolver, urn=urn)
-        (target, rangepair) = urn.SerializeToString().split("[")
+        super().__init__(
+            resolver, urn, None)
+        (target, rangepair) = urn.toPython().split("[")
         rangepair = rangepair[0:len(rangepair)-1]
         (offset, length) = rangepair.split(":")
-        self.target = target
+        self.target = ARN(target)
         self.offset = int(offset,16)
         self.length = int(length,16)
         self.version = version

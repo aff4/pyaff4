@@ -17,7 +17,7 @@ import binascii
 import os
 import hexdump
 
-referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"test_images")
+referenceImagesPath = os.path.join(os.path.dirname(__file__), u"..", u"reference_images")
 stdLinear = os.path.join(referenceImagesPath, u"AFF4Std", u"Base-Linear.aff4")
 
 with container.Container.open(stdLinear) as mapStream:

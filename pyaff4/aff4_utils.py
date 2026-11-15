@@ -1,7 +1,3 @@
-from __future__ import unicode_literals
-from future import standard_library
-standard_library.install_aliases()
-from builtins import chr
 import os
 import re
 import shutil
@@ -9,7 +5,6 @@ import string
 import urllib.parse
 
 from pyaff4 import rdfvalue
-from pyaff4 import utils
 
 
 def MkDir(path):

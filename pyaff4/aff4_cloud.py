@@ -1,4 +1,5 @@
 # Copyright 2016 Google Inc. All rights reserved.
+# Copyright © 2026 Apple Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -16,9 +17,6 @@
 
 It allows use of cloud buckets as transparent AFF4 images.
 """
-from __future__ import unicode_literals
-from builtins import str
-from builtins import range
 import json
 import logging
 from multiprocessing.dummy import Pool as ThreadPool
@@ -74,7 +72,7 @@ class AFF4GStore(aff4_directory.AFF4Directory):
 
     @classmethod
     def NewAFF4GStore(cls, resolver, root_urn):
-        urn_parts = root_urn.Parse()
+        (urn_parts, original_filename) = rdfvalue.Parse(root_urn.toPython())
         result = AFF4GStore(resolver)
         result.root_path = urn_parts.path
 
@@ -168,7 +166,7 @@ class AFF4GCSStream(aff4_file.FileBackedObject):
     """A stream stored in cloud storage."""
 
     def __init__(self, *args, **kwargs):
-        super(AFF4GCSStream, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if self.resolver.flush_callbacks.get("CloudThreadPool") is None:
             self.resolver.CloudThreadPool = ThreadPool(4)
@@ -179,7 +177,8 @@ class AFF4GCSStream(aff4_file.FileBackedObject):
             self.resolver.flush_callbacks["CloudThreadPool"] = close
 
     def _get_storage_urn(self):
-        if self.urn.Parse().scheme == "gs":
+        (components, original_filename) = rdfvalue.Parse(self.urn.toPython())
+        if components.scheme == "gs":
             storage_urn = self.urn
         else:
             # Try to find where we are actually stored.
@@ -191,7 +190,7 @@ class AFF4GCSStream(aff4_file.FileBackedObject):
         return storage_urn
 
     def _fetch_blob_data(self):
-        storage_parts = self._get_storage_urn().Parse()
+        (storage_parts, original_filename) = rdfvalue.Parse(self._get_storage_urn().toPython())
         gcs = get_client()
 
         # The bucket that contains this stream.
@@ -269,7 +268,7 @@ class AFF4GCSStream(aff4_file.FileBackedObject):
             LOGGER.info("Flushing %s -> %s (length %s)", self.urn, storage_urn,
                         self.Size())
             gcs = get_client()
-            urn_parts = storage_urn.Parse()
+            (urn_parts, original_filename) = rdfvalue.Parse(storage_urn.toPython())
 
             # The bucket that contains this stream.
             bucket = gcs.get_bucket(urn_parts.netloc)
@@ -293,12 +292,13 @@ class AFF4GCSStream(aff4_file.FileBackedObject):
         else:
             self.fd.close()
 
-        super(AFF4GCSStream, self).Flush()
+        super().Flush()
 
 
 def GenericGCSHandler(resolver, urn):
     # This is a bucket urn.
-    if not urn.Parse().path.strip("/"):
+    (components, original_filename) = rdfvalue.Parse(urn.toPython())
+    if not components.path.strip("/"):
         directory_handler = registry.AFF4_TYPE_MAP[lexicon.AFF4_DIRECTORY_TYPE]
         result = directory_handler(resolver)
         resolver.Set(result.urn, lexicon.AFF4_STORED, urn)

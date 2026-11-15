@@ -1,0 +1,153 @@
+# A synthetic graph for the HDT reader tests. synthetic.hdt is this file converted by hdt-cpp
+# (see README.md). Each block below exercises one kind of term or structure. Every dictionary
+# section (shared subject-objects, subjects, objects, predicates) holds more than 16 entries, so
+# lookups cross the 16-string block boundaries of the front-coded sections.
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix aff4: <http://aff4.org/Schema#> .
+@prefix ex:   <http://example.org/vocab#> .
+@prefix item: <http://example.org/item/> .
+
+# Classes: subjects ending in "Type", linked by ex:broader to a common ancestor, labelled in
+# several languages.
+
+ex:BaseType a ex:Class ;
+    ex:label "Base type"@en , "Basistyp"@de , "Базовый тип"@ru ;
+    ex:code "base" .
+
+ex:AlphaType a ex:Class ; ex:broader ex:BaseType ; ex:label "Alpha"@en , "Alpha"@de .
+ex:BetaType a ex:Class ; ex:broader ex:BaseType ; ex:label "Beta"@en , "Beta"@de .
+ex:GammaType a ex:Class ; ex:broader ex:BaseType ; ex:label "Gamma"@en , "Gamma"@de .
+ex:DeltaType a ex:Class ; ex:broader ex:BaseType ; ex:label "Delta"@en .
+ex:EpsilonType a ex:Class ; ex:broader ex:AlphaType ; ex:label "Epsilon"@en .
+ex:ZetaType a ex:Class ; ex:broader ex:AlphaType ; ex:label "Zeta"@en .
+ex:EtaType a ex:Class ; ex:broader ex:BetaType ; ex:label "Eta"@en .
+ex:ThetaType a ex:Class ; ex:broader ex:BetaType ; ex:label "Theta"@en .
+
+# Predicates described as subjects: these IRIs are in the predicate section and in the
+# subject or shared section, whose IDs are numbered independently.
+
+ex:label a ex:Property ; ex:range ex:Literal ; ex:comment "A human-readable name."@en .
+ex:broader a ex:Property ; ex:domain ex:Class ; ex:range ex:Class .
+ex:member a ex:Property ; ex:domain ex:Collection .
+
+# One subject with many objects for one predicate. The members are also subjects, so they are
+# in the shared subject-object section.
+
+item:hub a ex:Collection ;
+    ex:member item:m01 , item:m02 , item:m03 , item:m04 , item:m05 , item:m06 , item:m07 ,
+        item:m08 , item:m09 , item:m10 , item:m11 , item:m12 , item:m13 , item:m14 ,
+        item:m15 , item:m16 , item:m17 , item:m18 , item:m19 , item:m20 .
+
+item:m01 a ex:AlphaType ; ex:count 1 .
+item:m02 a ex:AlphaType ; ex:count 2 .
+item:m03 a ex:AlphaType ; ex:count 3 .
+item:m04 a ex:BetaType ; ex:count 4 .
+item:m05 a ex:BetaType ; ex:count 5 .
+item:m06 a ex:BetaType ; ex:count 6 .
+item:m07 a ex:GammaType ; ex:count 7 .
+item:m08 a ex:GammaType ; ex:count 8 .
+item:m09 a ex:DeltaType ; ex:count 9 .
+item:m10 a ex:DeltaType ; ex:count 10 .
+item:m11 a ex:EpsilonType ; ex:next item:m12 .
+item:m12 a ex:EpsilonType ; ex:next item:m13 .
+item:m13 a ex:ZetaType ; ex:next item:m14 .
+item:m14 a ex:ZetaType ; ex:next item:m15 .
+item:m15 a ex:EtaType ; ex:next item:m16 .
+item:m16 a ex:EtaType ; ex:next item:m17 .
+item:m17 a ex:ThetaType ; ex:next item:m18 .
+item:m18 a ex:ThetaType .
+item:m19 a ex:BaseType .
+item:m20 a ex:BaseType .
+
+# A predicate used exactly once, on a subject with exactly one triple.
+
+item:lonely ex:onlyOnce "the only triple of its subject and predicate" .
+
+# Subjects that are never objects.
+
+item:doc1 ex:label "Document one"@en .
+item:doc2 ex:label "Document two"@en .
+item:doc3 ex:label "Document three"@en .
+
+# IRIs where one is a prefix of another, percent-encoded, with a query and with a fragment.
+
+item:a ex:related item:ab .
+item:ab ex:related <http://example.org/item/a#x> .
+<http://example.org/item/a#x> ex:related <http://example.org/item/a%20b> .
+<http://example.org/item/a%20b> ex:related <http://example.org/item/a?x=1&y=2> .
+<http://example.org/item/a?x=1&y=2> ex:related item:a .
+
+# Literal text that looks like literal syntax: embedded quotes, a backslash, control
+# characters, and text that ends in what looks like a language tag or a datatype.
+
+item:tricky
+    ex:note "he said \"hi\"@en" ,
+        "ends like a datatype^^<http://example.org/vocab#x>" ,
+        "a \\ backslash" ,
+        "line one\nline two" ,
+        "tab\tseparated" ,
+        "carriage\rreturn" ,
+        "\"" ,
+        "" ,
+        ""@en .
+
+# The same text with different decorations, which sort next to each other and share prefixes.
+
+item:forms
+    ex:value "meta" , "meta"@en , "meta"@de , "meta"^^xsd:string , "meta"^^ex:Code ,
+        "1"^^xsd:int , "1"^^xsd:integer , "1"^^xsd:long , "1" ,
+        "01"^^xsd:integer , "1.0"^^xsd:decimal , "1.0E0"^^xsd:double ,
+        "2016-12-07"^^xsd:date , "2016-12-07T03:40:09.131Z"^^xsd:dateTime ,
+        "true"^^xsd:boolean .
+
+# Language tags with subtags and in mixed case.
+
+item:tags
+    ex:label "colour"@en-GB , "color"@en-US , "顏色"@zh-Hant-TW , "Hello"@EN , "Hello"@en .
+
+# Non-ASCII text: Cyrillic, characters in U+E000-U+FFFF (which sort after supplementary
+# characters in UTF-16 but before them in UTF-8), supplementary characters, and a word in
+# precomposed and decomposed form.
+
+item:хобби ex:label "ХОББИ"@ru .
+item:unicode
+    ex:note "\uE000 private use" , "\uFF21 fullwidth A" , "\uFFFD replacement" ,
+        "\U0001F600 grinning face" , "\U00010348 gothic hwair" ,
+        "caf\u00E9 precomposed" , "cafe\u0301 decomposed" , "caf\u00E9" , "cafe\u0301" .
+<http://example.org/item/\uFF21> ex:related <http://example.org/item/\U0001F600> .
+
+# Long literals.
+
+item:long
+    ex:description "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."@en ,
+        "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis."@en ,
+        "Zwölf Boxkämpfer jagen Viktor quer über den großen Sylter Deich. Falsches Üben von Xylophonmusik quält jeden größeren Zwerg. Franz jagt im komplett verwahrlosten Taxi quer durch Bayern, und Victor jagt zwölf Boxkämpfer quer über den Sylter Deich."@de .
+
+# Blank nodes: two that refer to each other (so both are in the shared section), nested
+# anonymous nodes, and an RDF list.
+
+_:first ex:next _:second ; ex:label "first blank node"@en .
+_:second ex:next _:first ; ex:label "second blank node"@en .
+item:nested ex:shape [ ex:partOf [ ex:label "inner anonymous node"@en ; ex:count 2 ] ; ex:count 1 ] .
+item:list ex:sequence ( item:a item:ab "a literal in a list" 3 ) .
+
+# AFF4-shaped metadata: an ImageStream, its BlockHashes and its volume.
+
+<aff4://c215ba20-5648-4209-a793-1f918c723610>
+    a aff4:ImageStream ;
+    aff4:chunkSize "32768"^^xsd:int ;
+    aff4:size "3964928"^^xsd:long ;
+    aff4:stored <aff4://685e15cc-d0fb-4dbc-ba47-48117fc77044> ;
+    aff4:hash "fbac22cca549310bc5df03b7560afcf490995fbb"^^aff4:SHA1 ,
+        "d5825dc1152a42958c8219ff11ed01a3"^^aff4:MD5 .
+
+<aff4://c215ba20-5648-4209-a793-1f918c723610/blockhash.md5>
+    a aff4:BlockHashes ;
+    aff4:hash "9062f1c9f48438a6875a60b7e1323151e8ff583c8531ca7806d6c29b7d961ceddba8783e8e4c49ff37702304cdf1dc4c7a9b8f67c73af07fc14422c0be9ae20d"^^aff4:SHA512 .
+
+<aff4://685e15cc-d0fb-4dbc-ba47-48117fc77044>
+    a aff4:ZipVolume ;
+    aff4:contains <aff4://c215ba20-5648-4209-a793-1f918c723610> ;
+    aff4:stored "Base-Linear.aff4" .

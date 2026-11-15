@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked
+      - name: Tests
+        if: matrix.python != '3.14'
+        run: uv run --no-sync python -m unittest discover -s tests -t .
+      # pyaff4 supports Python <= 3.13 (urllib's pathname2url changed in 3.14); the HDT engine and
+      # store support 3.14.
+      - name: HDT tests
+        if: matrix.python == '3.14'
+        run: |
+          uv run --no-sync python -m unittest discover -s tests/test_pyhdt2_cython -t .
+          uv run --no-sync python -m unittest discover -s tests/test_rdflib_hdt_ng -t .
+      - name: Kernel lint
+        run: uv run --no-sync python cicd/lint_kernels.py
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - name: HDT tests, interpreted kernels
+        env:
+          PYHDT2_CYTHON_INTERPRETED: "1"
+        run: uv run --no-sync python -m unittest discover -s tests/test_pyhdt2_cython -t .
+      # The rest of pyaff4/ and tests/ predates ruff and is not yet clean.
+      - name: Ruff
+        run: |
+          paths=(pyhdt2_cython rdflib_hdt_ng tests/test_pyhdt2_cython tests/test_rdflib_hdt_ng
+            cicd benchmarks setup.py)
+          uv run --no-sync ruff check "${paths[@]}"
+          uv run --no-sync ruff format --check "${paths[@]}"
