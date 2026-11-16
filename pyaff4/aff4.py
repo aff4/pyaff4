@@ -69,9 +69,6 @@ class NoneObject:
     def __bool__(self):
         return False
 
-    def __bool__(self):
-        return False
-
     # Comparisons.
     def __eq__(self, other):
         return other is None
@@ -85,10 +82,6 @@ class NoneObject:
     __lt__ = __gt__
     __le__ = __gt__
     __ge__ = __gt__
-
-    ## Make us subscriptable obj[j]
-    def __getitem__(self, item):
-        return self
 
     def __call__(self, *arg, **kwargs):
         return self

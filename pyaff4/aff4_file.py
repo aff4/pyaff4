@@ -20,7 +20,6 @@ import os
 import io
 
 from pyaff4 import aff4
-from pyaff4 import aff4_utils
 from pyaff4 import lexicon
 from pyaff4 import rdfvalue
 from pyaff4 import registry
@@ -46,33 +45,6 @@ class FileBackedObject(aff4.AFF4Stream):
         if components.scheme == "file":
             return self.urn.ToFilename()
 
-    @staticmethod
-    def _CreateIntermediateDirectories(components):
-        """Recursively create intermediate directories."""
-        path = os.sep
-
-        if aff4.WIN32:
-            # On windows we do not want a leading \ (e.g. C:\windows not
-            # \C:\Windows)
-            path = ""
-
-        for component in components:
-            path = path + component + os.sep
-            if LOGGER.isEnabledFor(logging.INFO):
-                LOGGER.info("Creating intermediate directories %s", path)
-
-            if os.isdir(path):
-                continue
-
-            # Directory does not exist - Try to make it.
-            try:
-                aff4_utils.MkDir(path)
-                continue
-            except IOError as e:
-                LOGGER.error(
-                    "Unable to create intermediate directory: %s", e)
-                raise
-
     def LoadFromURN(self):
         flags = "rb"
 
@@ -80,22 +52,16 @@ class FileBackedObject(aff4.AFF4Stream):
         if not filename:
             raise IOError("Unable to find storage for %s" % self.urn)
 
-        directory_components = os.sep.split(filename)
-        directory_components.pop(-1)
-
         if self.mode is not None:
             if self.mode == "truncate":
                 flags = "w+b"
                 self.properties.writable = True
-                self._CreateIntermediateDirectories(directory_components)
             elif self.mode == "append":
                 flags = "a+b"
                 self.properties.writable = True
-                self._CreateIntermediateDirectories(directory_components)
             elif self.mode == "random":
                 flags = "r+b"
                 self.properties.writable = True
-                self._CreateIntermediateDirectories(directory_components)
 
         if LOGGER.isEnabledFor(logging.INFO):
             LOGGER.info("Opening file %s", filename)

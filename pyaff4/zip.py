@@ -137,8 +137,8 @@ class ZipFileHeader(struct_parser.CreateStruct(
         uint16_t lastmodtime;
         uint16_t lastmoddate;
         uint32_t crc32;
-        int32_t compress_size;
-        int32_t file_size;
+        uint32_t compress_size;
+        uint32_t file_size;
         uint16_t file_name_length;
         uint16_t extra_field_len = 0;
         """)):
@@ -175,7 +175,7 @@ class Zip64FileHeaderExtensibleField:
 
     def Pack(self):
         # Size of extra less the header.
-        self.data_size = self.sizeof()
+        self.Set("data_size", self.sizeof() - 4)
         return struct.pack(self.format_string(),
                            *[v for t, _, v in self.fields if v is not None])
 
@@ -317,25 +317,20 @@ class ZipInfo:
         if USE_UNICODE:
             header.flags = header.flags | (1 << 11)
 
+        # The header is written before the member's data, when its size is not yet known, and
+        # rewritten in place afterwards, so it always reserves the Zip64 field: adding it on the
+        # rewrite would overwrite the start of the data.
+        header.file_size = 0xFFFFFFFF
+        header.compress_size = 0xFFFFFFFF
         extra_header_64 = Zip64FileHeaderExtensibleField()
-        if self.file_size > ZIP32_MAX_SIZE:
-            header.file_size = 0xFFFFFFFF
-            extra_header_64.Set("file_size", self.file_size)
-
-        if self.compress_size > ZIP32_MAX_SIZE:
-            header.compress_size = 0xFFFFFFFF
-            extra_header_64.Set("compress_size", self.compress_size)
-
-        # Only write the extra header if we have to.
-        if not extra_header_64.empty():
-            header.extra_field_len = extra_header_64.sizeof()
+        extra_header_64.Set("file_size", self.file_size)
+        extra_header_64.Set("compress_size", self.compress_size)
+        header.extra_field_len = extra_header_64.sizeof()
 
         backing_store.SeekWrite(self.file_header_offset)
         backing_store.Write(header.Pack())
         backing_store.write(encodedFilename)
-
-        if not extra_header_64.empty():
-            backing_store.Write(extra_header_64.Pack())
+        backing_store.Write(extra_header_64.Pack())
 
     def WriteCDFileHeader(self, backing_store):
         encodedFilename = self.filename
@@ -1030,6 +1025,9 @@ class BasicZipFile(aff4.AFF4Volume):
           compression_method: How to compress the member.
 
         """
+        if compression_method not in (ZIP_DEFLATE, ZIP_STORED):
+            raise RuntimeError(
+                f"Unsupported compression method {compression_method!r} for {segment_name}")
         if progress is None:
             progress = aff4.EMPTY_PROGRESS
 
@@ -1080,8 +1078,8 @@ class BasicZipFile(aff4.AFF4Volume):
                 zip_info.compress_size += len(c_data)
                 backing_store.Write(c_data)
 
-            # Just write the data directly. We allow usage of the AFF4 store synonym for simplicity
-            elif compression_method == ZIP_STORED or lexicon.AFF4_IMAGE_COMPRESSION_STORED:
+            # Just write the data directly.
+            elif compression_method == ZIP_STORED:
                 zip_info.compression_method = ZIP_STORED
                 while True:
                     data = stream.read(BUFF_SIZE)
@@ -1094,8 +1092,6 @@ class BasicZipFile(aff4.AFF4Volume):
                     zip_info.crc32 = zlib.crc32(data, zip_info.crc32) & 0xffffffff
                     progress.Report(zip_info.file_size)
                     backing_store.Write(data)
-            else:
-                raise RuntimeError("Unsupported compression method")
 
             if LOGGER.isEnabledFor(logging.INFO):
                 LOGGER.info("Wrote ZIP stream @ %x[%x]", start_of_stream_addr, zip_info.compress_size)

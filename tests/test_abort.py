@@ -256,7 +256,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                         self.assertFalse(member_container.ContainsMember(seg_arn))
                         self.assertFalse(member_container.ContainsMember(idx_arn))
 
-        self.assertEqual(656, os.stat(self.filename).st_size)
+        self.assertEqual(796, os.stat(self.filename).st_size)
 
     #@unittest.skip
     def testAbortImageStreamWithSingleBevyThenSecondStream(self):
@@ -306,7 +306,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                 image.SeekRead(0, 0)
                 res = image.Read(7)
                 self.assertEqual(b"abcdefg", res)
-        self.assertEqual(1106, os.stat(self.filename).st_size)
+        self.assertEqual(1206, os.stat(self.filename).st_size)
 
     #@unittest.skip
     def testAbortImageStreamWithSingleBevy(self):
@@ -342,7 +342,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                         self.assertFalse(member_container.ContainsMember(seg_arn))
                         self.assertFalse(member_container.ContainsMember(idx_arn))
 
-        self.assertEqual(254, os.stat(self.filename).st_size)
+        self.assertEqual(274, os.stat(self.filename).st_size)
 
     #@unittest.skip
     def testAbortImageStreamWithSubBevyWrite(self):
@@ -378,7 +378,7 @@ class AFF4AbortImageStreamTest(unittest.TestCase):
                         self.assertFalse(member_container.ContainsMember(seg_arn))
                         self.assertFalse(member_container.ContainsMember(idx_arn))
 
-        self.assertEqual(254, os.stat(self.filename).st_size)
+        self.assertEqual(274, os.stat(self.filename).st_size)
 
     #@unittest.skip
     def testCreateAndReadSingleImageStreamLogicalPush(self):

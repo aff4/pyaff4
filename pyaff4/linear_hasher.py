@@ -17,6 +17,7 @@ import io
 
 from rdflib import Literal
 
+from pyaff4 import aff4
 from pyaff4 import block_hasher
 from pyaff4 import container
 from pyaff4 import data_store
@@ -86,30 +87,6 @@ class LinearHasher:
 
     def doHash(self, mapURI, hashDataType):
         hash = hashes.new(hashDataType)
-        if not self.isMap(mapURI):
-            import pdb; pdb.set_trace()
-
-        if self.isMap(mapURI):
-            with self.resolver.AFF4FactoryOpen(mapURI) as mapStream:
-                remaining = mapStream.Size()
-                count = 0
-                while remaining > 0:
-                    toRead = min(32*1024, remaining)
-                    data = mapStream.Read(toRead)
-                    assert len(data) == toRead
-                    remaining -= len(data)
-                    hash.update(data)
-                    count = count + 1
-
-                b = hash.hexdigest()
-                #return hashes.newImmutableHash(b, hashDataType)
-                return Literal(b, datatype=hashDataType)
-        raise Exception("IllegalState")
-
-    def doHash(self, mapURI, hashDataType):
-        hash = hashes.new(hashDataType)
-        # if not self.isMap(mapURI):
-        #     import pdb; pdb.set_trace()
 
         if self.isMap(mapURI):
             with self.resolver.AFF4FactoryOpen(mapURI) as mapStream:
@@ -165,13 +142,13 @@ class LinearHasher2:
         self.delegate = None
         self.resolver = resolver
 
-    def hash(self, image):
+    def hash(self, image, progress=None):
 
         storedHashes = list(self.resolver.QuerySubjectPredicate(image.container.urn, image.urn, lexicon.standard.hash))
         with self.resolver.AFF4FactoryOpen(image.urn, version=image.container.version) as stream:
             datatypes = [h.datatype for h in storedHashes]
             stream2 = StreamHasher(stream, datatypes)
-            self.readall2(stream2)
+            self.readall2(stream2, progress=progress)
             for storedHash in storedHashes:
                 dt = storedHash.datatype
                 shortHashAlgoName = hashes.shortName(dt)
@@ -183,13 +160,18 @@ class LinearHasher2:
                     self.listener.onInvalidHash(shortHashAlgoName, storedHashHexDigest, calculatedHashHexDigest, image.urn)
 
 
-    def readall2(self, stream):
+    def readall2(self, stream, progress=None):
+        if progress is None:
+            progress = aff4.EMPTY_PROGRESS
+        total_read = 0
         while True:
             toRead = 32 * 1024
             data = stream.read(toRead)
             if data is None or len(data) == 0:
                 # EOF
                 return
+            total_read += len(data)
+            progress.Report(total_read)
 
 
 class StreamHasher:

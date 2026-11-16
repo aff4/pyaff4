@@ -25,7 +25,6 @@ dependencies = [
     "intervaltree == 3.1.0",
     "pyyaml >= 6.0.1",
     "tzlocal",
-    "pytz",
     "html5lib == 1.1",
     "python-dateutil == 2.8.2",
     "fastcdc == 1.7.0",
@@ -46,9 +45,6 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-
-[project.optional-dependencies]
-cloud = ["google-api-python-client"]
 
 [project.scripts]
 aff4 = "pyaff4.cli:main"

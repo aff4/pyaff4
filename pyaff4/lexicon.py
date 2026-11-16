@@ -74,9 +74,6 @@ AFF4_ZIP_TYPE = URIRef(AFF4_NAMESPACE + "zip_volume")
 AFF4_STREAM_SIZE = URIRef(AFF4_NAMESPACE + "size")
 AFF4_LEGACY_STREAM_SIZE = URIRef(AFF4_LEGACY_NAMESPACE + "size")
 
-# The original filename the stream had.
-AFF4_STREAM_ORIGINAL_FILENAME = (AFF4_NAMESPACE + "original_filename")
-
 # Can be "read", "truncate", "append"
 AFF4_STREAM_WRITE_MODE = URIRef(AFF4_VOLATILE_NAMESPACE + "writable")
 

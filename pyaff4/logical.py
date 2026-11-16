@@ -15,11 +15,10 @@
 
 import os
 import platform
-from pyaff4 import lexicon, rdfvalue
+from pyaff4 import lexicon
 from rdflib import Literal, XSD
 import tzlocal
-import pytz
-from datetime import datetime
+from datetime import UTC, datetime
 from dateutil.parser import parse
 import traceback
 
@@ -33,8 +32,9 @@ class FSMetadata:
         self.urn = urn
 
     def store(self, resolver):
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.size), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, rdfvalue.URN(lexicon.name), rdfvalue.XSDInteger(self.name))
+        size = Literal(self.length, datatype=XSD.integer)
+        resolver.Set(self.urn, self.urn, lexicon.AFF4_STREAM_SIZE, size)
+        resolver.Set(self.urn, self.urn, lexicon.standard11.pathName, Literal(self.name))
 
     @staticmethod
     def createFromTarInfo(filename, tarinfo):
@@ -44,7 +44,7 @@ class FSMetadata:
         accessed = datetime.fromtimestamp(int(tarinfo.pax_headers["atime"]), local_tz)
         recordChanged = datetime.fromtimestamp(int(tarinfo.pax_headers["ctime"]), local_tz)
         # addedDate  ?? todo
-        return UnixMetadata(filename, filename, size, lastWritten, accessed, recordChanged)
+        return ClassicUnixMetadata(filename, filename, size, lastWritten, accessed, recordChanged)
 
     @staticmethod
     def createFromSFTPAttr(filename, attr):
@@ -54,7 +54,7 @@ class FSMetadata:
         accessed = datetime.fromtimestamp(attr.st_atime, local_tz)
         #recordChanged = datetime.fromtimestamp(attr.st_ctime, local_tz)
         # addedDate  ?? todo
-        return UnixMetadata(filename, filename, size, lastWritten, accessed, 0)
+        return ClassicUnixMetadata(filename, filename, size, lastWritten, accessed, 0)
 
     @staticmethod
     def create(filename):
@@ -88,6 +88,9 @@ class FSMetadata:
             sx = statx.statx(filename)
             birthTime = datetime.fromtimestamp(sx.get_btime(), local_tz)
             return LinuxFSMetadata(filename, filename, size, lastWritten, accessed, recordChanged, birthTime)
+
+        raise NotImplementedError(
+            f"Reading file system metadata is not supported on {p} ({filename})")
 
 class ClassicUnixMetadata(FSMetadata):
     def __init__(self, urn, name, size, lastWritten, lastAccessed, recordChanged):
@@ -129,10 +132,14 @@ class WindowsFSMetadata(FSMetadata):
         self.birthTime = birthTime
 
     def store(self, resolver):
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.AFF4_STREAM_SIZE), rdfvalue.XSDInteger(self.length))
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastWritten), rdfvalue.XSDDateTime(self.lastWritten))
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.lastAccessed), rdfvalue.XSDDateTime(self.lastAccessed))
-        resolver.Set(self.urn, self.urn, rdfvalue.URN(lexicon.standard11.birthTime), rdfvalue.XSDDateTime(self.birthTime))
+        size = Literal(self.length, datatype=XSD.integer)
+        resolver.Set(self.urn, self.urn, lexicon.AFF4_STREAM_SIZE, size)
+        for attribute, time in (
+            (lexicon.standard11.lastWritten, self.lastWritten),
+            (lexicon.standard11.lastAccessed, self.lastAccessed),
+            (lexicon.standard11.birthTime, self.birthTime),
+        ):
+            resolver.Set(self.urn, self.urn, attribute, Literal(time, datatype=XSD.dateTime))
 
 def resetTimestampsPosix(destFile, lastWritten, lastAccessed, recordChanged, birthTime):
     if lastWritten is None or lastAccessed is None:
@@ -151,7 +158,7 @@ def resetTimestampsNone(destFile, lastWritten, lastAccessed, recordChanged, birt
     pass
 
 resetTimestamps = resetTimestampsNone
-epoch = datetime(1970, 1, 1, tzinfo=pytz.utc)
+epoch = datetime(1970, 1, 1, tzinfo=UTC)
 
 p = platform.system()
 if p == "Darwin" or p == "Linux":

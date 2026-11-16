@@ -362,18 +362,18 @@ class WritableLogicalImageContainer(Container):
                     versionFile.Flush()
 
     # write the logical stream as a compressed block stream using the Stream API
-    def writeCompressedBlockStream(self, image_urn, filename, readstream):
+    def writeCompressedBlockStream(self, image_urn, filename, readstream, progress=None):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with aff4_image.AFF4Image.NewAFF4Image(self.resolver, volume, image_urn, self.urn) as stream:
                 stream.compression = lexicon.AFF4_IMAGE_COMPRESSION_SNAPPY
-                stream.WriteStream(readstream)
+                stream.WriteStream(readstream, progress=progress)
 
         # write the logical stream as a zip segment using the Stream API
-    def writeZipStream(self, image_urn, filename, readstream):
+    def writeZipStream(self, image_urn, filename, readstream, progress=None):
         with self.resolver.AFF4FactoryOpen(self.urn) as volume:
             with volume.CreateMember(image_urn) as streamed:
                 streamed.compression_method = zip.ZIP_DEFLATE
-                streamed.WriteStream(readstream)
+                streamed.WriteStream(readstream, progress=progress)
 
     # create a file like object for writing a logical image as a new compressed block stream
     def newCompressedBlockStream(self, image_urn, filename):
@@ -409,7 +409,7 @@ class WritableLogicalImageContainer(Container):
         self.resolver.Add(self.urn, image_urn, lexicon.standard11.pathName, Literal(filename))
         return writer
 
-    def writeLogicalStream(self, filename, readstream, length):
+    def writeLogicalStream(self, filename, readstream, length, progress=None):
         image_urn = None
         if self.isAFF4Collision(filename):
             image_urn = rdfvalue.URN("aff4://%s" % uuid.uuid4())
@@ -417,11 +417,11 @@ class WritableLogicalImageContainer(Container):
             image_urn = self.urn.Append(escaping.arnPathFragment_from_path(filename), quote=False)
 
         if length > self.maxSegmentResidentSize:
-            self.writeCompressedBlockStream(image_urn, filename, readstream)
+            self.writeCompressedBlockStream(image_urn, filename, readstream, progress=progress)
             self.resolver.Add(self.urn, image_urn, lexicon.AFF4_TYPE,
                               lexicon.AFF4_IMAGE_TYPE)
         else:
-            self.writeZipStream(image_urn, filename, readstream)
+            self.writeZipStream(image_urn, filename, readstream, progress=progress)
             self.resolver.Add(self.urn, image_urn, lexicon.AFF4_TYPE, lexicon.AFF4_ZIP_SEGMENT_IMAGE_TYPE)
 
         self.resolver.Add(self.urn, image_urn, lexicon.AFF4_TYPE, lexicon.standard11.FileImage)
@@ -598,6 +598,8 @@ class ZipMemberContainer(MemberContainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.zip = self.parent
+        if self.zip.arn_in_comment is None and len(self.zip.members) > 0:
+            self.zip.arn_in_comment = self._arn_from_description()
         if self.zip.arn_in_comment is not None:
             (arn, version, lex) = Container.identifyURNFromZip(self.zip, self.resolver)
             self.urn = rdfvalue.ARN(self.zip.arn_in_comment)
@@ -610,6 +612,15 @@ class ZipMemberContainer(MemberContainer):
         self.children = set()
         self.resolver.ObjectCache.Put(self, True)
         self.Prepare()
+
+    def _arn_from_description(self):
+        """The volume ARN from container.description, for zips written without the zip comment."""
+        if lexicon.AFF4_CONTAINER_DESCRIPTION not in self.zip.members:
+            raise OSError(
+                f"{self.zip.urn} is not an AFF4 volume: it has no volume URN in its zip comment"
+                f" or in {lexicon.AFF4_CONTAINER_DESCRIPTION}")
+        with self.zip.OpenZipSegment(lexicon.AFF4_CONTAINER_DESCRIPTION) as description:
+            return description.ReadAll().decode("utf-8").strip()
 
     def OpenMember(self, arn):
         segment_name = escaping.member_name_for_urn(arn, self.version, self.urn, use_unicode=zip.USE_UNICODE)

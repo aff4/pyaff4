@@ -18,6 +18,7 @@ import binascii
 import logging
 import lz4.block
 import struct
+import urllib.parse
 
 from expiringdict import ExpiringDict
 
@@ -528,8 +529,23 @@ class AFF4Image(aff4.AFF4Stream):
                 LOGGER.info("Loaded Bevy Index %s entries=%x", bevy_index_urn, len(result))
             return result
 
+    def _bevy_urn(self, bevy_id):
+        if self.version is not None and "AXIOMProcess" in self.version.tool:
+            return self._axiom_bevy_urn(bevy_id)
+        return self.urn.Append(f"{bevy_id:08d}")
+
+    def _axiom_bevy_urn(self, bevy_id):
+        """Magnet AXIOM names an image's bevies after its original path rather than its URN."""
+        volume_urn = "/".join(str(self.urn).split("/")[0:3])
+        path_name = self.resolver.lexicon.pathName
+        original_filename = self.resolver.GetUnique(ARN(volume_urn), self.urn, path_name)
+        if original_filename is None:
+            raise OSError(f"AXIOM image {self.urn} has no {path_name}")
+        escaped = urllib.parse.quote(str(original_filename).encode("utf-8"), safe="/\\")
+        return ARN(f"{volume_urn}/{escaped}\\{bevy_id:08d}")
+
     def reloadBevy(self, bevy_id):
-        bevy_urn = self.urn.Append("%08d" % bevy_id)
+        bevy_urn = self._bevy_urn(bevy_id)
         bevy_index_urn = ARN("%s.index" % bevy_urn)
         if LOGGER.isEnabledFor(logging.INFO):
             LOGGER.info("Reload Bevy %s", bevy_urn)
@@ -640,7 +656,7 @@ class AFF4Image(aff4.AFF4Stream):
                     continue
 
             bevy_id = chunk_id // self.chunks_per_segment
-            bevy_urn = self.urn.Append("%08d" % bevy_id)
+            bevy_urn = self._bevy_urn(bevy_id)
 
             with self.resolver.AFF4FactoryOpen(bevy_urn, version=self.version) as bevy:
                 while chunks_to_read > 0:

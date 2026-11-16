@@ -14,8 +14,11 @@
 # the License.
 import os
 import io
+import struct
 import unittest
 import tempfile
+import zipfile
+from unittest import mock
 
 from pyaff4.aff4 import newARN
 from pyaff4 import data_store
@@ -121,6 +124,70 @@ class Zip64ExtraFieldTest(unittest.TestCase):
         self.assertEqual(5, first.Get("file_size"))
         self.assertIsNone(second.Get("file_size"))
         self.assertTrue(second.empty())
+
+    def testPackRecordsDataSizeLessHeader(self):
+        field = zip.Zip64FileHeaderExtensibleField()
+        field.Set("file_size", 5)
+        field.Set("compress_size", 3)
+        header_id, data_size, file_size, compress_size = struct.unpack("<HHQQ", field.Pack())
+        self.assertEqual((1, 16, 5, 3), (header_id, data_size, file_size, compress_size))
+
+
+class ZipFileHeaderTest(unittest.TestCase):
+    def testPacksSizesAtAndAbove2GiB(self):
+        for size in (2**31, 3 * 2**30, 0xFFFFFFFF):
+            with self.subTest(size=size):
+                header = zip.ZipFileHeader(
+                    crc32=0, compress_size=size, file_size=size, file_name_length=1,
+                    compression_method=zip.ZIP_STORED, lastmodtime=0, lastmoddate=0)
+                parsed = zip.ZipFileHeader(header.Pack())
+                self.assertEqual((size, size), (parsed.file_size, parsed.compress_size))
+
+
+class StreamedMemberTest(unittest.TestCase):
+    def setUp(self):
+        self.filename = os.path.join(tempfile.mkdtemp(), "zip64.zip")
+        self.filename_urn = rdfvalue.URN.FromFileName(self.filename)
+        self.data = bytes(range(256)) * 4
+
+    def tearDown(self):
+        os.unlink(self.filename)
+        os.rmdir(os.path.dirname(self.filename))
+
+    def testMemberPastZip32LimitRoundTrips(self):
+        # Lower the limit so that a small member needs the Zip64 fields.
+        with mock.patch.object(zip, "ZIP32_MAX_SIZE", 64):
+            with data_store.MemoryDataStore() as resolver:
+                with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn,
+                                            appendmode="truncate") as zip_file:
+                    with zip_file.CreateZipSegment("member.bin") as segment:
+                        segment.compression_method = zip.ZIP_STORED
+                        segment.WriteStream(io.BytesIO(self.data))
+
+            with data_store.MemoryDataStore() as resolver:
+                with zip.ZipFile.NewZipFile(resolver, version.aff4v10,
+                                            self.filename_urn) as zip_file:
+                    with zip_file.OpenZipSegment("member.bin") as segment:
+                        self.assertEqual(self.data, segment.Read(len(self.data) + 1))
+
+        with zipfile.ZipFile(self.filename) as other_reader:
+            self.assertIsNone(other_reader.testzip())
+            self.assertEqual(self.data, other_reader.read("member.bin"))
+
+    def testUnsupportedCompressionWritesNothing(self):
+        with data_store.MemoryDataStore() as resolver:
+            with zip.ZipFile.NewZipFile(resolver, version.aff4v10, self.filename_urn,
+                                        appendmode="truncate") as zip_file:
+                with zip_file.CreateZipSegment("kept.bin") as segment:
+                    segment.WriteStream(io.BytesIO(self.data))
+                with self.assertRaisesRegex(RuntimeError, "Unsupported compression method 99"):
+                    zip_file.StreamAddSegment("rejected.bin", io.BytesIO(self.data),
+                                              compression_method=99)
+
+        with zipfile.ZipFile(self.filename) as other_reader:
+            self.assertIsNone(other_reader.testzip())
+            self.assertNotIn("rejected.bin", other_reader.namelist())
+            self.assertEqual(self.data, other_reader.read("kept.bin"))
 
 
 if __name__ == '__main__':
