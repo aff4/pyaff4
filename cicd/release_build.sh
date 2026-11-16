@@ -15,9 +15,6 @@ ART="$PKG/build/release-artifacts"
 mkdir -p "$ART"
 exec > >(tee "$ART/release-build-$(uname -m).log") 2>&1
 
-# Pinned build toolchain.
-TOOLS=(numpy==2.5.3 crc32c==2.9.post0 cython==3.3.0 setuptools==84.0.0 ziglang==0.16.0
-  abi3audit==0.0.26 auditwheel==6.8.2 macholib==1.16.4)
 TEST_PYTHONS=(3.12 3.13 3.14)
 
 step() { echo "== $(date -u +%H:%M:%S) $*"; }
@@ -32,7 +29,10 @@ step "host: $(uname -srm)"
 uv python install -q "${TEST_PYTHONS[@]}"
 VENV="$PKG/build/tools-venv"
 uv venv -q --clear --python 3.12 "$VENV"
-uv pip install -q --python "$VENV/bin/python" "${TOOLS[@]}"
+# The build toolchain is the `release` dependency group, at the versions and hashes in uv.lock.
+TOOLS_TXT="$PKG/build/release-tools.txt"
+uv export -q --project "$PKG" --frozen --only-group release -o "$TOOLS_TXT"
+uv pip install -q --python "$VENV/bin/python" --require-hashes -r "$TOOLS_TXT"
 PY="$VENV/bin/python"
 VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$PKG/pyproject.toml")"
 echo "pyaff4 $VERSION"
@@ -48,6 +48,8 @@ uv build -q --sdist --out-dir "$PKG/dist" "$PKG"
 ls -l "$PKG/dist"
 
 step "audits"
+# The checks PyPI's upload action runs, so bad metadata fails here rather than at publish.
+"$PY" -m twine check --strict "$PKG"/dist/*
 "$PY" -m abi3audit --strict --summary "$PKG"/dist/*abi3*.whl
 for whl in "$PKG"/dist/*manylinux*.whl; do
   "$PY" -m auditwheel show "$whl"

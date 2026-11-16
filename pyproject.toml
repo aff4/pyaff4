@@ -59,6 +59,19 @@ dev = [
     "ty",
     "pip-audit",
 ]
+# Toolchain for cicd/release_build.sh, installed from uv.lock. numpy, crc32c and cython follow the
+# runtime lock; the rest are pinned so a relock doesn't change the toolchain.
+release = [
+    "numpy",
+    "crc32c",
+    "cython",
+    "setuptools==84.0.0",
+    "ziglang==0.16.0",
+    "abi3audit==0.0.26",
+    "auditwheel==6.8.2",
+    "macholib==1.16.4",
+    "twine==7.0.0",
+]
 
 [tool.setuptools]
 packages = ["pyaff4", "pyaff4.cli", "rdflib_hdt_ng", "pyhdt2_cython"]
