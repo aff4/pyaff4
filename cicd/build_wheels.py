@@ -53,13 +53,15 @@ ZIP_DATE = (2026, 1, 1, 0, 0, 0)
 
 def metadata(project: dict) -> str:
     extras = project.get("optional-dependencies", {})
+    # Author-email may appear only once, so all authors share one field.
+    authors = ", ".join(f"{a['name']} <{a['email']}>" for a in project["authors"])
     lines = [
         "Metadata-Version: 2.4",
         f"Name: {project['name']}",
         f"Version: {project['version']}",
         f"Summary: {project['description']}",
         *([f"Keywords: {','.join(project['keywords'])}"] if "keywords" in project else []),
-        *(f"Author-email: {a['name']} <{a['email']}>" for a in project["authors"]),
+        f"Author-email: {authors}",
         f"License-Expression: {project['license']}",
         *(f"License-File: {f}" for f in project["license-files"]),
         *(f"Classifier: {c}" for c in project["classifiers"]),
