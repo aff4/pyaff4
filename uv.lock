@@ -1124,7 +1124,7 @@ wheels = [
 
 [[package]]
 name = "pyaff4"
-version = "2.0.0a20"
+version = "2.0.0a21"
 source = { editable = "." }
 dependencies = [
     { name = "crc32c" },

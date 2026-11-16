@@ -11,7 +11,7 @@ authors = [
     { name = "Michael Cohen", email = "scudette@gmail.com" },
     { name = "Bradley Schatz", email = "blschatz@apple.com" },
 ]
-version = "2.0.0a20"
+version = "2.0.0a21"
 requires-python = ">=3.12"
 # Cython is a runtime dependency: the HDT kernels (pyhdt2_cython._kernels) are Cython pure-Python
 # mode, and the interpreted fallback (py312-none-any wheel) imports `cython` for its type
