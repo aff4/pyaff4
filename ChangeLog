@@ -1,3 +1,11 @@
+--v2.0.0a20
++ Python 3.12 or later, removes Python 2 compatibility, and builds with uv.
++ Ships as cp312-abi3 wheels for Linux, macOS and Windows on x86_64 and arm64, plus a pure-Python fallback wheel.
++ Container metadata can now also be stored as HDT for accelerated loading and RDF scaling.
++ Fixes double open of ZIP containers on load.
++ Rdflib 7 replaces the custom RDF model.
++ API changes in ways that break 0.x code - see the README for a summary.
++ The aff4 cli adds an ls [-l] command for exploring logical images.
 --v.037
 + HDT support for RDF infomodel
 + Use rdflib as datastore, rather than parallel RDF store
