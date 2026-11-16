@@ -80,7 +80,8 @@ for ver in "${TEST_PYTHONS[@]}"; do
   TV="/tmp/pyaff4-install-$ver"
   uv venv -q --clear --python "$ver" "$TV"
   uv pip install -q --python "$TV/bin/python" "${HOST_WHL[0]}"
-  "$TV/bin/python" - "$NATIVE_SO" <<'PY'
+  # -I keeps the working directory (this source tree, with uncompiled kernels) off sys.path.
+  "$TV/bin/python" -I - "$NATIVE_SO" <<'PY'
 import hashlib
 import sys
 from pathlib import Path
