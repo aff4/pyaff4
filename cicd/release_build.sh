@@ -68,8 +68,8 @@ step "HDT engine unit tests, interpreted kernels (source tree)"
   "$PY" -W error -m unittest discover -s tests/test_pyhdt2_cython -t .)
 
 NATIVE_SO="$PKG/build/cross/linux-$(uname -m)/pyhdt2_cython/_kernels.abi3.so"
-# Install this host's wheel by path: resolving by name lets uv fall back to the py312-none-any
-# wheel, and the index may already hold the same version.
+# Install this host's wheel by path, with its dependencies from the index. Requesting pyaff4 by name
+# would let uv pick the py312-none-any wheel, or the same version from the index.
 HOST_WHL=("$PKG"/dist/pyaff4-"$VERSION"-cp312-abi3-manylinux*_"$(uname -m)".whl)
 if [[ ${#HOST_WHL[@]} -ne 1 || ! -f ${HOST_WHL[0]} ]]; then
   echo "expected one manylinux $(uname -m) wheel in dist/, found: ${HOST_WHL[*]}" >&2
@@ -79,9 +79,7 @@ for ver in "${TEST_PYTHONS[@]}"; do
   step "install test: Python $ver"
   TV="/tmp/pyaff4-install-$ver"
   uv venv -q --clear --python "$ver" "$TV"
-  uv pip install -q --python "$TV/bin/python" --no-deps "${HOST_WHL[0]}"
-  # Its dependencies, from the index; the installed wheel already satisfies pyaff4 itself.
-  uv pip install -q --python "$TV/bin/python" "pyaff4==$VERSION"
+  uv pip install -q --python "$TV/bin/python" "${HOST_WHL[0]}"
   "$TV/bin/python" - "$NATIVE_SO" <<'PY'
 import hashlib
 import sys
