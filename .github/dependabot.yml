@@ -9,6 +9,10 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    ignore:
+      # cryptography 49+ publishes no macOS x86_64 wheels, so Intel Macs would build it from source.
+      - dependency-name: cryptography
+        versions: [">=49"]
 
   - package-ecosystem: github-actions
     directory: /
