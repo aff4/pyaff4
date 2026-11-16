@@ -14,7 +14,9 @@ from rdflib_hdt_ng import HdtStore
 
 with open("graph.hdt", "rb") as f:
     g = rdflib.Graph(HdtStore(f.read()))
-for s, p, o in g.triples((None, URIRef("http://example.org/vocab#label"), Literal("Alpha", lang="en"))):
+for s, p, o in g.triples(
+    (None, URIRef("http://example.org/vocab#label"), Literal("Alpha", lang="en"))
+):
     print(s)
 ```
 
