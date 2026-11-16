@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80,<90", "cython>=3.1,<4"]
+requires = ["setuptools<90,>=80", "cython>=3.1,<4"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -65,7 +65,7 @@ release = [
     "numpy",
     "crc32c",
     "cython",
-    "setuptools==84.0.0",
+    "setuptools==84.1.0",
     "ziglang==0.16.0",
     "abi3audit==0.0.26",
     "auditwheel==6.8.2",
